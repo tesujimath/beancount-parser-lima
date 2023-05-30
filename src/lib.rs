@@ -1,14 +1,8 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use chrono::NaiveDate;
+use nom::{bytes::complete::take, combinator::map_res, IResult};
+
+pub fn date(i: &str) -> IResult<&str, NaiveDate> {
+    map_res(take(10usize), |s| NaiveDate::parse_from_str(s, "%Y-%m-%d"))(i)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+mod tests;
