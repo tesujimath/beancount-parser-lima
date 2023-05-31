@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use nom::{
     branch::alt,
     bytes::complete::take_while_m_n,
-    character::complete::{anychar, none_of},
+    character::complete::{anychar, none_of, one_of},
     combinator::{map, map_res, recognize},
     multi::many0_count,
     sequence::{delimited, tuple},
@@ -38,16 +38,20 @@ impl Display for ParseError {
 impl Error for ParseError {}
 
 pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
+    fn date_sep(i: &str) -> IResult<&str, (), ErrorTree<&str>> {
+        one_of("-/")(i).map(|(s, _)| (s, ()))
+    }
+
     let (i, year) = map_res(
         take_while_m_n(4, 4, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<i32>(),
     )(i0)?;
-    let (i, _) = tag("-")(i)?;
+    let (i, _) = date_sep(i)?;
     let (i, month) = map_res(
         take_while_m_n(2, 2, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<u32>(),
     )(i)?;
-    let (i, _) = tag("-")(i)?;
+    let (i, _) = date_sep(i)?;
     let (i, day) = map_res(
         take_while_m_n(2, 2, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<u32>(),
