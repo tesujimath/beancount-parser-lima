@@ -3,10 +3,15 @@ use super::*;
 use test_case::test_case;
 
 #[test_case("2023-03-23", Some(("", 2023, 3, 23)))]
+#[test_case("2023-3-2", Some(("", 2023, 3, 2)))]
 #[test_case("2023/03/24", Some(("", 2023, 3, 24)))]
 #[test_case("2023/03-25", Some(("", 2023, 3, 25)))]
-#[test_case("2023-04-011", Some(("1", 2023, 4, 1)))]
+#[test_case("002023-0004-0000011x", Some(("x", 2023, 4, 11)))]
+#[test_case("23-03-01", None)]
+#[test_case("123-03-01", None)]
 #[test_case("2023-03-99", None)]
+#[test_case("2023-13-01", None)]
+#[test_case("2023-12-101", None)]
 #[test_case("2023_04-01", None)]
 #[test_case("freddyfish", None)]
 fn test_date(s: &str, expected: Option<(&str, i32, u32, u32)>) {

@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use nom::{
     branch::alt,
-    bytes::complete::take_while_m_n,
+    bytes::complete::take_while1,
     character::complete::{anychar, none_of, one_of},
     combinator::{map, map_res, recognize},
     multi::many0_count,
@@ -19,6 +19,7 @@ use std::{
 
 #[derive(Debug)]
 enum ParseErrorReason {
+    DateMissingCentury,
     DateOutOfRange,
 }
 
@@ -27,9 +28,19 @@ pub struct ParseError {
     reason: ParseErrorReason,
 }
 
+impl ParseError {
+    fn nom_error(location: &str, reason: ParseErrorReason) -> nom::Err<ErrorTree<&str>> {
+        nom::Err::Error(ErrorTree::Base {
+            location,
+            kind: BaseErrorKind::External(Box::new(ParseError { reason })),
+        })
+    }
+}
+
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.reason {
+            ParseErrorReason::DateMissingCentury => write!(f, "date requires century"),
             ParseErrorReason::DateOutOfRange => write!(f, "date out of range"),
         }
     }
@@ -42,30 +53,27 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
         one_of("-/")(i).map(|(s, _)| (s, ()))
     }
 
-    let (i, year) = map_res(
-        take_while_m_n(4, 4, |c: char| c.is_ascii_digit()),
-        |s: &str| s.parse::<i32>(),
-    )(i0)?;
+    let (i, (year, year_len)) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+        s.parse::<i32>().map(|y| (y, s.len()))
+    })(i0)?;
+    if year_len < 4 {
+        return Err(ParseError::nom_error(
+            i0,
+            ParseErrorReason::DateMissingCentury,
+        ));
+    }
     let (i, _) = date_sep(i)?;
-    let (i, month) = map_res(
-        take_while_m_n(2, 2, |c: char| c.is_ascii_digit()),
-        |s: &str| s.parse::<u32>(),
-    )(i)?;
+    let (i, month) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+        s.parse::<u32>()
+    })(i)?;
     let (i, _) = date_sep(i)?;
-    let (i, day) = map_res(
-        take_while_m_n(2, 2, |c: char| c.is_ascii_digit()),
-        |s: &str| s.parse::<u32>(),
-    )(i)?;
+    let (i, day) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+        s.parse::<u32>()
+    })(i)?;
 
     match NaiveDate::from_ymd_opt(year, month, day) {
         Some(d) => Ok((i, d)),
-        // TODO build this via helper
-        None => Err(nom::Err::Error(ErrorTree::Base {
-            location: i0,
-            kind: BaseErrorKind::External(Box::new(ParseError {
-                reason: ParseErrorReason::DateOutOfRange,
-            })),
-        })), //None => Err(parse_error(i, ParseErrorReason::DateOutOfRange)),
+        None => Err(ParseError::nom_error(i0, ParseErrorReason::DateOutOfRange)),
     }
 }
 
