@@ -15,6 +15,32 @@ pub enum Flag {
     Letter(UppercaseAsciiChar),
 }
 
+impl Default for Flag {
+    fn default() -> Self {
+        Flag::Asterisk
+    }
+}
+
+impl Display for Flag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Flag::*;
+        let (prefix, c) = match self {
+            Asterisk => (None, '*'),
+            Exclamation => (None, '!'),
+            Ampersand => (None, '&'),
+            Hash => (None, '#'),
+            Question => (None, '?'),
+            Percent => (None, '%'),
+            Letter(UppercaseAsciiChar(c)) => (Some('\''), *c),
+        };
+
+        match prefix {
+            Some(prefix) => write!(f, "{}{}", prefix, c),
+            None => write!(f, "{}", c),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct UppercaseAsciiChar(char);
 
