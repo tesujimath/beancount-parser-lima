@@ -1,12 +1,7 @@
 use chrono::NaiveDate;
-use nom::{
-    bytes::complete::{take, take_while_m_n},
-    combinator::map_res,
-    IResult,
-};
+use nom::{bytes::complete::take_while_m_n, combinator::map_res, IResult};
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree},
-    final_parser::final_parser,
     tag::complete::tag,
 };
 use std::{
@@ -60,27 +55,6 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
             })),
         })), //None => Err(parse_error(i, ParseErrorReason::DateOutOfRange)),
     }
-}
-
-pub fn date2(i: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
-    // this isn't as good, as we lean too heavily on parse_from_str
-    map_res(take(10usize), |s| NaiveDate::parse_from_str(s, "%Y-%m-%d"))(i)
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct Doc {
-    d1: NaiveDate,
-    d2: NaiveDate,
-}
-
-pub fn doc(i: &str) -> IResult<&str, Doc, ErrorTree<&str>> {
-    let (i, d1) = date(i)?;
-    let (i, d2) = date(i)?;
-    Ok((i, Doc { d1, d2 }))
-}
-
-pub fn final_doc(i: &str) -> Result<Doc, ()> {
-    final_parser(doc)(i)
 }
 
 mod tests;
