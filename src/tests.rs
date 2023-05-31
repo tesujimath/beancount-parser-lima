@@ -48,3 +48,15 @@ fn test_final_doc(s: &str, expected: Result<Doc, ()>) {
     assert_eq!(final_doc(s), expected);
 }
 */
+
+// TODO test txn and flag
+
+#[test_case("\"hello world\"", "hello world")]
+#[test_case("\"hello \t world\"", "hello \t world")]
+fn test_string(s: &str, expected: &str) {
+    if let Ok((_, actual)) = string(s) {
+        assert_eq!(actual, expected)
+    } else {
+        panic!("failed")
+    }
+}

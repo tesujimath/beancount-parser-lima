@@ -2,9 +2,10 @@ use chrono::NaiveDate;
 use nom::{
     branch::alt,
     bytes::complete::take_while_m_n,
-    character::complete::anychar,
-    combinator::{map, map_res},
-    sequence::tuple,
+    character::complete::{anychar, none_of},
+    combinator::{map, map_res, recognize},
+    multi::many0_count,
+    sequence::{delimited, tuple},
     IResult,
 };
 use nom_supreme::{
@@ -119,6 +120,10 @@ pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
         map(tag("*"), |_| Flag::Asterisk),
         flag,
     ))(i)
+}
+
+pub fn string(i: &str) -> IResult<&str, &str, ErrorTree<&str>> {
+    delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\""))(i)
 }
 
 mod tests;
