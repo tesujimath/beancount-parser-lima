@@ -4,8 +4,9 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub enum Flag {
+    #[default]
     Asterisk,
     Exclamation,
     Ampersand,
@@ -13,12 +14,6 @@ pub enum Flag {
     Question,
     Percent,
     Letter(UppercaseAsciiChar),
-}
-
-impl Default for Flag {
-    fn default() -> Self {
-        Flag::Asterisk
-    }
 }
 
 impl Display for Flag {
