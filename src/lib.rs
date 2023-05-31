@@ -1,5 +1,12 @@
 use chrono::NaiveDate;
-use nom::{bytes::complete::take_while_m_n, combinator::map_res, IResult};
+use nom::{
+    branch::alt,
+    bytes::complete::take_while_m_n,
+    character::complete::anychar,
+    combinator::{map, map_res},
+    sequence::tuple,
+    IResult,
+};
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree},
     tag::complete::tag,
@@ -55,6 +62,63 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
             })),
         })), //None => Err(parse_error(i, ParseErrorReason::DateOutOfRange)),
     }
+}
+
+#[derive(Debug)]
+pub struct UppercaseAsciiChar(char);
+
+#[derive(Debug)]
+pub struct UppercaseAsciiCharError;
+
+impl Display for UppercaseAsciiCharError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "not uppercase ASCII")
+    }
+}
+
+impl Error for UppercaseAsciiCharError {}
+
+impl TryFrom<char> for UppercaseAsciiChar {
+    type Error = UppercaseAsciiCharError;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        if c.is_ascii_uppercase() {
+            Ok(UppercaseAsciiChar(c))
+        } else {
+            Err(UppercaseAsciiCharError)
+        }
+    }
+}
+
+pub enum Flag {
+    Asterisk,
+    Exclamation,
+    Ampersand,
+    Hash,
+    Question,
+    Percent,
+    Letter(UppercaseAsciiChar),
+}
+
+pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
+    alt((
+        map(tag("!"), |_| Flag::Exclamation),
+        map(tag("&"), |_| Flag::Exclamation),
+        map(tag("#"), |_| Flag::Hash),
+        map(tag("?"), |_| Flag::Question),
+        map(tag("%"), |_| Flag::Percent),
+        map_res(tuple((tag("'"), anychar)), |(_, c)| {
+            UppercaseAsciiChar::try_from(c).map(Flag::Letter)
+        }),
+    ))(i)
+}
+
+pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
+    alt((
+        map(tag("txn"), |_| Flag::Asterisk),
+        map(tag("*"), |_| Flag::Asterisk),
+        flag,
+    ))(i)
 }
 
 mod tests;
