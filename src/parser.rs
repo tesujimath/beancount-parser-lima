@@ -1,12 +1,15 @@
 // TODO remove suppression for dead code warning
 #![allow(dead_code)]
 
+use std::iter::once;
+
 use super::*;
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, take_while1},
-    character::complete::{anychar, one_of},
-    combinator::{map, map_res, value},
+    character::complete::{anychar, one_of, space0},
+    combinator::{map, map_res, opt, value},
+    multi::many0,
     sequence::{delimited, tuple},
     IResult,
 };
@@ -88,6 +91,7 @@ pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     ))(i)
 }
 
+/// Matches the `txn` keyword or a flag.
 pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     alt((
         map(tag("txn"), |_| Flag::Asterisk),
@@ -96,6 +100,15 @@ pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     ))(i)
 }
 
+/// Matches zero or more quoted strings, optionally separated by whitespace.
+pub fn txn_strings(i: &str) -> IResult<&str, Vec<String>, ErrorTree<&str>> {
+    match opt(tuple((string, many0(tuple((space0, string))))))(i)? {
+        (i, Some((s1, v))) => Ok((i, once(s1).chain(v.into_iter().map(|(_, s)| s)).collect())),
+        (i, None) => Ok((i, Vec::new())),
+    }
+}
+
+/// Matches a quoted string supporting embedded newlines and character escapes for `\\`, `\"`, `\n`, `\t`.
 pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
     fn string_content(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
         escaped_transform(
@@ -105,6 +118,7 @@ pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
                 value("\\", tag("\\")),
                 value("\"", tag("\"")),
                 value("\n", tag("n")),
+                value("\t", tag("t")),
             )),
         )(i)
     }

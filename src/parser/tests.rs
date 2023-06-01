@@ -28,8 +28,21 @@ fn test_date(s: &str, expected: Option<(&str, i32, u32, u32)>) {
 
 // TODO test txn and flag
 
+#[test_case(r#""a" "b" "c"X"#, vec!["a", "b", "c"], "X")]
+#[test_case(r#""d"   "e""f"X"#, vec!["d", "e", "f"], "X")]
+fn test_txn_strings(s: &str, expected: Vec<&str>, expected_loc: &str) {
+    match txn_strings(s) {
+        Ok((loc, actual)) => {
+            assert_eq!(actual, expected);
+            assert_eq!(loc, expected_loc);
+        }
+        e => panic!("failed with {:?}", e),
+    }
+}
+
 #[test_case("\"hello world\"\"", "hello world", "\"")]
-#[test_case("\"hello \t world\" ", "hello \t world", " ")]
+#[test_case("\"hello \\t world\" ", "hello \t world", " ")]
+#[test_case("\"hello newline\\nworld\" ", "hello newline\nworld", " ")]
 #[test_case("\"hello quoted \\\"world\\\"\" ", "hello quoted \"world\"", " ")]
 #[test_case(
     r#""hello multiline quoted \"world\"
