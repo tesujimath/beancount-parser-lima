@@ -1,5 +1,6 @@
 #![cfg(test)]
 use super::*;
+use either::Either::{self, Left, Right};
 use test_case::test_case;
 
 #[test_case("2023-03-23", Some(("", 2023, 3, 23)))]
@@ -28,10 +29,34 @@ fn test_date(s: &str, expected: Option<(&str, i32, u32, u32)>) {
 
 // TODO test txn and flag
 
+#[test_case(r#"X"#, Vec::new(), "X")]
 #[test_case(r#""a" "b" "c"X"#, vec!["a", "b", "c"], "X")]
 #[test_case(r#""d"   "e""f"X"#, vec!["d", "e", "f"], "X")]
 fn test_txn_strings(s: &str, expected: Vec<&str>, expected_loc: &str) {
     match txn_strings(s) {
+        Ok((loc, actual)) => {
+            assert_eq!(actual, expected);
+            assert_eq!(loc, expected_loc);
+        }
+        e => panic!("failed with {:?}", e),
+    }
+}
+
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link="#, vec![Left(Tag::try_from("a").unwrap()), Right(Link::try_from("b").unwrap()), Left(Tag::try_from("c-is-my-tag").unwrap()), Right(Link::try_from("d.is_my/link").unwrap())], "=")]
+fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_loc: &str) {
+    match tags_links(s) {
+        Ok((loc, actual)) => {
+            assert_eq!(actual, expected);
+            assert_eq!(loc, expected_loc);
+        }
+        e => panic!("failed with {:?}", e),
+    }
+}
+
+#[test_case("#c-is-my-tag ", Left(Tag::try_from("c-is-my-tag").unwrap()), " ")]
+#[test_case("^d.is_my/link ", Right(Link::try_from("d.is_my/link").unwrap()), " ")]
+fn test_tag_or_links(s: &str, expected: Either<Tag, Link>, expected_loc: &str) {
+    match tag_or_link(s) {
         Ok((loc, actual)) => {
             assert_eq!(actual, expected);
             assert_eq!(loc, expected_loc);

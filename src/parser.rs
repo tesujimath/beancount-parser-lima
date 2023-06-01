@@ -4,6 +4,7 @@
 use std::iter::once;
 
 use super::*;
+use either::Either;
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, take_while1},
@@ -15,7 +16,7 @@ use nom::{
 };
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree},
-    tag::complete::tag,
+    tag::complete::tag as sym, // beancount grammar has its own tag
 };
 
 #[derive(Debug)]
@@ -80,12 +81,12 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
 
 pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     alt((
-        map(tag("!"), |_| Flag::Exclamation),
-        map(tag("&"), |_| Flag::Exclamation),
-        map(tag("#"), |_| Flag::Hash),
-        map(tag("?"), |_| Flag::Question),
-        map(tag("%"), |_| Flag::Percent),
-        map_res(tuple((tag("'"), anychar)), |(_, c)| {
+        map(sym("!"), |_| Flag::Exclamation),
+        map(sym("&"), |_| Flag::Exclamation),
+        map(sym("#"), |_| Flag::Hash),
+        map(sym("?"), |_| Flag::Question),
+        map(sym("%"), |_| Flag::Percent),
+        map_res(tuple((sym("'"), anychar)), |(_, c)| {
             UppercaseAsciiChar::try_from(c).map(Flag::Letter)
         }),
     ))(i)
@@ -94,8 +95,8 @@ pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
 /// Matches the `txn` keyword or a flag.
 pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     alt((
-        map(tag("txn"), |_| Flag::Asterisk),
-        map(tag("*"), |_| Flag::Asterisk),
+        map(sym("txn"), |_| Flag::Asterisk),
+        map(sym("*"), |_| Flag::Asterisk),
         flag,
     ))(i)
 }
@@ -108,6 +109,39 @@ pub fn txn_strings(i: &str) -> IResult<&str, Vec<String>, ErrorTree<&str>> {
     }
 }
 
+/// Matches zero or more tags or links, optionally separated by whitespace.
+pub fn tags_links(i: &str) -> IResult<&str, Vec<Either<Tag, Link>>, ErrorTree<&str>> {
+    match opt(tuple((tag_or_link, many0(tuple((space0, tag_or_link))))))(i)? {
+        (i, Some((s1, v))) => Ok((i, once(s1).chain(v.into_iter().map(|(_, s)| s)).collect())),
+        (i, None) => Ok((i, Vec::new())),
+    }
+}
+
+/// Matches a tag or a link.
+pub fn tag_or_link(i: &str) -> IResult<&str, Either<Tag, Link>, ErrorTree<&str>> {
+    use Either::*;
+    alt((map(tag, Left), map(link, Right)))(i)
+}
+
+/// Matches a tag.
+pub fn tag(i: &str) -> IResult<&str, Tag, ErrorTree<&str>> {
+    let (i, _) = sym("#")(i)?;
+    map(tag_or_link_identifier, Tag::from)(i)
+}
+
+/// Matches a link.
+pub fn link(i: &str) -> IResult<&str, Link, ErrorTree<&str>> {
+    let (i, _) = sym("^")(i)?;
+    map(tag_or_link_identifier, Link::from)(i)
+}
+
+pub fn tag_or_link_identifier(i: &str) -> IResult<&str, TagOrLinkIdentifier, ErrorTree<&str>> {
+    map_res(
+        take_while1(|c: char| TagOrLinkIdentifier::is_valid_char(&c)),
+        TagOrLinkIdentifier::try_from,
+    )(i)
+}
+
 /// Matches a quoted string supporting embedded newlines and character escapes for `\\`, `\"`, `\n`, `\t`.
 pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
     fn string_content(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
@@ -115,15 +149,15 @@ pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
             take_while1(|c| c != '\\' && c != '"'),
             '\\',
             alt((
-                value("\\", tag("\\")),
-                value("\"", tag("\"")),
-                value("\n", tag("n")),
-                value("\t", tag("t")),
+                value("\\", sym("\\")),
+                value("\"", sym("\"")),
+                value("\n", sym("n")),
+                value("\t", sym("t")),
             )),
         )(i)
     }
 
-    delimited(tag("\""), string_content, tag("\""))(i)
+    delimited(sym("\""), string_content, sym("\""))(i)
 }
 
 mod tests;
