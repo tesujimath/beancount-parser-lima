@@ -79,11 +79,13 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
     }
 }
 
+/// Matches any flag, including asterisk or hash.
 pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     alt((
+        map(sym("*"), |_| Flag::Asterisk),
+        map(sym("#"), |_| Flag::Hash),
         map(sym("!"), |_| Flag::Exclamation),
         map(sym("&"), |_| Flag::Exclamation),
-        map(sym("#"), |_| Flag::Hash),
         map(sym("?"), |_| Flag::Question),
         map(sym("%"), |_| Flag::Percent),
         map_res(tuple((sym("'"), anychar)), |(_, c)| {
@@ -94,11 +96,7 @@ pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
 
 /// Matches the `txn` keyword or a flag.
 pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
-    alt((
-        map(sym("txn"), |_| Flag::Asterisk),
-        map(sym("*"), |_| Flag::Asterisk),
-        flag,
-    ))(i)
+    alt((map(sym("txn"), |_| Flag::Asterisk), flag))(i)
 }
 
 /// Matches zero or more quoted strings, optionally separated by whitespace.
