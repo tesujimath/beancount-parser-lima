@@ -85,6 +85,12 @@ impl TryFrom<&str> for Tag {
     }
 }
 
+impl Display for Tag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "#{}", self.0 .0)
+    }
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct Link(TagOrLinkIdentifier);
 
@@ -99,6 +105,12 @@ impl TryFrom<&str> for Link {
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         TagOrLinkIdentifier::try_from(s).map(Link)
+    }
+}
+
+impl Display for Link {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "^{}", self.0 .0)
     }
 }
 
