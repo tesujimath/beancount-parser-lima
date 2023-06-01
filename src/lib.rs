@@ -13,7 +13,7 @@ pub enum Flag {
     Hash,
     Question,
     Percent,
-    Letter(UppercaseAsciiChar),
+    Letter(FlagLetterChar),
 }
 
 impl Display for Flag {
@@ -26,7 +26,7 @@ impl Display for Flag {
             Hash => (None, '#'),
             Question => (None, '?'),
             Percent => (None, '%'),
-            Letter(UppercaseAsciiChar(c)) => (Some('\''), *c),
+            Letter(FlagLetterChar(c)) => (Some('\''), *c),
         };
 
         match prefix {
@@ -37,27 +37,33 @@ impl Display for Flag {
 }
 
 #[derive(Debug)]
-pub struct UppercaseAsciiChar(char);
+pub struct FlagLetterChar(char);
+
+impl FlagLetterChar {
+    pub fn is_valid(c: &char) -> bool {
+        c.is_ascii_uppercase()
+    }
+}
 
 #[derive(Debug)]
-pub struct UppercaseAsciiCharError;
+pub struct FlagLetterCharError;
 
-impl Display for UppercaseAsciiCharError {
+impl Display for FlagLetterCharError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "not uppercase ASCII")
     }
 }
 
-impl Error for UppercaseAsciiCharError {}
+impl Error for FlagLetterCharError {}
 
-impl TryFrom<char> for UppercaseAsciiChar {
-    type Error = UppercaseAsciiCharError;
+impl TryFrom<char> for FlagLetterChar {
+    type Error = FlagLetterCharError;
 
     fn try_from(c: char) -> Result<Self, Self::Error> {
-        if c.is_ascii_uppercase() {
-            Ok(UppercaseAsciiChar(c))
+        if FlagLetterChar::is_valid(&c) {
+            Ok(FlagLetterChar(c))
         } else {
-            Err(UppercaseAsciiCharError)
+            Err(FlagLetterCharError)
         }
     }
 }

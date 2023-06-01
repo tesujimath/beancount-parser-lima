@@ -87,7 +87,7 @@ pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
         map(sym("?"), |_| Flag::Question),
         map(sym("%"), |_| Flag::Percent),
         map_res(tuple((sym("'"), anychar)), |(_, c)| {
-            UppercaseAsciiChar::try_from(c).map(Flag::Letter)
+            FlagLetterChar::try_from(c).map(Flag::Letter)
         }),
     ))(i)
 }
