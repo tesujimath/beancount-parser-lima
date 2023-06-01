@@ -3,6 +3,16 @@ use std::{
     error::Error,
     fmt::{self, Display, Formatter},
 };
+use strum_macros::Display;
+
+#[derive(PartialEq, Eq, Display, Debug)]
+pub enum AccountType {
+    Assets,
+    Liabilities,
+    Equity,
+    Income,
+    Expenses,
+}
 
 #[derive(PartialEq, Eq, Default, Debug)]
 pub enum Flag {
