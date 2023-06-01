@@ -4,7 +4,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Default, Debug)]
+#[derive(PartialEq, Eq, Default, Debug)]
 pub enum Flag {
     #[default]
     Asterisk,
@@ -13,7 +13,7 @@ pub enum Flag {
     Hash,
     Question,
     Percent,
-    Letter(FlagLetterChar),
+    Letter(FlagLetter),
 }
 
 impl Display for Flag {
@@ -26,7 +26,7 @@ impl Display for Flag {
             Hash => (None, '#'),
             Question => (None, '?'),
             Percent => (None, '%'),
-            Letter(FlagLetterChar(c)) => (Some('\''), *c),
+            Letter(FlagLetter(c)) => (Some('\''), *c),
         };
 
         match prefix {
@@ -36,34 +36,38 @@ impl Display for Flag {
     }
 }
 
-#[derive(Debug)]
-pub struct FlagLetterChar(char);
+#[derive(PartialEq, Eq, Debug)]
+pub struct FlagLetter(char);
 
-impl FlagLetterChar {
+impl FlagLetter {
     pub fn is_valid(c: &char) -> bool {
         c.is_ascii_uppercase()
     }
 }
 
-#[derive(Debug)]
-pub struct FlagLetterCharError;
+#[derive(PartialEq, Eq, Debug)]
+pub struct FlagLetterError(char);
 
-impl Display for FlagLetterCharError {
+impl Display for FlagLetterError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "not uppercase ASCII")
+        write!(
+            f,
+            "invalid character '{}' for flag letter - must be uppercase ASCII",
+            self.0
+        )
     }
 }
 
-impl Error for FlagLetterCharError {}
+impl Error for FlagLetterError {}
 
-impl TryFrom<char> for FlagLetterChar {
-    type Error = FlagLetterCharError;
+impl TryFrom<char> for FlagLetter {
+    type Error = FlagLetterError;
 
     fn try_from(c: char) -> Result<Self, Self::Error> {
-        if FlagLetterChar::is_valid(&c) {
-            Ok(FlagLetterChar(c))
+        if FlagLetter::is_valid(&c) {
+            Ok(FlagLetter(c))
         } else {
-            Err(FlagLetterCharError)
+            Err(FlagLetterError(c))
         }
     }
 }
@@ -126,12 +130,25 @@ impl TagOrLinkIdentifier {
     }
 }
 
-#[derive(Debug)]
-pub struct TagOrLinkIdentifierError(char);
+#[derive(PartialEq, Eq, Debug)]
+pub struct TagOrLinkIdentifierError(Vec<char>);
 
 impl Display for TagOrLinkIdentifierError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid character for tag or link: '{}'", self.0)
+        write!(
+            f,
+            "invalid characters {} for tag or link identifier - must be alphanumeric or one of {}",
+            itertools::Itertools::intersperse(
+                self.0.iter().map(|c| format!("'{}'", c)),
+                ", ".to_string()
+            )
+            .collect::<String>(),
+            itertools::Itertools::intersperse(
+                TAG_OR_LINK_EXTRA_CHARS.iter().map(|c| format!("'{}'", c)),
+                ", ".to_string()
+            )
+            .collect::<String>()
+        )
     }
 }
 
@@ -141,11 +158,17 @@ impl TryFrom<&str> for TagOrLinkIdentifier {
     type Error = TagOrLinkIdentifierError;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        match s.chars().find(|c| !(TagOrLinkIdentifier::is_valid_char(c))) {
-            None => Ok(TagOrLinkIdentifier(s.to_owned())),
-            Some(bad) => Err(TagOrLinkIdentifierError(bad)),
+        let bad_chars = s
+            .chars()
+            .filter_map(|c| (!TagOrLinkIdentifier::is_valid_char(&c)).then_some(c))
+            .collect::<Vec<char>>();
+        if bad_chars.is_empty() {
+            Ok(TagOrLinkIdentifier(s.to_owned()))
+        } else {
+            Err(TagOrLinkIdentifierError(bad_chars))
         }
     }
 }
 
 mod parser;
+mod tests;
