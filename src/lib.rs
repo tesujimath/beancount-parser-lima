@@ -4,9 +4,9 @@ use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
 };
-use strum_macros::Display;
+use strum_macros::{Display, EnumString};
 
-#[derive(PartialEq, Eq, Display, Debug)]
+#[derive(PartialEq, Eq, Display, EnumString, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
