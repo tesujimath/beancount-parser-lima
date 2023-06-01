@@ -27,7 +27,7 @@
             devShells.default = mkShell {
               nativeBuildInputs = [
                 # build dependencies
-                cargo-flamegraph
+                cargo-modules
                 cargo-nightly
                 cargo-udeps
                 gcc

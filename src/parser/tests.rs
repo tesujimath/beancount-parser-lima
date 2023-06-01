@@ -30,6 +30,7 @@ fn test_date(s: &str, expected: Option<(&str, i32, u32, u32)>) {
 
 #[test_case("\"hello world\"\"", "hello world", "\"")]
 #[test_case("\"hello \t world\" ", "hello \t world", " ")]
+#[test_case("\"hello quoted \\\"world\\\"\" ", "hello quoted \"world\"", " ")]
 fn test_string(s: &str, expected: &str, expected_loc: &str) {
     match string(s) {
         Ok((loc, actual)) => {

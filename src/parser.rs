@@ -4,10 +4,9 @@
 use super::*;
 use nom::{
     branch::alt,
-    bytes::complete::take_while1,
-    character::complete::{anychar, none_of, one_of},
-    combinator::{map, map_res, recognize},
-    multi::many0_count,
+    bytes::complete::{escaped_transform, take_while1},
+    character::complete::{anychar, one_of},
+    combinator::{map, map_res, value},
     sequence::{delimited, tuple},
     IResult,
 };
@@ -97,8 +96,20 @@ pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
     ))(i)
 }
 
-pub fn string(i: &str) -> IResult<&str, &str, ErrorTree<&str>> {
-    delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\""))(i)
+pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
+    fn string_content(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
+        escaped_transform(
+            take_while1(|c| c != '\\' && c != '"'),
+            '\\',
+            alt((
+                value("\\", tag("\\")),
+                value("\"", tag("\"")),
+                value("\n", tag("n")),
+            )),
+        )(i)
+    }
+
+    delimited(tag("\""), string_content, tag("\""))(i)
 }
 
 mod tests;
