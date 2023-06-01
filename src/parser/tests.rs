@@ -42,7 +42,7 @@ fn test_txn_strings(s: &str, expected: Vec<&str>, expected_loc: &str) {
     }
 }
 
-#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link="#, vec![Left(Tag::from_str("a").unwrap()), Right(Link::from_str("b").unwrap()), Left(Tag::from_str("c-is-my-tag").unwrap()), Right(Link::from_str("d.is_my/link").unwrap())], "=")]
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link="#, vec![Left("a".parse::<Tag>().unwrap()), Right("b".parse::<Link>().unwrap()), Left("c-is-my-tag".parse::<Tag>().unwrap()), Right("d.is_my/link".parse::<Link>().unwrap())], "=")]
 fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_loc: &str) {
     match tags_links(s) {
         Ok((loc, actual)) => {
@@ -53,8 +53,8 @@ fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_loc: &str
     }
 }
 
-#[test_case("#c-is-my-tag ", Left(Tag::from_str("c-is-my-tag").unwrap()), " ")]
-#[test_case("^d.is_my/link ", Right(Link::from_str("d.is_my/link").unwrap()), " ")]
+#[test_case("#c-is-my-tag ", Left("c-is-my-tag".parse::<Tag>().unwrap()), " ")]
+#[test_case("^d.is_my/link ", Right("d.is_my/link".parse::<Link>().unwrap()), " ")]
 fn test_tag_or_links(s: &str, expected: Either<Tag, Link>, expected_loc: &str) {
     match tag_or_link(s) {
         Ok((loc, actual)) => {
