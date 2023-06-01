@@ -136,7 +136,7 @@ pub fn link(i: &str) -> IResult<&str, Link, ErrorTree<&str>> {
 pub fn tag_or_link_identifier(i: &str) -> IResult<&str, TagOrLinkIdentifier, ErrorTree<&str>> {
     map_res(
         take_while1(|c: char| TagOrLinkIdentifier::is_valid_char(&c)),
-        TagOrLinkIdentifier::try_from,
+        TagOrLinkIdentifier::from_str,
     )(i)
 }
 

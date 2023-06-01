@@ -2,6 +2,7 @@ use chrono::NaiveDate;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
+    str::FromStr,
 };
 use strum_macros::Display;
 
@@ -91,11 +92,11 @@ impl From<TagOrLinkIdentifier> for Tag {
     }
 }
 
-impl TryFrom<&str> for Tag {
-    type Error = TagOrLinkIdentifierError;
+impl FromStr for Tag {
+    type Err = TagOrLinkIdentifierError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        TagOrLinkIdentifier::try_from(s).map(Tag)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        TagOrLinkIdentifier::from_str(s).map(Tag)
     }
 }
 
@@ -114,11 +115,11 @@ impl From<TagOrLinkIdentifier> for Link {
     }
 }
 
-impl TryFrom<&str> for Link {
-    type Error = TagOrLinkIdentifierError;
+impl FromStr for Link {
+    type Err = TagOrLinkIdentifierError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        TagOrLinkIdentifier::try_from(s).map(Link)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        TagOrLinkIdentifier::from_str(s).map(Link)
     }
 }
 
@@ -164,10 +165,10 @@ impl Display for TagOrLinkIdentifierError {
 
 impl Error for TagOrLinkIdentifierError {}
 
-impl TryFrom<&str> for TagOrLinkIdentifier {
-    type Error = TagOrLinkIdentifierError;
+impl FromStr for TagOrLinkIdentifier {
+    type Err = TagOrLinkIdentifierError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bad_chars = s
             .chars()
             .filter_map(|c| (!TagOrLinkIdentifier::is_valid_char(&c)).then_some(c))
