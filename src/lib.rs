@@ -6,6 +6,55 @@ use std::{
 };
 use strum_macros::Display;
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct Account {
+    account_type: AccountType,
+    sub_accounts: Vec<SubAccount>,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct AccountError;
+
+impl Account {
+    pub fn new(
+        account_type: AccountType,
+        sub_accounts: Vec<SubAccount>,
+    ) -> Result<Account, AccountError> {
+        if sub_accounts.is_empty() {
+            Err(AccountError)
+        } else {
+            Ok(Account {
+                account_type,
+                sub_accounts,
+            })
+        }
+    }
+}
+
+impl Display for AccountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // there's only one error possible
+        write!(f, "missing subaccounts")
+    }
+}
+
+impl Error for AccountError {}
+
+impl Display for Account {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}",
+            self.account_type,
+            itertools::Itertools::intersperse(
+                self.sub_accounts.iter().map(|s| format!("{}", s)),
+                ":".to_string()
+            )
+            .collect::<String>()
+        )
+    }
+}
+
 #[derive(PartialEq, Eq, Display, Debug)]
 pub enum AccountType {
     Assets,
@@ -25,6 +74,12 @@ impl SubAccount {
 
     pub fn is_valid_subsequent(c: &char) -> bool {
         c.is_alphanumeric() || *c == '-'
+    }
+}
+
+impl Display for SubAccount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
     }
 }
 

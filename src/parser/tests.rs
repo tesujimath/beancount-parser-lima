@@ -3,6 +3,24 @@ use super::*;
 use either::Either::{self, Left, Right};
 use test_case::test_case;
 
+#[test_case("Assets:Car", Some((AccountType::Assets, vec!["Car"])))]
+#[test_case("Assets:oops", None)]
+#[test_case("Assets:Bike:oops", Some((AccountType::Assets, vec!["Bike"])))]
+fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
+    let expected = expected_raw.map(|(account_type, subs)| Account {
+        account_type,
+        sub_accounts: subs.iter().map(|sub| SubAccount(sub.to_string())).collect(),
+    });
+
+    match account(s) {
+        Ok((_, result)) => assert_eq!(result, expected.unwrap()),
+        Err(e) => {
+            println!("{:?}", e);
+            assert!(expected.is_none());
+        }
+    }
+}
+
 // TODO test txn and flag
 
 #[test_case(r#"X"#, Vec::new(), "X")]

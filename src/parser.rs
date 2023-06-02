@@ -19,6 +19,26 @@ use nom_supreme::{
     tag::complete::tag as sym, // beancount grammar has its own tag
 };
 
+/// Matches `Account`.
+pub fn account(i: &str) -> IResult<&str, Account, ErrorTree<&str>> {
+    map_res(
+        tuple((
+            account_type,
+            sym(":"),
+            sub_account,
+            many0(tuple((sym(":"), sub_account))),
+        )),
+        |(acc_type, _colon, sub, colon_sub_pairs)| {
+            Account::new(
+                acc_type,
+                once(sub)
+                    .chain(colon_sub_pairs.into_iter().map(|(_colon, sub)| sub))
+                    .collect(),
+            )
+        },
+    )(i)
+}
+
 /// Matches `AccountType`.
 pub fn account_type(i: &str) -> IResult<&str, AccountType, ErrorTree<&str>> {
     alt((
