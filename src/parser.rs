@@ -8,9 +8,9 @@ use either::Either;
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, take_while1},
-    character::complete::{anychar, one_of, space0},
-    combinator::{map, map_res, opt, value},
-    multi::many0,
+    character::complete::{anychar, one_of, satisfy, space0},
+    combinator::{map, map_res, opt, recognize, value},
+    multi::{many0, many0_count},
     sequence::{delimited, tuple},
     IResult,
 };
@@ -18,6 +18,28 @@ use nom_supreme::{
     error::{BaseErrorKind, ErrorTree},
     tag::complete::tag as sym, // beancount grammar has its own tag
 };
+
+/// Matches `AccountType`.
+pub fn account_type(i: &str) -> IResult<&str, AccountType, ErrorTree<&str>> {
+    alt((
+        map(sym("Assets"), |_| AccountType::Assets),
+        map(sym("Liabilities"), |_| AccountType::Liabilities),
+        map(sym("Equity"), |_| AccountType::Equity),
+        map(sym("Income"), |_| AccountType::Income),
+        map(sym("Expenses"), |_| AccountType::Expenses),
+    ))(i)
+}
+
+/// Matches `SubAccount`.
+pub fn sub_account(i: &str) -> IResult<&str, SubAccount, ErrorTree<&str>> {
+    map_res(
+        recognize(tuple((
+            satisfy(|c| SubAccount::is_valid_initial(&c)),
+            many0_count(satisfy(|c| SubAccount::is_valid_subsequent(&c))),
+        ))),
+        |s: &str| s.parse::<SubAccount>(),
+    )(i)
+}
 
 /// Matches the `txn` keyword or a flag.
 pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {

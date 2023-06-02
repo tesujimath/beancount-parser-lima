@@ -15,6 +15,77 @@ pub enum AccountType {
     Expenses,
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct SubAccount(String);
+
+impl SubAccount {
+    pub fn is_valid_initial(c: &char) -> bool {
+        c.is_ascii_uppercase() || c.is_ascii_digit()
+    }
+
+    pub fn is_valid_subsequent(c: &char) -> bool {
+        c.is_alphanumeric() || *c == '-'
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct SubAccountError(SubAccountErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum SubAccountErrorKind {
+    Empty,
+    Initial(char),
+    Subsequent(Vec<char>),
+}
+
+impl Display for SubAccountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use SubAccountErrorKind::*;
+        match &self.0 {
+            Empty => write!(f, "empty subaccount"),
+            Initial(bad_char) => write!(
+                f,
+                "invalid character '{}' for subaccount initial - must be uppercase ASCII letter or digit",
+                bad_char
+            ),
+            Subsequent(bad_chars) => write!(f,
+                                            "invalid characters {} for subaccount - must be alphanumeric or '-'",
+                                            itertools::Itertools::intersperse(
+                                                bad_chars.iter().map(|c| format!("'{}'", c)),
+                                                ", ".to_string())
+                                            .collect::<String>()),
+        }
+    }
+}
+
+impl Error for SubAccountError {}
+
+impl FromStr for SubAccount {
+    type Err = SubAccountError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use SubAccountErrorKind::*;
+        if s.is_empty() {
+            Err(SubAccountError(Empty))
+        } else {
+            let mut chars = s.chars();
+            let initial = chars.next().unwrap();
+            if !SubAccount::is_valid_initial(&initial) {
+                Err(SubAccountError(Initial(initial)))
+            } else {
+                let bad_chars = chars
+                    .filter_map(|c| (!SubAccount::is_valid_subsequent(&c)).then_some(c))
+                    .collect::<Vec<char>>();
+                if bad_chars.is_empty() {
+                    Ok(SubAccount(s.to_owned()))
+                } else {
+                    Err(SubAccountError(Subsequent(bad_chars)))
+                }
+            }
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Default, Debug)]
 pub enum Flag {
     #[default]

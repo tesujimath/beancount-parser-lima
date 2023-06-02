@@ -2,6 +2,23 @@
 use super::*;
 use test_case::test_case;
 
+#[test_case("MySubAccount", Ok("MySubAccount"))]
+#[test_case("", Err(SubAccountErrorKind::Empty))]
+#[test_case("dySubAccount", Err(SubAccountErrorKind::Initial('d')))]
+#[test_case("My-Sub=Account?Bad", Err(SubAccountErrorKind::Subsequent(vec!['=', '?'])))]
+fn test_subaccount_from_str(s: &str, expected_raw: Result<&str, SubAccountErrorKind>) {
+    let result = SubAccount::from_str(s);
+    let expected = match expected_raw {
+        Ok(s) => Ok(SubAccount(s.to_string())),
+        Err(e) => Err(SubAccountError(e)),
+    };
+    // visually check the error display by making a bad test case
+    if let Err(ref e) = result {
+        println!("{}", e);
+    }
+    assert_eq!(result, expected);
+}
+
 #[test_case('A', Ok(FlagLetter('A')))]
 #[test_case('b', Err(FlagLetterError('b')))]
 #[test_case('?', Err(FlagLetterError('?')))]
