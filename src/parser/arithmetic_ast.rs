@@ -1,23 +1,26 @@
 // adapted from https://github.com/rust-bakery/nom/blob/main/tests/arithmetic_ast.rs, with thanks 😊
-// replaced many with many0, without the initial range parameter
+// changes:
+// - replace many with many0, without the initial range parameter
+// - use Decimal instead of i64 for Value
+// - use new submodule for decimal::value
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
-use std::str::FromStr;
-
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{digit1 as digit, multispace0 as multispace},
-    combinator::{map, map_res},
+    character::complete::multispace0 as multispace,
+    combinator::map,
     multi::many0,
     sequence::{delimited, preceded},
     IResult,
 };
 
+use rust_decimal::Decimal;
+
 pub enum Expr {
-    Value(i64),
+    Value(Decimal),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
@@ -70,13 +73,7 @@ fn parens(i: &str) -> IResult<&str, Expr> {
 }
 
 fn factor(i: &str) -> IResult<&str, Expr> {
-    alt((
-        map(
-            map_res(delimited(multispace, digit, multispace), FromStr::from_str),
-            Expr::Value,
-        ),
-        parens,
-    ))(i)
+    alt((value, parens))(i)
 }
 
 fn fold_exprs(initial: Expr, remainder: Vec<(Oper, Expr)>) -> Expr {
@@ -107,7 +104,7 @@ fn term(i: &str) -> IResult<&str, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-fn expr(i: &str) -> IResult<&str, Expr> {
+pub fn expr(i: &str) -> IResult<&str, Expr> {
     let (i, initial) = term(i)?;
     let (i, remainder) = many0(alt((
         |i| {
@@ -162,3 +159,7 @@ fn parens_test() {
         Ok(("", String::from("([(1 + 2)] * 3)")))
     );
 }
+
+// enhancements for decimal value
+mod decimal;
+use decimal::value;
