@@ -16,7 +16,7 @@ use nom_tracable::tracable_parser;
 use std::str::FromStr;
 
 #[cfg(test)]
-use rust_decimal_macros::dec;
+use {rust_decimal::Decimal, rust_decimal_macros::dec, test_case::test_case};
 
 #[derive(Debug)]
 pub enum Oper {
@@ -99,6 +99,7 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
             delimited(
                 multispace0,
                 recognize(tuple((
+                    opt(sym("-")),
                     digit1,
                     many0(tuple((sym(","), digit, digit, digit))),
                     opt(tuple((sym("."), digit1))),
@@ -115,11 +116,13 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
     )(i)
 }
 
-#[test]
-fn value_test() {
+#[test_case("123,456,789", dec!(123456789))]
+#[test_case("-123,456,789.12", dec!(-123456789.12))]
+fn value_test(s: &str, expected: Decimal) {
     use DecimalExpr::Value;
-    match value("123,456,789".into()) {
-        Ok((_, Value(d))) => assert_eq!(d, dec!(123456789)),
+
+    match value(s.into()) {
+        Ok((_, Value(d))) => assert_eq!(d, expected),
         _ => panic!("oops"),
     }
 }
@@ -158,6 +161,14 @@ fn expr_test() {
     assert_eq!(
         expr(" 72 / 2 / 3 ".into()).map(format_span_expr),
         Ok(("", String::from("((72 / 2) / 3)")))
+    );
+    assert_eq!(
+        expr(" 10 - 1 ".into()).map(format_span_expr),
+        Ok(("", String::from("(10 - 1)")))
+    );
+    assert_eq!(
+        expr(" 10 - -2 ".into()).map(format_span_expr),
+        Ok(("", String::from("(10 - -2)")))
     );
 }
 
