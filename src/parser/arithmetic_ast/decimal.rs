@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
 use nom::{
-    character::complete::{digit1 as digit, multispace0 as multispace},
+    character::complete::{digit1, multispace0 as multispace, satisfy},
     combinator::{map, map_res, opt, recognize},
-    multi::{many0, many1},
+    multi::many0,
     sequence::{delimited, tuple},
     IResult,
 };
@@ -11,14 +11,17 @@ use nom::{
 use nom_supreme::tag::complete::tag as sym;
 
 use nom_tracable::tracable_parser;
-#[cfg(test)]
-use nom_tracable::{cumulative_histogram, histogram};
 
 #[cfg(test)]
 use rust_decimal_macros::dec;
 
 use super::super::Span;
 use super::Expr;
+
+/// Match a single digit
+fn digit(i: Span) -> IResult<Span, char> {
+    satisfy(|c| c.is_ascii_digit())(i)
+}
 
 /// Match a number with optional thousands separators and optional decimal point and fractional part
 #[tracable_parser]
@@ -28,9 +31,9 @@ pub fn value(i: Span) -> IResult<Span, Expr> {
             delimited(
                 multispace,
                 recognize(tuple((
-                    many1(digit),
+                    digit1,
                     many0(tuple((sym(","), digit, digit, digit))),
-                    opt(tuple((sym("."), many1(digit)))),
+                    opt(tuple((sym("."), digit1))),
                 ))),
                 multispace,
             ),
@@ -51,8 +54,4 @@ fn value_test() {
         Ok((_, Value(d))) => assert_eq!(d, dec!(123456789)),
         _ => panic!("oops"),
     }
-
-    // Show histogram
-    histogram();
-    cumulative_histogram();
 }
