@@ -1,8 +1,4 @@
-// adapted from https://github.com/rust-bakery/nom/blob/main/tests/arithmetic_ast.rs, with thanks 😊
-// changes:
-// - replace many with many0, without the initial range parameter
-// - use Decimal instead of i64 for Value
-// - use new submodule for decimal::value
+// based on from https://github.com/rust-bakery/nom/blob/main/tests/arithmetic_ast.rs, with thanks and quite a few changes 😊
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -64,7 +60,7 @@ impl Debug for Expr {
     }
 }
 
-fn parens(i: &str) -> IResult<&str, Expr> {
+fn parens(i: Span) -> IResult<Span, Expr> {
     delimited(
         multispace,
         delimited(tag("("), map(expr, |e| Expr::Paren(Box::new(e))), tag(")")),
@@ -72,7 +68,7 @@ fn parens(i: &str) -> IResult<&str, Expr> {
     )(i)
 }
 
-fn factor(i: &str) -> IResult<&str, Expr> {
+fn factor(i: Span) -> IResult<Span, Expr> {
     alt((value, parens))(i)
 }
 
@@ -88,7 +84,7 @@ fn fold_exprs(initial: Expr, remainder: Vec<(Oper, Expr)>) -> Expr {
     })
 }
 
-fn term(i: &str) -> IResult<&str, Expr> {
+fn term(i: Span) -> IResult<Span, Expr> {
     let (i, initial) = factor(i)?;
     let (i, remainder) = many0(alt((
         |i| {
@@ -104,7 +100,7 @@ fn term(i: &str) -> IResult<&str, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn expr(i: &str) -> IResult<&str, Expr> {
+pub fn expr(i: Span) -> IResult<Span, Expr> {
     let (i, initial) = term(i)?;
     let (i, remainder) = many0(alt((
         |i| {
@@ -120,10 +116,15 @@ pub fn expr(i: &str) -> IResult<&str, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
+#[cfg(test)]
+fn format_span_expr((i, x): (Span, Expr)) -> (&str, String) {
+    (*i.fragment(), format!("{:?}", x))
+}
+
 #[test]
 fn factor_test() {
     assert_eq!(
-        factor("  3  ").map(|(i, x)| (i, format!("{:?}", x))),
+        factor("  3  ".into()).map(format_span_expr),
         Ok(("", String::from("3")))
     );
 }
@@ -131,7 +132,7 @@ fn factor_test() {
 #[test]
 fn term_test() {
     assert_eq!(
-        term(" 3 *  5   ").map(|(i, x)| (i, format!("{:?}", x))),
+        term(" 3 *  5   ".into()).map(format_span_expr),
         Ok(("", String::from("(3 * 5)")))
     );
 }
@@ -139,15 +140,15 @@ fn term_test() {
 #[test]
 fn expr_test() {
     assert_eq!(
-        expr(" 1 + 2 *  3 ").map(|(i, x)| (i, format!("{:?}", x))),
+        expr(" 1 + 2 *  3 ".into()).map(format_span_expr),
         Ok(("", String::from("(1 + (2 * 3))")))
     );
     assert_eq!(
-        expr(" 1 + 2 *  3 / 4 - 5 ").map(|(i, x)| (i, format!("{:?}", x))),
+        expr(" 1 + 2 *  3 / 4 - 5 ".into()).map(format_span_expr),
         Ok(("", String::from("((1 + ((2 * 3) / 4)) - 5)")))
     );
     assert_eq!(
-        expr(" 72 / 2 / 3 ").map(|(i, x)| (i, format!("{:?}", x))),
+        expr(" 72 / 2 / 3 ".into()).map(format_span_expr),
         Ok(("", String::from("((72 / 2) / 3)")))
     );
 }
@@ -155,7 +156,7 @@ fn expr_test() {
 #[test]
 fn parens_test() {
     assert_eq!(
-        expr(" ( 1 + 2 ) *  3 ").map(|(i, x)| (i, format!("{:?}", x))),
+        expr(" ( 1 + 2 ) *  3 ".into()).map(format_span_expr),
         Ok(("", String::from("([(1 + 2)] * 3)")))
     );
 }
@@ -163,3 +164,5 @@ fn parens_test() {
 // enhancements for decimal value
 mod decimal;
 use decimal::value;
+
+use super::Span;

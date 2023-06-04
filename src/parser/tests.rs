@@ -12,7 +12,7 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
         sub_accounts: subs.iter().map(|sub| SubAccount(sub.to_string())).collect(),
     });
 
-    match account(s) {
+    match account(s.into()) {
         Ok((_, result)) => assert_eq!(result, expected.unwrap()),
         Err(e) => {
             println!("{:?}", e);
@@ -26,22 +26,22 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
 #[test_case(r#"X"#, Vec::new(), "X")]
 #[test_case(r#""a" "b" "c"X"#, vec!["a", "b", "c"], "X")]
 #[test_case(r#""d"   "e""f"X"#, vec!["d", "e", "f"], "X")]
-fn test_txn_strings(s: &str, expected: Vec<&str>, expected_loc: &str) {
-    match txn_strings(s) {
-        Ok((loc, actual)) => {
-            assert_eq!(actual, expected);
-            assert_eq!(loc, expected_loc);
+fn test_txn_strings(s: &str, expected: Vec<&str>, expected_i: &str) {
+    match txn_strings(s.into()) {
+        Ok((i, result)) => {
+            assert_eq!(result, expected);
+            assert_eq!(*i.fragment(), expected_i);
         }
         e => panic!("failed with {:?}", e),
     }
 }
 
 #[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link="#, vec![Left("a".parse::<Tag>().unwrap()), Right("b".parse::<Link>().unwrap()), Left("c-is-my-tag".parse::<Tag>().unwrap()), Right("d.is_my/link".parse::<Link>().unwrap())], "=")]
-fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_loc: &str) {
-    match tags_links(s) {
-        Ok((loc, actual)) => {
-            assert_eq!(actual, expected);
-            assert_eq!(loc, expected_loc);
+fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_i: &str) {
+    match tags_links(s.into()) {
+        Ok((i, result)) => {
+            assert_eq!(result, expected);
+            assert_eq!(*i.fragment(), expected_i);
         }
         e => panic!("failed with {:?}", e),
     }
@@ -49,11 +49,11 @@ fn test_tags_links(s: &str, expected: Vec<Either<Tag, Link>>, expected_loc: &str
 
 #[test_case("#c-is-my-tag ", Left("c-is-my-tag".parse::<Tag>().unwrap()), " ")]
 #[test_case("^d.is_my/link ", Right("d.is_my/link".parse::<Link>().unwrap()), " ")]
-fn test_tag_or_links(s: &str, expected: Either<Tag, Link>, expected_loc: &str) {
-    match tag_or_link(s) {
-        Ok((loc, actual)) => {
-            assert_eq!(actual, expected);
-            assert_eq!(loc, expected_loc);
+fn test_tag_or_links(s: &str, expected: Either<Tag, Link>, expected_i: &str) {
+    match tag_or_link(s.into()) {
+        Ok((i, result)) => {
+            assert_eq!(result, expected);
+            assert_eq!(*i.fragment(), expected_i);
         }
         e => panic!("failed with {:?}", e),
     }
@@ -72,10 +72,10 @@ fn test_tag_or_links(s: &str, expected: Either<Tag, Link>, expected_loc: &str) {
 #[test_case("2023_04-01", None)]
 #[test_case("freddyfish", None)]
 fn test_date(s: &str, expected: Option<(&str, i32, u32, u32)>) {
-    match (date(s), expected) {
-        (Ok((actual_loc, actual_result)), Some((expected_loc, y, m, d))) => {
-            assert_eq!(actual_result, NaiveDate::from_ymd_opt(y, m, d).unwrap());
-            assert_eq!(actual_loc, expected_loc);
+    match (date(s.into()), expected) {
+        (Ok((i, result)), Some((expected_i, y, m, d))) => {
+            assert_eq!(result, NaiveDate::from_ymd_opt(y, m, d).unwrap());
+            assert_eq!(*i.fragment(), expected_i);
         }
         (Err(_), None) => (),
         (Ok(_), None) => panic!("unexpectedly succeeded"),
@@ -94,11 +94,11 @@ ok" extras"#,
 ok"#,
     " extras"
 )]
-fn test_string(s: &str, expected: &str, expected_loc: &str) {
-    match string(s) {
-        Ok((loc, actual)) => {
-            assert_eq!(actual, expected);
-            assert_eq!(loc, expected_loc);
+fn test_string(s: &str, expected: &str, expected_i: &str) {
+    match string(s.into()) {
+        Ok((i, result)) => {
+            assert_eq!(result, expected);
+            assert_eq!(*i.fragment(), expected_i);
         }
         e => panic!("failed with {:?}", e),
     }

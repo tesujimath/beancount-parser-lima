@@ -14,13 +14,17 @@ use nom::{
     sequence::{delimited, tuple},
     IResult,
 };
+use nom_locate::LocatedSpan;
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree},
     tag::complete::tag as sym, // beancount grammar has its own tag
 };
+use nom_tracable::TracableInfo;
+
+type Span<'a> = LocatedSpan<&'a str, TracableInfo>;
 
 /// Matches `Account`.
-pub fn account(i: &str) -> IResult<&str, Account, ErrorTree<&str>> {
+pub fn account(i: Span) -> IResult<Span, Account, ErrorTree<Span>> {
     map_res(
         tuple((
             account_type,
@@ -40,7 +44,7 @@ pub fn account(i: &str) -> IResult<&str, Account, ErrorTree<&str>> {
 }
 
 /// Matches `AccountType`.
-pub fn account_type(i: &str) -> IResult<&str, AccountType, ErrorTree<&str>> {
+pub fn account_type(i: Span) -> IResult<Span, AccountType, ErrorTree<Span>> {
     alt((
         map(sym("Assets"), |_| AccountType::Assets),
         map(sym("Liabilities"), |_| AccountType::Liabilities),
@@ -51,23 +55,23 @@ pub fn account_type(i: &str) -> IResult<&str, AccountType, ErrorTree<&str>> {
 }
 
 /// Matches `SubAccount`.
-pub fn sub_account(i: &str) -> IResult<&str, SubAccount, ErrorTree<&str>> {
+pub fn sub_account(i: Span) -> IResult<Span, SubAccount, ErrorTree<Span>> {
     map_res(
         recognize(tuple((
             satisfy(|c| SubAccount::is_valid_initial(&c)),
             many0_count(satisfy(|c| SubAccount::is_valid_subsequent(&c))),
         ))),
-        |s: &str| s.parse::<SubAccount>(),
+        |s: Span| s.parse::<SubAccount>(),
     )(i)
 }
 
 /// Matches the `txn` keyword or a flag.
-pub fn txn(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
+pub fn txn(i: Span) -> IResult<Span, Flag, ErrorTree<Span>> {
     alt((map(sym("txn"), |_| Flag::Asterisk), flag))(i)
 }
 
 /// Matches any flag, including asterisk or hash.
-pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
+pub fn flag(i: Span) -> IResult<Span, Flag, ErrorTree<Span>> {
     alt((
         map(sym("*"), |_| Flag::Asterisk),
         map(sym("#"), |_| Flag::Hash),
@@ -82,7 +86,7 @@ pub fn flag(i: &str) -> IResult<&str, Flag, ErrorTree<&str>> {
 }
 
 /// Matches zero or more quoted strings, optionally separated by whitespace.
-pub fn txn_strings(i: &str) -> IResult<&str, Vec<String>, ErrorTree<&str>> {
+pub fn txn_strings(i: Span) -> IResult<Span, Vec<String>, ErrorTree<Span>> {
     match opt(tuple((string, many0(tuple((space0, string))))))(i)? {
         (i, Some((s1, v))) => Ok((i, once(s1).chain(v.into_iter().map(|(_, s)| s)).collect())),
         (i, None) => Ok((i, Vec::new())),
@@ -90,7 +94,7 @@ pub fn txn_strings(i: &str) -> IResult<&str, Vec<String>, ErrorTree<&str>> {
 }
 
 /// Matches zero or more tags or links, optionally separated by whitespace.
-pub fn tags_links(i: &str) -> IResult<&str, Vec<Either<Tag, Link>>, ErrorTree<&str>> {
+pub fn tags_links(i: Span) -> IResult<Span, Vec<Either<Tag, Link>>, ErrorTree<Span>> {
     match opt(tuple((tag_or_link, many0(tuple((space0, tag_or_link))))))(i)? {
         (i, Some((s1, v))) => Ok((i, once(s1).chain(v.into_iter().map(|(_, s)| s)).collect())),
         (i, None) => Ok((i, Vec::new())),
@@ -98,36 +102,36 @@ pub fn tags_links(i: &str) -> IResult<&str, Vec<Either<Tag, Link>>, ErrorTree<&s
 }
 
 /// Matches a tag or a link.
-pub fn tag_or_link(i: &str) -> IResult<&str, Either<Tag, Link>, ErrorTree<&str>> {
+pub fn tag_or_link(i: Span) -> IResult<Span, Either<Tag, Link>, ErrorTree<Span>> {
     use Either::*;
     alt((map(tag, Left), map(link, Right)))(i)
 }
 
 /// Matches a tag.
-pub fn tag(i: &str) -> IResult<&str, Tag, ErrorTree<&str>> {
+pub fn tag(i: Span) -> IResult<Span, Tag, ErrorTree<Span>> {
     let (i, _) = sym("#")(i)?;
     map(tag_or_link_identifier, Tag::from)(i)
 }
 
 /// Matches a link.
-pub fn link(i: &str) -> IResult<&str, Link, ErrorTree<&str>> {
+pub fn link(i: Span) -> IResult<Span, Link, ErrorTree<Span>> {
     let (i, _) = sym("^")(i)?;
     map(tag_or_link_identifier, Link::from)(i)
 }
 
-pub fn tag_or_link_identifier(i: &str) -> IResult<&str, TagOrLinkIdentifier, ErrorTree<&str>> {
+pub fn tag_or_link_identifier(i: Span) -> IResult<Span, TagOrLinkIdentifier, ErrorTree<Span>> {
     map_res(
         take_while1(|c: char| TagOrLinkIdentifier::is_valid_char(&c)),
-        TagOrLinkIdentifier::from_str,
+        |s: Span| TagOrLinkIdentifier::from_str(&s),
     )(i)
 }
 
-pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
-    fn date_sep(i: &str) -> IResult<&str, (), ErrorTree<&str>> {
+pub fn date(i0: Span) -> IResult<Span, NaiveDate, ErrorTree<Span>> {
+    fn date_sep(i: Span) -> IResult<Span, (), ErrorTree<Span>> {
         one_of("-/")(i).map(|(s, _)| (s, ()))
     }
 
-    let (i, (year, year_len)) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+    let (i, (year, year_len)) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
         s.parse::<i32>().map(|y| (y, s.len()))
     })(i0)?;
     if year_len < 4 {
@@ -137,11 +141,11 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
         ));
     }
     let (i, _) = date_sep(i)?;
-    let (i, month) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+    let (i, month) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
         s.parse::<u32>()
     })(i)?;
     let (i, _) = date_sep(i)?;
-    let (i, day) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: &str| {
+    let (i, day) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
         s.parse::<u32>()
     })(i)?;
 
@@ -152,8 +156,8 @@ pub fn date(i0: &str) -> IResult<&str, NaiveDate, ErrorTree<&str>> {
 }
 
 /// Matches a quoted string supporting embedded newlines and character escapes for `\\`, `\"`, `\n`, `\t`.
-pub fn string(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
-    fn string_content(i: &str) -> IResult<&str, String, ErrorTree<&str>> {
+pub fn string(i: Span) -> IResult<Span, String, ErrorTree<Span>> {
+    fn string_content(i: Span) -> IResult<Span, String, ErrorTree<Span>> {
         escaped_transform(
             take_while1(|c| c != '\\' && c != '"'),
             '\\',
@@ -181,7 +185,7 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    fn nom_error(location: &str, reason: ParseErrorReason) -> nom::Err<ErrorTree<&str>> {
+    fn nom_error(location: Span, reason: ParseErrorReason) -> nom::Err<ErrorTree<Span>> {
         nom::Err::Error(ErrorTree::Base {
             location,
             kind: BaseErrorKind::External(Box::new(ParseError { reason })),

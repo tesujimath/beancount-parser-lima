@@ -9,13 +9,19 @@ use nom::{
     IResult,
 };
 
+use nom_tracable::tracable_parser;
+#[cfg(test)]
+use nom_tracable::{cumulative_histogram, histogram};
+
 #[cfg(test)]
 use rust_decimal_macros::dec;
 
+use super::super::Span;
 use super::Expr;
 
 /// Match a number with optional thousands separators and optional decimal point and fractional part
-pub fn value(i: &str) -> IResult<&str, Expr> {
+#[tracable_parser]
+pub fn value(i: Span) -> IResult<Span, Expr> {
     map(
         map_res(
             delimited(
@@ -27,7 +33,7 @@ pub fn value(i: &str) -> IResult<&str, Expr> {
                 ))),
                 multispace,
             ),
-            |s: &str| {
+            |s: Span| {
                 let mut without_commas = s.to_string();
                 without_commas.retain(|c| c != ',');
                 FromStr::from_str(&without_commas)
@@ -40,8 +46,12 @@ pub fn value(i: &str) -> IResult<&str, Expr> {
 #[test]
 fn value_test() {
     use Expr::Value;
-    match value("123,456,789") {
+    match value("123,456,789".into()) {
         Ok((_, Value(d))) => assert_eq!(d, dec!(123456789)),
         _ => panic!("oops"),
     }
+
+    // Show histogram
+    histogram();
+    cumulative_histogram();
 }
