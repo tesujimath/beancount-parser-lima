@@ -5,13 +5,13 @@ use std::fmt::{Debug, Display, Formatter};
 
 use nom::{
     branch::alt,
-    bytes::complete::tag,
     character::complete::multispace0 as multispace,
     combinator::map,
     multi::many0,
     sequence::{delimited, preceded},
     IResult,
 };
+use nom_supreme::tag::complete::tag as sym;
 
 use rust_decimal::Decimal;
 
@@ -63,7 +63,7 @@ impl Debug for Expr {
 fn parens(i: Span) -> IResult<Span, Expr> {
     delimited(
         multispace,
-        delimited(tag("("), map(expr, |e| Expr::Paren(Box::new(e))), tag(")")),
+        delimited(sym("("), map(expr, |e| Expr::Paren(Box::new(e))), sym(")")),
         multispace,
     )(i)
 }
@@ -88,11 +88,11 @@ fn term(i: Span) -> IResult<Span, Expr> {
     let (i, initial) = factor(i)?;
     let (i, remainder) = many0(alt((
         |i| {
-            let (i, mul) = preceded(tag("*"), factor)(i)?;
+            let (i, mul) = preceded(sym("*"), factor)(i)?;
             Ok((i, (Oper::Mul, mul)))
         },
         |i| {
-            let (i, div) = preceded(tag("/"), factor)(i)?;
+            let (i, div) = preceded(sym("/"), factor)(i)?;
             Ok((i, (Oper::Div, div)))
         },
     )))(i)?;
@@ -104,11 +104,11 @@ pub fn expr(i: Span) -> IResult<Span, Expr> {
     let (i, initial) = term(i)?;
     let (i, remainder) = many0(alt((
         |i| {
-            let (i, add) = preceded(tag("+"), term)(i)?;
+            let (i, add) = preceded(sym("+"), term)(i)?;
             Ok((i, (Oper::Add, add)))
         },
         |i| {
-            let (i, sub) = preceded(tag("-"), term)(i)?;
+            let (i, sub) = preceded(sym("-"), term)(i)?;
             Ok((i, (Oper::Sub, sub)))
         },
     )))(i)?;

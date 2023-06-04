@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 use nom::{
-    bytes::complete::tag,
     character::complete::{digit1 as digit, multispace0 as multispace},
     combinator::{map, map_res, opt, recognize},
     multi::{many0, many1},
     sequence::{delimited, tuple},
     IResult,
 };
+
+use nom_supreme::tag::complete::tag as sym;
 
 use nom_tracable::tracable_parser;
 #[cfg(test)]
@@ -28,8 +29,8 @@ pub fn value(i: Span) -> IResult<Span, Expr> {
                 multispace,
                 recognize(tuple((
                     many1(digit),
-                    many0(tuple((tag(","), digit, digit, digit))),
-                    opt(tuple((tag("."), many1(digit)))),
+                    many0(tuple((sym(","), digit, digit, digit))),
+                    opt(tuple((sym("."), many1(digit)))),
                 ))),
                 multispace,
             ),
