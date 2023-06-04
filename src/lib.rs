@@ -1,7 +1,8 @@
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use std::{
     error::Error,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
 use strum_macros::Display;
@@ -303,6 +304,43 @@ impl FromStr for TagOrLinkIdentifier {
             Ok(TagOrLinkIdentifier(s.to_owned()))
         } else {
             Err(TagOrLinkIdentifierError(bad_chars))
+        }
+    }
+}
+
+pub enum DecimalExpr {
+    Value(Decimal),
+    Add(Box<DecimalExpr>, Box<DecimalExpr>),
+    Sub(Box<DecimalExpr>, Box<DecimalExpr>),
+    Mul(Box<DecimalExpr>, Box<DecimalExpr>),
+    Div(Box<DecimalExpr>, Box<DecimalExpr>),
+    Paren(Box<DecimalExpr>),
+}
+
+impl Display for DecimalExpr {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::DecimalExpr::*;
+        match *self {
+            Value(val) => write!(format, "{}", val),
+            Add(ref left, ref right) => write!(format, "{} + {}", left, right),
+            Sub(ref left, ref right) => write!(format, "{} - {}", left, right),
+            Mul(ref left, ref right) => write!(format, "{} * {}", left, right),
+            Div(ref left, ref right) => write!(format, "{} / {}", left, right),
+            Paren(ref expr) => write!(format, "({})", expr),
+        }
+    }
+}
+
+impl Debug for DecimalExpr {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::DecimalExpr::*;
+        match *self {
+            Value(val) => write!(format, "{}", val),
+            Add(ref left, ref right) => write!(format, "({:?} + {:?})", left, right),
+            Sub(ref left, ref right) => write!(format, "({:?} - {:?})", left, right),
+            Mul(ref left, ref right) => write!(format, "({:?} * {:?})", left, right),
+            Div(ref left, ref right) => write!(format, "({:?} / {:?})", left, right),
+            Paren(ref expr) => write!(format, "[{:?}]", expr),
         }
     }
 }

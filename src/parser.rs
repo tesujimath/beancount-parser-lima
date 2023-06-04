@@ -204,5 +204,5 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
-mod arithmetic_ast;
+mod expr;
 mod tests;
