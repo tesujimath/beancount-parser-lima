@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use super::{DecimalExpr, Span};
 use nom::{
     branch::alt,
-    character::complete::{digit1, multispace0 as multispace, satisfy},
+    character::complete::{digit1, multispace0, satisfy},
     combinator::{map, map_res, opt, recognize},
     multi::many0,
     sequence::{delimited, preceded, tuple},
@@ -28,13 +28,13 @@ pub enum Oper {
 
 fn parens(i: Span) -> IResult<Span, DecimalExpr> {
     delimited(
-        multispace,
+        multispace0,
         delimited(
             sym("("),
             map(expr, |e| DecimalExpr::Paren(Box::new(e))),
             sym(")"),
         ),
-        multispace,
+        multispace0,
     )(i)
 }
 
@@ -97,13 +97,13 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
     map(
         map_res(
             delimited(
-                multispace,
+                multispace0,
                 recognize(tuple((
                     digit1,
                     many0(tuple((sym(","), digit, digit, digit))),
                     opt(tuple((sym("."), digit1))),
                 ))),
-                multispace,
+                multispace0,
             ),
             |s: Span| {
                 let mut without_commas = s.to_string();
