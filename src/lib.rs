@@ -1,6 +1,10 @@
+// TODO remove suppression for dead code warning
+#![allow(dead_code)]
+
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use std::{
+    cmp::max,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
@@ -308,18 +312,61 @@ impl FromStr for TagOrLinkIdentifier {
     }
 }
 
-pub enum DecimalExpr {
-    Value(Decimal),
-    Add(Box<DecimalExpr>, Box<DecimalExpr>),
-    Sub(Box<DecimalExpr>, Box<DecimalExpr>),
-    Mul(Box<DecimalExpr>, Box<DecimalExpr>),
-    Div(Box<DecimalExpr>, Box<DecimalExpr>),
-    Paren(Box<DecimalExpr>),
+#[derive(Debug)]
+pub struct DecimalExpr {
+    pub value: Decimal,
+    raw: RawDecimalExpr,
+}
+
+impl DecimalExpr {
+    fn new(raw: RawDecimalExpr) -> Self {
+        let (mut value, scale) = raw.evaluate();
+        value.set_scale(scale).unwrap(); // can't fail, as scale is simply the max over the expression
+        Self { value, raw }
+    }
 }
 
 impl Display for DecimalExpr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::DecimalExpr::*;
+        Display::fmt(&self.raw, format)
+    }
+}
+
+pub enum RawDecimalExpr {
+    Value(Decimal),
+    Add(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
+    Sub(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
+    Mul(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
+    Div(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
+    Paren(Box<RawDecimalExpr>),
+}
+
+impl RawDecimalExpr {
+    fn evaluate(&self) -> (Decimal, u32) {
+        fn evaluate_binary<F>(op: F, e1: &RawDecimalExpr, e2: &RawDecimalExpr) -> (Decimal, u32)
+        where
+            F: Fn(Decimal, Decimal) -> Decimal,
+        {
+            let (d1, s1) = e1.evaluate();
+            let (d2, s2) = e2.evaluate();
+            (op(d1, d2), max(s1, s2))
+        }
+
+        use RawDecimalExpr::*;
+        match self {
+            Value(d) => (*d, d.scale()),
+            Add(e1, e2) => evaluate_binary(std::ops::Add::add, e1, e2),
+            Sub(e1, e2) => evaluate_binary(std::ops::Sub::sub, e1, e2),
+            Mul(e1, e2) => evaluate_binary(std::ops::Mul::mul, e1, e2),
+            Div(e1, e2) => evaluate_binary(std::ops::Div::div, e1, e2),
+            Paren(e) => e.evaluate(),
+        }
+    }
+}
+
+impl Display for RawDecimalExpr {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::RawDecimalExpr::*;
         match *self {
             Value(val) => write!(format, "{}", val),
             Add(ref left, ref right) => write!(format, "{} + {}", left, right),
@@ -331,9 +378,9 @@ impl Display for DecimalExpr {
     }
 }
 
-impl Debug for DecimalExpr {
+impl Debug for RawDecimalExpr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::DecimalExpr::*;
+        use self::RawDecimalExpr::*;
         match *self {
             Value(val) => write!(format, "{}", val),
             Add(ref left, ref right) => write!(format, "({:?} + {:?})", left, right),

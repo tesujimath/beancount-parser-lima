@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use super::{DecimalExpr, Span};
+use super::{RawDecimalExpr, Span};
 use nom::{
     branch::alt,
     character::complete::{digit1, multispace0, satisfy},
@@ -29,35 +29,35 @@ pub enum Oper {
     Div,
 }
 
-fn parens(i: Span) -> IResult<Span, DecimalExpr> {
+fn parens(i: Span) -> IResult<Span, RawDecimalExpr> {
     delimited(
         multispace0,
         delimited(
             sym("("),
-            map(expr, |e| DecimalExpr::Paren(Box::new(e))),
+            map(expr, |e| RawDecimalExpr::Paren(Box::new(e))),
             sym(")"),
         ),
         multispace0,
     )(i)
 }
 
-fn factor(i: Span) -> IResult<Span, DecimalExpr> {
+fn factor(i: Span) -> IResult<Span, RawDecimalExpr> {
     alt((value, parens))(i)
 }
 
-fn fold_exprs(initial: DecimalExpr, remainder: Vec<(Oper, DecimalExpr)>) -> DecimalExpr {
+fn fold_exprs(initial: RawDecimalExpr, remainder: Vec<(Oper, RawDecimalExpr)>) -> RawDecimalExpr {
     remainder.into_iter().fold(initial, |acc, pair| {
         let (oper, expr) = pair;
         match oper {
-            Oper::Add => DecimalExpr::Add(Box::new(acc), Box::new(expr)),
-            Oper::Sub => DecimalExpr::Sub(Box::new(acc), Box::new(expr)),
-            Oper::Mul => DecimalExpr::Mul(Box::new(acc), Box::new(expr)),
-            Oper::Div => DecimalExpr::Div(Box::new(acc), Box::new(expr)),
+            Oper::Add => RawDecimalExpr::Add(Box::new(acc), Box::new(expr)),
+            Oper::Sub => RawDecimalExpr::Sub(Box::new(acc), Box::new(expr)),
+            Oper::Mul => RawDecimalExpr::Mul(Box::new(acc), Box::new(expr)),
+            Oper::Div => RawDecimalExpr::Div(Box::new(acc), Box::new(expr)),
         }
     })
 }
 
-fn term(i: Span) -> IResult<Span, DecimalExpr> {
+fn term(i: Span) -> IResult<Span, RawDecimalExpr> {
     let (i, initial) = factor(i)?;
     let (i, remainder) = many0(alt((
         |i| {
@@ -73,7 +73,7 @@ fn term(i: Span) -> IResult<Span, DecimalExpr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn expr(i: Span) -> IResult<Span, DecimalExpr> {
+pub fn expr(i: Span) -> IResult<Span, RawDecimalExpr> {
     let (i, initial) = term(i)?;
     let (i, remainder) = many0(alt((
         |i| {
@@ -96,7 +96,7 @@ fn digit(i: Span) -> IResult<Span, char> {
 
 /// Match a number with optional thousands separators and optional decimal point and fractional part
 #[tracable_parser]
-pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
+pub fn value(i: Span) -> IResult<Span, RawDecimalExpr> {
     map(
         map_res(
             delimited(
@@ -115,7 +115,7 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
                 FromStr::from_str(&without_commas)
             },
         ),
-        DecimalExpr::Value,
+        RawDecimalExpr::Value,
     )(i)
 }
 
@@ -123,7 +123,7 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
 #[test_case("123,456,789", dec!(123456789))]
 #[test_case("-123,456,789.12", dec!(-123456789.12))]
 fn value_test(s: &str, expected: Decimal) {
-    use DecimalExpr::Value;
+    use RawDecimalExpr::Value;
 
     match value(s.into()) {
         Ok((_, Value(d))) => assert_eq!(d, expected),
@@ -132,7 +132,7 @@ fn value_test(s: &str, expected: Decimal) {
 }
 
 #[cfg(test)]
-fn format_span_expr((i, x): (Span, DecimalExpr)) -> (&str, String) {
+fn format_span_expr((i, x): (Span, RawDecimalExpr)) -> (&str, String) {
     (*i.fragment(), format!("{:?}", x))
 }
 
