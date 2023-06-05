@@ -1,4 +1,6 @@
 // based on from https://github.com/rust-bakery/nom/blob/main/tests/arithmetic_ast.rs, with thanks and quite a few changes 😊
+//
+// the original is part of nom, which is MIT licensed, and the fragment used here is not a "substantial portions" of nom
 
 use std::fmt::Debug;
 
