@@ -20,6 +20,31 @@ fn test_subaccount_from_str(s: &str, expected_raw: Result<&str, SubAccountErrorK
     assert_eq!(result, expected);
 }
 
+use CurrencyErrorKind::*;
+#[test_case("GBP", Ok("GBP"))]
+#[test_case("AAPL", Ok("AAPL"))] // stock
+#[test_case("V", Ok("V"))] // single-character stock
+#[test_case("NT.TO", Ok("NT.TO"))] // stock on another market
+#[test_case("TLT_040921C144", Ok("TLT_040921C144"))] // equity option
+#[test_case("/6J", Ok("/6J"))] // currency futures
+#[test_case("/6'J", Ok("/6'J"))] // currency futures
+#[test_case("/NQH21", Ok("/NQH21"))] // commodity futures
+#[test_case("/NQH21-EXT", Ok("/NQH21-EXT"))] // commodity futures
+#[test_case("/NQH21_QNEG21C13100", Ok("/NQH21_QNEG21C13100"))] // futures option
+#[test_case("/6.3", Err(MissingLetter))]
+#[test_case("CAC_", Err(Final('_')))]
+#[test_case("abc", Err(Initial('a')))]
+#[test_case("A?=.-BJ", Err(Intermediate(vec!['?', '='])))]
+#[test_case("", Err(Empty))]
+fn test_currency_from_str(s: &str, expected: Result<&str, CurrencyErrorKind>) {
+    match (Currency::from_str(s), expected) {
+        (Ok(actual), Ok(expected)) => assert_eq!(actual, Currency(expected.to_owned())),
+        (Err(actual), Err(kind)) => assert_eq!(actual, CurrencyError(kind)),
+        (Err(actual), Ok(_)) => panic!("unexpected failure: {}", actual),
+        (Ok(actual), Err(_)) => panic!("unexpected success: {}", actual),
+    }
+}
+
 #[test_case('A', Ok(FlagLetter('A')))]
 #[test_case('b', Err(FlagLetterError('b')))]
 #[test_case('?', Err(FlagLetterError('?')))]

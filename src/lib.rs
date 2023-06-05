@@ -7,6 +7,7 @@ use std::{
     cmp::max,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
+    iter::empty,
     str::FromStr,
 };
 use strum_macros::Display;
@@ -148,6 +149,121 @@ impl FromStr for SubAccount {
                     Ok(SubAccount(s.to_owned()))
                 } else {
                     Err(SubAccountError(Subsequent(bad_chars)))
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct Currency(String);
+
+/// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
+const CURRENCY_INTERMEDIATE_EXTRA_CHARS: [char; 4] = ['\'', '.', '_', '-'];
+
+impl Currency {
+    fn is_valid_initial(c: &char) -> bool {
+        c.is_ascii_uppercase() || *c == '/'
+    }
+
+    fn is_valid_intermediate(c: &char) -> bool {
+        c.is_ascii_uppercase()
+            || c.is_ascii_digit()
+            || CURRENCY_INTERMEDIATE_EXTRA_CHARS.contains(c)
+    }
+
+    fn is_valid_final(c: &char) -> bool {
+        c.is_ascii_uppercase() || c.is_ascii_digit()
+    }
+}
+
+impl Display for Currency {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct CurrencyError(CurrencyErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum CurrencyErrorKind {
+    Empty,
+    Initial(char),
+    Intermediate(Vec<char>),
+    Final(char),
+    MissingLetter,
+}
+
+impl Display for CurrencyError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use CurrencyErrorKind::*;
+        match &self.0 {
+            Empty => write!(f, "empty currency"),
+            Initial(bad_char) => write!(
+                f,
+                "invalid initial character '{}' for currency - must be uppercase ASCII letter or '/'",
+                bad_char
+            ),
+            Intermediate(bad_chars) => write!(f,
+                                              "invalid intermediate characters {} for currency - must be upppercase ASCII alphanumeric or one of {}",
+                                              itertools::Itertools::intersperse(
+                                                  bad_chars.iter().map(|c| format!("'{}'", c)),
+                                                  ", ".to_string())
+                                              .collect::<String>(),
+                                              itertools::Itertools::intersperse(
+                                                  CURRENCY_INTERMEDIATE_EXTRA_CHARS.iter().map(|c| format!("'{}'", c)),
+                                                  ", ".to_string())
+                                              .collect::<String>()),
+            Final(bad_char) => write!(
+                f,
+                "invalid final character '{}' for currency - must be uppercase ASCII alphanumeric",
+                bad_char
+            ),
+            MissingLetter => write!(f, "currency must contain at least one letter")
+        }
+    }
+}
+
+impl Error for CurrencyError {}
+
+impl FromStr for Currency {
+    type Err = CurrencyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use CurrencyErrorKind::*;
+        if s.is_empty() {
+            Err(CurrencyError(Empty))
+        } else {
+            let mut chars = s.chars();
+            let first = chars.next().unwrap();
+            let intermediate: Vec<char> = if s.len() > 2 {
+                chars.by_ref().take(s.len() - 2).collect()
+            } else {
+                empty::<char>().collect()
+            };
+            let last = if s.len() > 1 {
+                chars.next().unwrap()
+            } else {
+                first
+            };
+
+            use CurrencyErrorKind::*;
+            if !Currency::is_valid_initial(&first) {
+                Err(CurrencyError(Initial(first)))
+            } else if !Currency::is_valid_final(&last) {
+                Err(CurrencyError(Final(last)))
+            } else {
+                let bad_intermediates = intermediate
+                    .into_iter()
+                    .filter_map(|c| (!Currency::is_valid_intermediate(&c)).then_some(c))
+                    .collect::<Vec<char>>();
+                if !bad_intermediates.is_empty() {
+                    Err(CurrencyError(Intermediate(bad_intermediates)))
+                } else if s.find(|c: char| c.is_ascii_uppercase()).is_none() {
+                    Err(CurrencyError(MissingLetter))
+                } else {
+                    Ok(Currency(s.to_owned()))
                 }
             }
         }
