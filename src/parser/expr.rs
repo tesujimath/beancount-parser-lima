@@ -16,7 +16,10 @@ use nom_tracable::tracable_parser;
 use std::str::FromStr;
 
 #[cfg(test)]
-use {rust_decimal::Decimal, rust_decimal_macros::dec, test_case::test_case};
+use {rust_decimal::Decimal, rust_decimal_macros::dec};
+
+#[cfg(test)]
+use test_case::test_case;
 
 #[derive(Debug)]
 pub enum Oper {
@@ -116,6 +119,7 @@ pub fn value(i: Span) -> IResult<Span, DecimalExpr> {
     )(i)
 }
 
+#[cfg(test)]
 #[test_case("123,456,789", dec!(123456789))]
 #[test_case("-123,456,789.12", dec!(-123456789.12))]
 fn value_test(s: &str, expected: Decimal) {
