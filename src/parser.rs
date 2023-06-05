@@ -65,6 +65,18 @@ pub fn sub_account(i: Span) -> IResult<Span, SubAccount, ErrorTree<Span>> {
     )(i)
 }
 
+/// Matches `Currency`.
+pub fn currency(i: Span) -> IResult<Span, Currency, ErrorTree<Span>> {
+    map_res(
+        // we recognize more than is legal, but the parse fails in that case
+        recognize(tuple((
+            satisfy(|c| Currency::is_valid_initial(&c)),
+            many0_count(satisfy(|c| Currency::is_valid_intermediate(&c))),
+        ))),
+        |s: Span| s.parse::<Currency>(),
+    )(i)
+}
+
 /// Matches the `txn` keyword or a flag.
 pub fn txn(i: Span) -> IResult<Span, Flag, ErrorTree<Span>> {
     alt((map(sym("txn"), |_| Flag::default()), flag))(i)
