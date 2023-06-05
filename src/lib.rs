@@ -17,16 +17,14 @@ pub struct Account {
     sub_accounts: Vec<SubAccount>,
 }
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct AccountError;
-
 impl Account {
     pub fn new(
         account_type: AccountType,
         sub_accounts: Vec<SubAccount>,
     ) -> Result<Account, AccountError> {
+        use AccountErrorKind::*;
         if sub_accounts.is_empty() {
-            Err(AccountError)
+            Err(AccountError(MissingSubAccounts))
         } else {
             Ok(Account {
                 account_type,
@@ -36,10 +34,20 @@ impl Account {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct AccountError(AccountErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum AccountErrorKind {
+    MissingSubAccounts,
+}
+
 impl Display for AccountError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // there's only one error possible
-        write!(f, "missing subaccounts")
+        use AccountErrorKind::*;
+        match &self.0 {
+            MissingSubAccounts => write!(f, "missing subaccounts"),
+        }
     }
 }
 
