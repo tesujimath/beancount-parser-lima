@@ -75,10 +75,10 @@ fn test_tag_or_link_identifier_from_str(
     assert_eq!(result, expected);
 }
 
-use RawDecimalExpr::*;
+use Expr::*;
 #[test_case(Add(Box::new(Value(dec!(12.01))), Box::new(Value(dec!(1.5)))), dec!(13.51))]
 #[test_case(Div(Box::new(Value(dec!(1.00))), Box::new(Value(dec!(3)))), dec!(0.33))]
-fn test_decimal_expr_new(raw: RawDecimalExpr, value: Decimal) {
-    let expr = DecimalExpr::new(raw);
-    assert_eq!(expr.value, value);
+fn test_expr_value_from_expr(expr: Expr, value: Decimal) {
+    let expr_value = ExprValue::from(expr);
+    assert_eq!(expr_value.value, value);
 }

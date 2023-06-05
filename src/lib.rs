@@ -437,38 +437,39 @@ impl FromStr for TagOrLinkIdentifier {
 }
 
 #[derive(Debug)]
-pub struct DecimalExpr {
+/// An `Expr` which has been evaluated.
+pub struct ExprValue {
     pub value: Decimal,
-    raw: RawDecimalExpr,
+    expr: Expr,
 }
 
-impl DecimalExpr {
-    /// Evaluate the `RawDecimalExpr` rounding to the max scale it contains.
-    fn new(raw: RawDecimalExpr) -> Self {
-        let (mut value, scale) = raw.evaluate();
+impl From<Expr> for ExprValue {
+    /// Evaluate the `Expr` rounding to the max scale it contains.
+    fn from(expr: Expr) -> Self {
+        let (mut value, scale) = expr.evaluate();
         value.rescale(scale);
-        Self { value, raw }
+        Self { value, expr }
     }
 }
 
-impl Display for DecimalExpr {
+impl Display for ExprValue {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.raw, format)
+        Display::fmt(&self.expr, format)
     }
 }
 
-pub enum RawDecimalExpr {
+pub enum Expr {
     Value(Decimal),
-    Add(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
-    Sub(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
-    Mul(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
-    Div(Box<RawDecimalExpr>, Box<RawDecimalExpr>),
-    Paren(Box<RawDecimalExpr>),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    Paren(Box<Expr>),
 }
 
-impl RawDecimalExpr {
+impl Expr {
     fn evaluate(&self) -> (Decimal, u32) {
-        fn evaluate_binary<F>(op: F, e1: &RawDecimalExpr, e2: &RawDecimalExpr) -> (Decimal, u32)
+        fn evaluate_binary<F>(op: F, e1: &Expr, e2: &Expr) -> (Decimal, u32)
         where
             F: Fn(Decimal, Decimal) -> Decimal,
         {
@@ -477,7 +478,7 @@ impl RawDecimalExpr {
             (op(d1, d2), max(s1, s2))
         }
 
-        use RawDecimalExpr::*;
+        use Expr::*;
         match self {
             Value(d) => (*d, d.scale()),
             Add(e1, e2) => evaluate_binary(std::ops::Add::add, e1, e2),
@@ -489,9 +490,9 @@ impl RawDecimalExpr {
     }
 }
 
-impl Display for RawDecimalExpr {
+impl Display for Expr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::RawDecimalExpr::*;
+        use self::Expr::*;
         match *self {
             Value(val) => write!(format, "{}", val),
             Add(ref left, ref right) => write!(format, "{} + {}", left, right),
@@ -503,9 +504,9 @@ impl Display for RawDecimalExpr {
     }
 }
 
-impl Debug for RawDecimalExpr {
+impl Debug for Expr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::RawDecimalExpr::*;
+        use self::Expr::*;
         match *self {
             Value(val) => write!(format, "{}", val),
             Add(ref left, ref right) => write!(format, "({:?} + {:?})", left, right),
