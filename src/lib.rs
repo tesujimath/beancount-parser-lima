@@ -319,9 +319,10 @@ pub struct DecimalExpr {
 }
 
 impl DecimalExpr {
+    /// Evaluate the `RawDecimalExpr` rounding to the max scale it contains.
     fn new(raw: RawDecimalExpr) -> Self {
         let (mut value, scale) = raw.evaluate();
-        value.set_scale(scale).unwrap(); // can't fail, as scale is simply the max over the expression
+        value.rescale(scale);
         Self { value, raw }
     }
 }

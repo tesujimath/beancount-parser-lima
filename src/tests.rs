@@ -1,6 +1,7 @@
 #![cfg(test)]
 use super::*;
 use test_case::test_case;
+use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 #[test_case("MySubAccount", Ok("MySubAccount"))]
 #[test_case("", Err(SubAccountErrorKind::Empty))]
@@ -47,4 +48,12 @@ fn test_tag_or_link_identifier_from_str(
         println!("{}", e);
     }
     assert_eq!(result, expected);
+}
+
+use RawDecimalExpr::*;
+#[test_case(Add(Box::new(Value(dec!(12.01))), Box::new(Value(dec!(1.5)))), dec!(13.51))]
+#[test_case(Div(Box::new(Value(dec!(1.00))), Box::new(Value(dec!(3)))), dec!(0.33))]
+fn test_decimal_expr_new(raw: RawDecimalExpr, value: Decimal) {
+    let expr = DecimalExpr::new(raw);
+    assert_eq!(expr.value, value);
 }
