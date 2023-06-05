@@ -67,7 +67,7 @@ pub fn sub_account(i: Span) -> IResult<Span, SubAccount, ErrorTree<Span>> {
 
 /// Matches the `txn` keyword or a flag.
 pub fn txn(i: Span) -> IResult<Span, Flag, ErrorTree<Span>> {
-    alt((map(sym("txn"), |_| Flag::Asterisk), flag))(i)
+    alt((map(sym("txn"), |_| Flag::default()), flag))(i)
 }
 
 /// Matches any flag, including asterisk or hash.
