@@ -127,8 +127,8 @@ pub fn tag_or_link_identifier(i: Span) -> IResult<Span, TagOrLinkIdentifier, Err
 }
 
 pub fn date(i0: Span) -> IResult<Span, NaiveDate, ErrorTree<Span>> {
-    fn date_sep(i: Span) -> IResult<Span, (), ErrorTree<Span>> {
-        one_of("-/")(i).map(|(s, _)| (s, ()))
+    fn date_sep(i: Span) -> IResult<Span, char, ErrorTree<Span>> {
+        one_of("-/")(i).map(|(i, c)| (i, c))
     }
 
     let (i, (year, year_len)) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
@@ -140,11 +140,11 @@ pub fn date(i0: Span) -> IResult<Span, NaiveDate, ErrorTree<Span>> {
             ParseErrorReason::DateMissingCentury,
         ));
     }
-    let (i, _) = date_sep(i)?;
+    let (i, first_date_sep) = date_sep(i)?;
     let (i, month) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
         s.parse::<u32>()
     })(i)?;
-    let (i, _) = date_sep(i)?;
+    let (i, _) = satisfy(|c| c == first_date_sep)(i)?;
     let (i, day) = map_res(take_while1(|c: char| c.is_ascii_digit()), |s: Span| {
         s.parse::<u32>()
     })(i)?;
