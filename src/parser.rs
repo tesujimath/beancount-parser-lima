@@ -5,6 +5,7 @@ use std::iter::once;
 
 use super::*;
 use either::Either;
+use expr::expr;
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, take_while1},
@@ -66,7 +67,7 @@ pub fn sub_account(i: Span) -> IResult<Span, SubAccount, ErrorTree<Span>> {
 }
 
 /// Matches `Currency`.
-pub fn currency(i: Span) -> IResult<Span, Currency, ErrorTree<Span>> {
+pub fn currency(i: Span) -> IResult<Span, Currency> {
     map_res(
         // we recognize more than is legal, but the parse fails in that case
         recognize(tuple((
@@ -75,6 +76,26 @@ pub fn currency(i: Span) -> IResult<Span, Currency, ErrorTree<Span>> {
         ))),
         |s: Span| s.parse::<Currency>(),
     )(i)
+}
+
+pub fn compound_expr(i: Span) -> IResult<Span, CompoundExpr> {
+    use CompoundExpr::*;
+    alt((
+        map(expr, PerUnit),
+        map(tuple((expr, sym("#"))), |(per_unit, _)| PerUnit(per_unit)),
+        map(tuple((sym("#"), expr)), |(_, total)| Total(total)),
+    ))(i)
+}
+
+pub fn compound_amount(i: Span) -> IResult<Span, CompoundAmount> {
+    use CompoundAmount::*;
+    alt((
+        map(tuple((compound_expr, currency)), |(amount, cur)| {
+            CurrencyAmount(amount, cur)
+        }),
+        map(currency, BareCurrency),
+        map(compound_expr, BareAmount),
+    ))(i)
 }
 
 /// Matches the `txn` keyword or a flag.

@@ -458,6 +458,7 @@ impl Display for ExprValue {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Expr {
     Value(Decimal),
     Add(Box<Expr>, Box<Expr>),
@@ -490,6 +491,10 @@ impl Expr {
     }
 }
 
+// impl PartialEq for Expr {
+
+// }
+
 impl Display for Expr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::Expr::*;
@@ -514,6 +519,42 @@ impl Debug for Expr {
             Mul(ref left, ref right) => write!(format, "({:?} * {:?})", left, right),
             Div(ref left, ref right) => write!(format, "({:?} / {:?})", left, right),
             Paren(ref expr) => write!(format, "[{:?}]", expr),
+        }
+    }
+}
+
+/// TODO It's unclear to me whether a compound expression is simply either per-unit or total, or whether it can be both.
+/// For now I assume one or the other.
+#[derive(PartialEq, Eq, Debug)]
+pub enum CompoundExpr {
+    PerUnit(Expr),
+    Total(Expr),
+}
+
+impl Display for CompoundExpr {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::CompoundExpr::*;
+        match self {
+            PerUnit(e) => write!(format, "{}", e),
+            Total(e) => write!(format, "# {}", e),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum CompoundAmount {
+    BareCurrency(Currency),
+    BareAmount(CompoundExpr),
+    CurrencyAmount(CompoundExpr, Currency),
+}
+
+impl Display for CompoundAmount {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::CompoundAmount::*;
+        match self {
+            BareCurrency(cur) => write!(format, "{}", cur),
+            BareAmount(ce) => write!(format, "{}", ce),
+            CurrencyAmount(ce, cur) => write!(format, "{} {}", ce, cur),
         }
     }
 }

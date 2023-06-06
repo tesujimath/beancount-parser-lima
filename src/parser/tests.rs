@@ -1,6 +1,7 @@
 #![cfg(test)]
 use super::*;
 use either::Either::{self, Left, Right};
+use rust_decimal_macros::dec;
 use test_case::test_case;
 
 #[test_case("Assets:Car", Some((AccountType::Assets, vec!["Car"])))]
@@ -18,6 +19,55 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
             println!("{:?}", e);
             assert!(expected.is_none());
         }
+    }
+}
+
+#[test_case("GBP", Some("GBP"))]
+#[test_case("AAPL", Some("AAPL"))] // stock
+#[test_case("V", Some("V"))] // single-character stock
+#[test_case("NT.TO", Some("NT.TO"))] // stock on another market
+#[test_case("TLT_040921C144", Some("TLT_040921C144"))] // equity option
+#[test_case("/6J", Some("/6J"))] // currency futures
+#[test_case("/6'J", Some("/6'J"))] // currency futures
+#[test_case("/NQH21", Some("/NQH21"))] // commodity futures
+#[test_case("/NQH21-EXT", Some("/NQH21-EXT"))] // commodity futures
+#[test_case("/NQH21_QNEG21C13100", Some("/NQH21_QNEG21C13100"))] // futures option
+#[test_case("/6.3", None)]
+#[test_case("CAC_", None)]
+#[test_case("abc", None)]
+#[test_case("A?=.-BJ", Some("A"))] // parser takes what it can
+#[test_case("", None)]
+fn test_currency(s: &str, expected: Option<&str>) {
+    match (currency(s.into()), expected) {
+        (Ok((_, actual)), Some(expected)) => assert_eq!(actual, Currency(expected.to_owned())),
+        (Err(_), None) => (),
+        (Err(actual), Some(_)) => panic!("unexpected failure: {}", actual),
+        (Ok((_, actual)), None) => panic!("unexpected success: {}", actual),
+    }
+}
+
+#[test_case("123.45", Some(CompoundExpr::PerUnit(Expr::Value(dec!(123.45)))))]
+#[test_case("# 123.45", Some(CompoundExpr::Total(Expr::Value(dec!(123.45)))))]
+fn test_compound_expr(s: &str, expected: Option<CompoundExpr>) {
+    match (compound_expr(s.into()), expected) {
+        (Ok((_, actual)), Some(expected)) => assert_eq!(actual, expected),
+        (Err(_), None) => (),
+        (Err(actual), Some(_)) => panic!("unexpected failure: {}", actual),
+        (Ok((_, actual)), None) => panic!("unexpected success: {}", actual),
+    }
+}
+
+#[test_case("GBP", Some(CompoundAmount::BareCurrency(Currency("GBP".to_owned()))))]
+#[test_case("456.78", Some(CompoundAmount::BareAmount(CompoundExpr::PerUnit(Expr::Value(dec!(456.78))))))]
+#[test_case("# 1456.98", Some(CompoundAmount::BareAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98))))))]
+#[test_case("456.78 NZD", Some(CompoundAmount::CurrencyAmount(CompoundExpr::PerUnit(Expr::Value(dec!(456.78))), Currency("NZD".to_owned()))))]
+#[test_case("# 1456.98 USD", Some(CompoundAmount::CurrencyAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98))), Currency("USD".to_owned()))))]
+fn test_compound_amount(s: &str, expected: Option<CompoundAmount>) {
+    match (compound_amount(s.into()), expected) {
+        (Ok((_, actual)), Some(expected)) => assert_eq!(actual, expected),
+        (Err(_), None) => (),
+        (Err(actual), Some(_)) => panic!("unexpected failure: {}", actual),
+        (Ok((_, actual)), None) => panic!("unexpected success: {}", actual),
     }
 }
 
