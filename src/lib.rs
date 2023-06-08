@@ -69,7 +69,7 @@ impl Display for Account {
     }
 }
 
-#[derive(PartialEq, Eq, Display, Debug)]
+#[derive(PartialEq, Eq, Display, Clone, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -559,5 +559,6 @@ impl Display for CompoundAmount {
     }
 }
 
+mod parser;
 mod parser_nom;
 mod tests;
