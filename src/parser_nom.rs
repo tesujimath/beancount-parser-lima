@@ -168,9 +168,9 @@ pub fn date(i0: Span) -> IResult<Span, NaiveDate, ErrorTree<Span>> {
         s.parse::<i32>().map(|y| (y, s.len()))
     })(i0)?;
     if year_len < 4 {
-        return Err(ParseError::nom_error(
+        return Err(DateError::nom_error(
             i0,
-            ParseErrorReason::DateMissingCentury,
+            DateErrorReason::DateMissingCentury,
         ));
     }
     let (i, first_date_sep) = date_sep(i)?;
@@ -184,7 +184,7 @@ pub fn date(i0: Span) -> IResult<Span, NaiveDate, ErrorTree<Span>> {
 
     match NaiveDate::from_ymd_opt(year, month, day) {
         Some(d) => Ok((i, d)),
-        None => Err(ParseError::nom_error(i0, ParseErrorReason::DateOutOfRange)),
+        None => Err(DateError::nom_error(i0, DateErrorReason::DateOutOfRange)),
     }
 }
 
@@ -207,35 +207,36 @@ pub fn string(i: Span) -> IResult<Span, String, ErrorTree<Span>> {
 }
 
 #[derive(Debug)]
-enum ParseErrorReason {
+enum DateErrorReason {
     DateMissingCentury,
     DateOutOfRange,
 }
 
 #[derive(Debug)]
-pub struct ParseError {
-    reason: ParseErrorReason,
+// TODO remove this in favour of a better approach?
+pub struct DateError {
+    reason: DateErrorReason,
 }
 
-impl ParseError {
-    fn nom_error(location: Span, reason: ParseErrorReason) -> nom::Err<ErrorTree<Span>> {
+impl DateError {
+    fn nom_error(location: Span, reason: DateErrorReason) -> nom::Err<ErrorTree<Span>> {
         nom::Err::Error(ErrorTree::Base {
             location,
-            kind: BaseErrorKind::External(Box::new(ParseError { reason })),
+            kind: BaseErrorKind::External(Box::new(DateError { reason })),
         })
     }
 }
 
-impl Display for ParseError {
+impl Display for DateError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.reason {
-            ParseErrorReason::DateMissingCentury => write!(f, "date requires century"),
-            ParseErrorReason::DateOutOfRange => write!(f, "date out of range"),
+            DateErrorReason::DateMissingCentury => write!(f, "date requires century"),
+            DateErrorReason::DateOutOfRange => write!(f, "date out of range"),
         }
     }
 }
 
-impl Error for ParseError {}
+impl Error for DateError {}
 
 mod expr;
 mod tests;

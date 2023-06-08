@@ -559,5 +559,5 @@ impl Display for CompoundAmount {
     }
 }
 
-mod parser;
+mod parser_nom;
 mod tests;
