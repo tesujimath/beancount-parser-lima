@@ -19,6 +19,7 @@ pub struct Account {
 }
 
 impl Account {
+    // TODO this shouldn't be called new if it can fail
     pub fn new(
         account_type: AccountType,
         sub_accounts: Vec<SubAccount>,
