@@ -17,6 +17,7 @@ nom = { version = "7.1.3", features = ["alloc"] }
 nom-supreme = "0.8.0"
 nom-tracable = "0.9.0"
 nom_locate = "4.1.0"
+nonempty = "0.8.1"
 rust_decimal = "1.29.1"
 strum_macros = "0.24.3"
 

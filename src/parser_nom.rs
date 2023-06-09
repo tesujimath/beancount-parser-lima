@@ -21,12 +21,13 @@ use nom_supreme::{
     tag::complete::tag as sym, // beancount grammar has its own tag
 };
 use nom_tracable::TracableInfo;
+use nonempty::NonEmpty;
 
 type Span<'a> = LocatedSpan<&'a str, TracableInfo>;
 
 /// Matches `Account`.
 pub fn account(i: Span) -> IResult<Span, Account, ErrorTree<Span>> {
-    map_res(
+    map(
         tuple((
             account_type,
             sym(":"),
@@ -36,9 +37,10 @@ pub fn account(i: Span) -> IResult<Span, Account, ErrorTree<Span>> {
         |(acc_type, _colon, sub, colon_sub_pairs)| {
             Account::new(
                 acc_type,
-                once(sub)
-                    .chain(colon_sub_pairs.into_iter().map(|(_colon, sub)| sub))
-                    .collect(),
+                NonEmpty::collect(
+                    once(sub).chain(colon_sub_pairs.into_iter().map(|(_colon, sub)| sub)),
+                )
+                .unwrap(),
             )
         },
     )(i)

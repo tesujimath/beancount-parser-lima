@@ -13,12 +13,11 @@ pub fn account() -> impl Parser<char, Account, Error = Simple<char>> {
                 .repeated()
                 .at_least(1),
         )
-        .try_map(|(acc_type, unit_subs), span| {
+        .map(|(acc_type, unit_subs)| {
             Account::new(
                 acc_type,
-                unit_subs.into_iter().map(|(_, sub)| sub).collect(),
+                NonEmpty::collect(unit_subs.into_iter().map(|(_, sub)| sub)).unwrap(),
             )
-            .map_err(|e| Simple::custom(span, format!("{}", e)))
         })
 }
 

@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use chrono::NaiveDate;
+use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     cmp::max,
@@ -15,45 +16,17 @@ use strum_macros::Display;
 #[derive(PartialEq, Eq, Debug)]
 pub struct Account {
     account_type: AccountType,
-    sub_accounts: Vec<SubAccount>,
+    sub_accounts: NonEmpty<SubAccount>,
 }
 
 impl Account {
-    // TODO this shouldn't be called new if it can fail
-    pub fn new(
-        account_type: AccountType,
-        sub_accounts: Vec<SubAccount>,
-    ) -> Result<Account, AccountError> {
-        use AccountErrorKind::*;
-        if sub_accounts.is_empty() {
-            Err(AccountError(MissingSubAccounts))
-        } else {
-            Ok(Account {
-                account_type,
-                sub_accounts,
-            })
+    pub fn new(account_type: AccountType, sub_accounts: NonEmpty<SubAccount>) -> Account {
+        Account {
+            account_type,
+            sub_accounts,
         }
     }
 }
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct AccountError(AccountErrorKind);
-
-#[derive(PartialEq, Eq, Debug)]
-enum AccountErrorKind {
-    MissingSubAccounts,
-}
-
-impl Display for AccountError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use AccountErrorKind::*;
-        match &self.0 {
-            MissingSubAccounts => write!(f, "missing subaccounts"),
-        }
-    }
-}
-
-impl Error for AccountError {}
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

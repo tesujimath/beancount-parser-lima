@@ -10,7 +10,8 @@ use test_case::test_case;
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
     let expected = expected_raw.map(|(account_type, subs)| Account {
         account_type,
-        sub_accounts: subs.iter().map(|sub| SubAccount(sub.to_string())).collect(),
+        sub_accounts: NonEmpty::collect(subs.iter().map(|sub| SubAccount(sub.to_string())))
+            .unwrap(),
     });
 
     match account(s.into()) {
