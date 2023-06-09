@@ -6,17 +6,17 @@ use chumsky::{prelude::*, text::keyword};
 /// Matches `Account`.
 pub fn account() -> impl Parser<char, Account, Error = Simple<char>> {
     account_type()
-        .then_ignore(
-            // TODO many1 of these
-            just(':'),
+        .then(
+            just(':')
+                .ignored()
+                .then(sub_account())
+                .repeated()
+                .at_least(1),
         )
-        .then(sub_account())
-        .try_map(|(acc_type, sub), span| {
+        .try_map(|(acc_type, unit_subs), span| {
             Account::new(
                 acc_type,
-                once(sub)
-                    // .chain(colon_sub_pairs.into_iter().map(|(_colon, sub)| sub))
-                    .collect(),
+                unit_subs.into_iter().map(|(_, sub)| sub).collect(),
             )
             .map_err(|e| Simple::custom(span, format!("{}", e)))
         })
@@ -36,10 +36,16 @@ pub fn account_type() -> impl Parser<char, AccountType, Error = Simple<char>> {
 /// Matches `SubAccount`.
 pub fn sub_account() -> impl Parser<char, SubAccount, Error = Simple<char>> {
     filter(|c| SubAccount::is_valid_initial(&c))
-        .then(filter(|c| SubAccount::is_valid_subsequent(&c)))
+        .then(
+            filter(|c| SubAccount::is_valid_subsequent(&c))
+                .repeated()
+                .at_least(0),
+        )
         .try_map(|(initial, subsequent), span| {
-            (vec![initial, subsequent])
-                .iter()
+            once(initial)
+                .chain(subsequent.into_iter())
+                .collect::<Vec<char>>()
+                .into_iter()
                 .collect::<String>()
                 .parse::<SubAccount>()
                 .map_err(|e| Simple::custom(span, format!("{}", e)))

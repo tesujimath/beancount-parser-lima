@@ -3,6 +3,7 @@ use super::*;
 use test_case::test_case;
 
 #[test_case("Assets:Car", Some((AccountType::Assets, vec!["Car"])))]
+#[test_case("Assets:Car:Fuel", Some((AccountType::Assets, vec!["Car", "Fuel"])))]
 #[test_case("Assets:oops", None)]
 #[test_case("Assets:Bike:oops", Some((AccountType::Assets, vec!["Bike"])))]
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
