@@ -51,4 +51,22 @@ pub fn sub_account() -> impl Parser<char, SubAccount, Error = Simple<char>> {
         })
 }
 
+pub fn currency() -> impl Parser<char, Currency, Error = Simple<char>> {
+    filter(|c| Currency::is_valid_initial(&c))
+        .then(
+            // we recognize more than is legal, but the parse fails in that case
+            filter(|c| Currency::is_valid_intermediate(&c))
+                .repeated()
+                .at_least(0),
+        )
+        .try_map(|(initial, subsequent), span| {
+            once(initial)
+                .chain(subsequent.into_iter())
+                .collect::<Vec<char>>()
+                .into_iter()
+                .collect::<String>()
+                .parse::<Currency>()
+                .map_err(|e| Simple::custom(span, format!("{}", e)))
+        })
+}
 mod tests;
