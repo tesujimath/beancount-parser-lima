@@ -23,12 +23,14 @@ pub fn account() -> impl Parser<char, Account, Error = Simple<char>> {
 
 /// Matches `AccountType`.
 pub fn account_type() -> impl Parser<char, AccountType, Error = Simple<char>> {
+    use AccountType::*;
+
     choice((
-        keyword("Assets").to(AccountType::Assets),
-        keyword("Liabilities").to(AccountType::Liabilities),
-        keyword("Equity").to(AccountType::Equity),
-        keyword("Income").to(AccountType::Income),
-        keyword("Expenses").to(AccountType::Expenses),
+        keyword("Assets").to(Assets),
+        keyword("Liabilities").to(Liabilities),
+        keyword("Equity").to(Equity),
+        keyword("Income").to(Income),
+        keyword("Expenses").to(Expenses),
     ))
 }
 
