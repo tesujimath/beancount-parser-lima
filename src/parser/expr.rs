@@ -13,7 +13,7 @@ pub fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src,
 }
 
 /// Match a number with optional thousands separators and optional decimal point and fractional part
-pub fn value<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'src, char, Span>>> {
+pub fn value<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
     just('-')
         .or_not()
         .then(
@@ -31,7 +31,9 @@ pub fn value<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'s
         .try_map(|s, span| {
             let mut without_commas = s.to_string();
             without_commas.retain(|c| c != ',');
-            FromStr::from_str(&without_commas).map_err(|e| chumsky::error::Rich::custom(span, e))
+            FromStr::from_str(&without_commas)
+                .map(Expr::Value)
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
 
@@ -39,5 +41,5 @@ pub fn value<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'s
 #[test_case("123,456,789", dec!(123456789))]
 #[test_case("-123,456,789.12", dec!(-123456789.12))]
 fn value_test(s: &str, expected: Decimal) {
-    assert_eq!(value().parse(s).into_result(), Ok(expected));
+    assert_eq!(value().parse(s).into_result(), Ok(Expr::Value(expected)));
 }
