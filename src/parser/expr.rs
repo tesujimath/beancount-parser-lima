@@ -4,6 +4,7 @@ use super::*;
 #[cfg(test)]
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
+use chumsky::text::inline_whitespace;
 #[cfg(test)]
 use test_case::test_case;
 
@@ -34,7 +35,7 @@ pub fn expr<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, 
 
         // Match a parenthesized expression
         let parens = expr
-            .padded()
+            .padded_by(inline_whitespace())
             .delimited_by(just('('), just(')'))
             .map(|x| Expr::Paren(Box::new(x)));
 
@@ -42,7 +43,7 @@ pub fn expr<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, 
         let factor = value.or(parens.clone());
 
         // Match the specified operator
-        let op = |c| just(c).ignored().padded();
+        let op = |c| just(c).ignored().padded_by(inline_whitespace());
 
         // Match a product of factors
         let product = factor.clone().foldl(
