@@ -43,9 +43,7 @@ pub fn product<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'sr
         .then(factor())
         .repeated(),
         |lhs, (op, rhs)| op(Box::new(lhs), Box::new(rhs)),
-    );
-
-    value().or(parens())
+    )
 }
 
 /// Match the specified operator
