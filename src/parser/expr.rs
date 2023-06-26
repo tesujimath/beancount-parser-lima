@@ -34,7 +34,7 @@ fn expr_test(s: &str, expected: &str) {
 }
 
 /// Match a product of factors
-pub fn product<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
+fn product<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
     factor().foldl(
         choice((
             op('*').to(Expr::Mul as fn(_, _) -> _),
@@ -47,17 +47,17 @@ pub fn product<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'sr
 }
 
 /// Match the specified operator
-pub fn op<'src>(c: char) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+fn op<'src>(c: char) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
     just(c).ignored().padded()
 }
 
 /// Match a factor of an expression
-pub fn factor<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
+fn factor<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
     value().or(parens())
 }
 
 /// Match a parenthesized expression
-pub fn parens<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
+fn parens<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
     value()
         .padded()
         .delimited_by(just('('), just(')'))
@@ -65,12 +65,12 @@ pub fn parens<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src
 }
 
 /// Match a single digit
-pub fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {
+fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {
     any().filter(char::is_ascii_digit)
 }
 
 /// Match a number with optional thousands separators and optional decimal point and fractional part
-pub fn value<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
+fn value<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, char, Span>>> {
     just('-')
         .or_not()
         .then(
