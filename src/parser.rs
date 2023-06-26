@@ -64,4 +64,6 @@ pub fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Ric
                 .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
+
+mod expr;
 mod tests;
