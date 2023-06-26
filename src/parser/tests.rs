@@ -5,7 +5,6 @@ use test_case::test_case;
 #[test_case("Assets:Car", Some((AccountType::Assets, vec!["Car"])))]
 #[test_case("Assets:Car:Fuel", Some((AccountType::Assets, vec!["Car", "Fuel"])))]
 #[test_case("Assets:oops", None)]
-#[test_case("Assets:Bike:oops", Some((AccountType::Assets, vec!["Bike"])))]
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
     let expected = expected_raw.map(|(account_type, subs)| Account {
         account_type,
@@ -13,7 +12,7 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
             .unwrap(),
     });
 
-    match account().parse(s) {
+    match account().parse(s).into_result() {
         Ok(result) => assert_eq!(result, expected.unwrap()),
         Err(e) => {
             println!("{:?}", e);
@@ -35,16 +34,9 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
 #[test_case("/6.3", None)]
 #[test_case("CAC_", None)]
 #[test_case("abc", None)]
-#[test_case("A?=.-BJ", Some("A"))] // parser takes what it can
 #[test_case("", None)]
 fn test_currency(s: &str, expected: Option<&str>) {
     let expected = expected.map(|s| s.parse::<Currency>().unwrap());
 
-    match currency().parse(s) {
-        Ok(result) => assert_eq!(result, expected.unwrap()),
-        Err(e) => {
-            println!("{:?}", e);
-            assert!(expected.is_none());
-        }
-    }
+    assert_eq!(currency().parse(s).into_output(), expected);
 }

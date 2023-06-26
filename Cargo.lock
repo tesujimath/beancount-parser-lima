@@ -218,11 +218,11 @@ dependencies = [
 
 [[package]]
 name = "chumsky"
-version = "0.9.2"
+version = "1.0.0-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23170228b96236b5a7299057ac284a321457700bc8c41a4476052f0f4ba5349d"
+checksum = "cc3172a80699de358070dd99f80ea8badc6cdf8ac2417cb5a96e6d81bf5fe06d"
 dependencies = [
- "hashbrown 0.12.3",
+ "hashbrown 0.13.2",
  "stacker",
 ]
 

@@ -1,17 +1,19 @@
-use std::iter::once;
-
 use super::*;
-use chumsky::{prelude::*, text::keyword};
+use chumsky::{prelude::*, span::SimpleSpan, text::keyword};
+
+pub type Span = SimpleSpan<usize>;
 
 /// Matches `Account`.
-pub fn account() -> impl Parser<char, Account, Error = Simple<char>> {
+pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<'src, char, Span>>>
+{
     account_type()
         .then(
             just(':')
                 .ignored()
                 .then(sub_account())
                 .repeated()
-                .at_least(1),
+                .at_least(1)
+                .collect::<Vec<_>>(),
         )
         .map(|(acc_type, unit_subs)| {
             Account::new(
@@ -22,7 +24,8 @@ pub fn account() -> impl Parser<char, Account, Error = Simple<char>> {
 }
 
 /// Matches `AccountType`.
-pub fn account_type() -> impl Parser<char, AccountType, Error = Simple<char>> {
+pub fn account_type<'src>(
+) -> impl Parser<'src, &'src str, AccountType, extra::Err<Rich<'src, char, Span>>> {
     use AccountType::*;
 
     choice((
@@ -35,40 +38,30 @@ pub fn account_type() -> impl Parser<char, AccountType, Error = Simple<char>> {
 }
 
 /// Matches `SubAccount`.
-pub fn sub_account() -> impl Parser<char, SubAccount, Error = Simple<char>> {
-    filter(|c| SubAccount::is_valid_initial(&c))
-        .then(
-            filter(|c| SubAccount::is_valid_subsequent(&c))
-                .repeated()
-                .at_least(0),
-        )
-        .try_map(|(initial, subsequent), span| {
-            once(initial)
-                .chain(subsequent.into_iter())
-                .collect::<Vec<char>>()
-                .into_iter()
-                .collect::<String>()
-                .parse::<SubAccount>()
-                .map_err(|e| Simple::custom(span, format!("{}", e)))
+pub fn sub_account<'src>(
+) -> impl Parser<'src, &'src str, SubAccount, extra::Err<Rich<'src, char, Span>>> {
+    any()
+        .filter(SubAccount::is_valid_initial)
+        .then(any().filter(SubAccount::is_valid_subsequent).repeated())
+        .slice()
+        .try_map(|s: &str, span| {
+            s.parse::<SubAccount>()
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
 
-pub fn currency() -> impl Parser<char, Currency, Error = Simple<char>> {
-    filter(|c| Currency::is_valid_initial(&c))
+pub fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>>
+{
+    any()
+        .filter(Currency::is_valid_initial)
         .then(
             // we recognize more than is legal, but the parse fails in that case
-            filter(|c| Currency::is_valid_intermediate(&c))
-                .repeated()
-                .at_least(0),
+            any().filter(Currency::is_valid_intermediate).repeated(),
         )
-        .try_map(|(initial, subsequent), span| {
-            once(initial)
-                .chain(subsequent.into_iter())
-                .collect::<Vec<char>>()
-                .into_iter()
-                .collect::<String>()
-                .parse::<Currency>()
-                .map_err(|e| Simple::custom(span, format!("{}", e)))
+        .slice()
+        .try_map(|s: &str, span| {
+            s.parse::<Currency>()
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
 mod tests;
