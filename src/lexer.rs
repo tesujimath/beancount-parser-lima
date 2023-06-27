@@ -1,5 +1,5 @@
 use super::*;
-use chrono::NaiveTime;
+use chrono::{NaiveDateTime, NaiveTime};
 use chumsky::{
     prelude::*,
     span::SimpleSpan,
@@ -26,7 +26,7 @@ pub enum Token {
     Hash,
     Asterisk,
     Colon,
-    Flag(char),
+    OtherFlag(char),
     Txn,
     Balance,
     Open,
@@ -47,6 +47,8 @@ pub enum Token {
     Options,
     Plugin,
     Include,
+    DateTime(NaiveDateTime),
+    Date(NaiveDate),
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
@@ -75,30 +77,39 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
         .or(just("#").to(Hash))
         .or(just("*").to(Asterisk))
         .or(just(":").to(Colon))
-        .or(one_of("!&?%").map(Flag))
+        // flag characters other than * #
+        .or(one_of("!&?%").map(OtherFlag))
         .or(just("'")
             .then(any().filter(char::is_ascii_uppercase))
-            .map(|(_, c)| Flag(c)))
-        .or(just("txn").to(Txn))
-        .or(just("balance").to(Balance))
-        .or(just("open").to(Open))
-        .or(just("close").to(Close))
-        .or(just("commodity").to(Commodity))
-        .or(just("pad").to(Pad))
-        .or(just("event").to(Event))
-        .or(just("query").to(Query))
-        .or(just("custom").to(Custom))
-        .or(just("price").to(Price))
-        .or(just("note").to(Note))
-        .or(just("document").to(Document))
-        .or(just("pushtag").to(Pushtag))
-        .or(just("poptag").to(Poptag))
-        .or(just("pushmeta").to(Pushmeta))
-        .or(just("popmeta").to(Popmeta))
-        .or(just("option").to(Option))
-        .or(just("options").to(Options))
-        .or(just("plugin").to(Plugin))
-        .or(just("include").to(Include))
+            .map(|(_, c)| OtherFlag(c)))
+        // keywords
+        .or(keyword("txn").to(Txn))
+        .or(keyword("balance").to(Balance))
+        .or(keyword("open").to(Open))
+        .or(keyword("close").to(Close))
+        .or(keyword("commodity").to(Commodity))
+        .or(keyword("pad").to(Pad))
+        .or(keyword("event").to(Event))
+        .or(keyword("query").to(Query))
+        .or(keyword("custom").to(Custom))
+        .or(keyword("price").to(Price))
+        .or(keyword("note").to(Note))
+        .or(keyword("document").to(Document))
+        .or(keyword("pushtag").to(Pushtag))
+        .or(keyword("poptag").to(Poptag))
+        .or(keyword("pushmeta").to(Pushmeta))
+        .or(keyword("popmeta").to(Popmeta))
+        .or(keyword("option").to(Option))
+        .or(keyword("options").to(Options))
+        .or(keyword("plugin").to(Plugin))
+        .or(keyword("include").to(Include))
+        // datetime or bare date
+        .or(date()
+            .then_ignore(inline_whitespace())
+            .then(time())
+            .then_ignore(end_of_word())
+            .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))))
+        .or(date().then_ignore(end_of_word()).map(Date))
 }
 
 fn date<'src>() -> impl Parser<'src, &'src str, NaiveDate, extra::Err<Rich<'src, char, Span>>> {
@@ -158,13 +169,19 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
             NaiveTime::from_hms_opt(hour, min, sec.unwrap_or(0))
                 .ok_or(chumsky::error::Rich::custom(span, "time out of range"))
         })
-
-    // const date_re: &str = r"\d{4}[\-/]\d{2}[\-/]\d{2}"
-    // const time_re: &str = r"\d{1,2}:\d{2}(:\d{2})?"
 }
 
 fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {
     any().filter(char::is_ascii_digit)
+}
+
+/// match only at the end of a word, without consuming what comes next
+fn end_of_word<'src>() -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+    any()
+        .filter(|c: &char| !c.is_alphanumeric() && *c != '_')
+        .ignored()
+        .or(end())
+        .rewind()
 }
 
 pub type Span = SimpleSpan<usize>;
