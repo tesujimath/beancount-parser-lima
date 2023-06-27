@@ -12,16 +12,15 @@ pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<
     account_type()
         .then(
             just(':')
-                .ignored()
-                .then(sub_account())
+                .ignore_then(sub_account())
                 .repeated()
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
-        .map(|(acc_type, unit_subs)| {
+        .map(|(acc_type, sub_accounts)| {
             Account::new(
                 acc_type,
-                NonEmpty::collect(unit_subs.into_iter().map(|(_, sub)| sub)).unwrap(),
+                NonEmpty::collect(sub_accounts.into_iter()).unwrap(),
             )
         })
 }
@@ -74,14 +73,12 @@ pub fn compound_expr<'src>(
 
     // we need to try for the variant with trailing # before the bare expression
     expr()
-        .then(inline_whitespace().then(just('#')).ignored())
-        .map(|(x, _)| PerUnit(x))
+        .then_ignore(inline_whitespace().then(just('#')))
+        .map(PerUnit)
         .or(expr().map(PerUnit))
-        .or(just('#')
-            .then(inline_whitespace())
-            .ignored()
-            .then(expr())
-            .map(|(_, x)| Total(x)))
+        .or((just('#').then(inline_whitespace()))
+            .ignore_then(expr())
+            .map(Total))
 }
 
 mod expr;
