@@ -1,5 +1,11 @@
 use super::*;
-use chumsky::{prelude::*, span::SimpleSpan, text::keyword};
+use chumsky::{
+    prelude::*,
+    span::SimpleSpan,
+    text::{inline_whitespace, keyword},
+};
+
+use expr::expr;
 
 pub type Span = SimpleSpan<usize>;
 
@@ -63,6 +69,22 @@ pub fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Ric
             s.parse::<Currency>()
                 .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
+}
+
+pub fn compound_expr<'src>(
+) -> impl Parser<'src, &'src str, CompoundExpr, extra::Err<Rich<'src, char, Span>>> {
+    use CompoundExpr::*;
+
+    // we need to try for the variant with trailing # before the bare expression
+    expr()
+        .then(inline_whitespace().then(just('#')).ignored())
+        .map(|(x, _)| PerUnit(x))
+        .or(expr().map(PerUnit))
+        .or(just('#')
+            .then(inline_whitespace())
+            .ignored()
+            .then(expr())
+            .map(|(_, x)| Total(x)))
 }
 
 mod expr;

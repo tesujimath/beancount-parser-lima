@@ -70,16 +70,24 @@ pub fn expr<'src>() -> impl Parser<'src, &'src str, Expr, extra::Err<Rich<'src, 
 }
 
 #[cfg(test)]
-#[test_case("1 + 2 *  3", "(1 + (2 * 3))")]
-#[test_case("1 + 2 *  3 / 4 - 5", "((1 + ((2 * 3) / 4)) - 5)")]
-#[test_case("(1 + 2) *  3 / (4 - 6)", "(([(1 + 2)] * 3) / [(4 - 6)])")]
-#[test_case("72 / 2 / 3", "((72 / 2) / 3)")]
-#[test_case("10 - 1", "(10 - 1)")]
-#[test_case("10 - -2", "(10 - -2)")]
-fn expr_test(s: &str, expected: &str) {
+#[test_case("1 + 2 *  3", "(1 + (2 * 3))", "")]
+#[test_case("1 + 2 *  3 / 4 - 5", "((1 + ((2 * 3) / 4)) - 5)", "")]
+#[test_case("(1 + 2) *  3 / (4 - 6)", "(([(1 + 2)] * 3) / [(4 - 6)])", "")]
+#[test_case("72 / 2 / 3", "((72 / 2) / 3)", "")]
+#[test_case("10 - 1", "(10 - 1)", "")]
+#[test_case("10 - -2", "(10 - -2)", "")]
+#[test_case("4 + 2 *  3 XYZ", "(4 + (2 * 3))", " XYZ")]
+#[test_case("4 + 2 *  3 # freddy", "(4 + (2 * 3))", " # freddy")]
+#[test_case("2.718 #", "2.718", " #")]
+#[test_case("3.141 # pi", "3.141", " # pi")]
+fn expr_test(s: &str, expected: &str, expected_unparsed: &str) {
     assert_eq!(
-        expr().map(|x| format!("{:?}", x)).parse(s).into_result(),
-        Ok(expected.to_owned())
+        expr()
+            .map(|x| format!("{:?}", x))
+            .then(any().repeated().collect::<String>())
+            .parse(s)
+            .into_result(),
+        Ok((expected.to_owned(), expected_unparsed.to_owned()))
     )
 }
 
