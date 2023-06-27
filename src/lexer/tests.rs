@@ -61,3 +61,22 @@ fn test_time(s: &str, expected: Option<(u32, u32, u32, &str)>) {
         None => assert!(result.is_err()),
     }
 }
+
+#[test_case("Assets:Car", Some((AccountType::Assets, vec!["Car"])))]
+#[test_case("Assets:Car:Fuel", Some((AccountType::Assets, vec!["Car", "Fuel"])))]
+#[test_case("Assets:oops", None)]
+fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
+    let expected = expected_raw.map(|(account_type, names)| Account {
+        account_type,
+        names: NonEmpty::collect(names.into_iter().map(|name| AccountName(name.to_string())))
+            .unwrap(),
+    });
+
+    match account().parse(s).into_result() {
+        Ok(result) => assert_eq!(result, expected.unwrap()),
+        Err(e) => {
+            println!("{:?}", e);
+            assert!(expected.is_none());
+        }
+    }
+}

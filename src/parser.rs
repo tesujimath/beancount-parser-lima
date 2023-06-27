@@ -6,22 +6,6 @@ use chumsky::{
 
 use expr::expr;
 
-/// Matches `Account`.
-pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<'src, char, Span>>>
-{
-    account_type()
-        .then(
-            just(':')
-                .ignore_then(account_name())
-                .repeated()
-                .at_least(1)
-                .collect::<Vec<_>>(),
-        )
-        .map(|(acc_type, names)| {
-            Account::new(acc_type, NonEmpty::collect(names.into_iter()).unwrap())
-        })
-}
-
 /// Matches `AccountType`.
 pub fn account_type<'src>(
 ) -> impl Parser<'src, &'src str, AccountType, extra::Err<Rich<'src, char, Span>>> {

@@ -14,7 +14,7 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account {
     account_type: AccountType,
     names: NonEmpty<AccountName>,
@@ -53,7 +53,7 @@ pub enum AccountType {
     Expenses,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct AccountName(String);
 
 impl AccountName {

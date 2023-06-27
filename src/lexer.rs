@@ -52,6 +52,7 @@ pub enum Token {
     Include,
     DateTime(NaiveDateTime),
     Date(NaiveDate),
+    Account(Account),
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
@@ -120,6 +121,9 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
             .then_ignore(end_of_word())
             .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))))
         .or(date().then_ignore(end_of_word()).map(Date))
+        //
+        // account
+        .or(account().map(Account))
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
@@ -186,6 +190,22 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
         .try_map(|(((hour, _), min), sec), span| {
             NaiveTime::from_hms_opt(hour, min, sec.unwrap_or(0))
                 .ok_or(chumsky::error::Rich::custom(span, "time out of range"))
+        })
+}
+
+/// Matches `Account`.
+pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<'src, char, Span>>>
+{
+    account_type()
+        .then(
+            just(':')
+                .ignore_then(account_name())
+                .repeated()
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .map(|(acc_type, names)| {
+            Account::new(acc_type, NonEmpty::collect(names.into_iter()).unwrap())
         })
 }
 
