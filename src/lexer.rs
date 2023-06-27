@@ -8,6 +8,9 @@ use chumsky::{
 
 #[derive(Clone)]
 pub enum Token {
+    True,
+    False,
+    Null,
     Currency(super::Currency),
     Pipe,
     AtAt,
@@ -54,12 +57,20 @@ pub enum Token {
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
-    regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
-        .try_map(|s: &str, span| {
-            s.parse::<super::Currency>()
-                .map(Currency)
-                .map_err(|e| chumsky::error::Rich::custom(span, e))
-        })
+    // keywords which look like currencies, so must be first
+    keyword("TRUE").to(True)
+        .or(keyword("FALSE").to(False))
+        .or(keyword("NULL").to(Null))
+        //
+        // currency
+        .or(regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
+            .try_map(|s: &str, span| {
+                s.parse::<super::Currency>()
+                    .map(Currency)
+                    .map_err(|e| chumsky::error::Rich::custom(span, e))
+            }))
+        //
+        // special characters
         .or(just("|").to(Pipe))
         .or(just("@@").to(AtAt))
         .or(just("@").to(At))
@@ -77,12 +88,14 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
         .or(just("#").to(Hash))
         .or(just("*").to(Asterisk))
         .or(just(":").to(Colon))
+        //
         // flag characters other than * #
         .or(one_of("!&?%").map(OtherFlag))
         .or(just("'")
             .then(any().filter(char::is_ascii_uppercase))
             .map(|(_, c)| OtherFlag(c)))
-        // keywords
+        //
+        // other keywords
         .or(keyword("txn").to(Txn))
         .or(keyword("balance").to(Balance))
         .or(keyword("open").to(Open))
@@ -103,7 +116,8 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
         .or(keyword("options").to(Options))
         .or(keyword("plugin").to(Plugin))
         .or(keyword("include").to(Include))
-        // datetime or bare date
+        //
+        // date/time or bare date
         .or(date()
             .then_ignore(inline_whitespace())
             .then(time())
