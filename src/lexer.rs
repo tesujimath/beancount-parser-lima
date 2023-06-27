@@ -58,17 +58,13 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
     use Token::*;
 
     // keywords which look like currencies, so must be first
-    keyword("TRUE").to(True)
+    keyword("TRUE")
+        .to(True)
         .or(keyword("FALSE").to(False))
         .or(keyword("NULL").to(Null))
         //
         // currency
-        .or(regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
-            .try_map(|s: &str, span| {
-                s.parse::<super::Currency>()
-                    .map(Currency)
-                    .map_err(|e| chumsky::error::Rich::custom(span, e))
-            }))
+        .or(currency().map(Currency))
         //
         // special characters
         .or(just("|").to(Pipe))
@@ -124,6 +120,14 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
             .then_ignore(end_of_word())
             .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))))
         .or(date().then_ignore(end_of_word()).map(Date))
+}
+
+fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
+        .try_map(|s: &str, span| {
+            s.parse::<super::Currency>()
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
+        })
 }
 
 fn date<'src>() -> impl Parser<'src, &'src str, NaiveDate, extra::Err<Rich<'src, char, Span>>> {
@@ -183,6 +187,22 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
             NaiveTime::from_hms_opt(hour, min, sec.unwrap_or(0))
                 .ok_or(chumsky::error::Rich::custom(span, "time out of range"))
         })
+}
+
+fn account_type<'src>(
+) -> impl Parser<'src, &'src str, AccountType, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"[\p{Lu}\p{Lo}][\p{L}\p{N}\-]*").try_map(|s: &str, span| {
+        s.parse::<AccountType>()
+            .map_err(|e| chumsky::error::Rich::custom(span, e))
+    })
+}
+
+fn account_name<'src>(
+) -> impl Parser<'src, &'src str, AccountName, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"[\p{Lu}\p{Lo}\p{N}][\p{L}\p{N}\-]*").try_map(|s: &str, span| {
+        s.parse::<AccountName>()
+            .map_err(|e| chumsky::error::Rich::custom(span, e))
+    })
 }
 
 fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {

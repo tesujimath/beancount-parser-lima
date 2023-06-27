@@ -31,14 +31,14 @@ pub fn account(i: Span) -> IResult<Span, Account, ErrorTree<Span>> {
         tuple((
             account_type,
             sym(":"),
-            sub_account,
-            many0(tuple((sym(":"), sub_account))),
+            account_name,
+            many0(tuple((sym(":"), account_name))),
         )),
-        |(acc_type, _colon, sub, colon_sub_pairs)| {
+        |(acc_type, _colon, name, colon_name_pairs)| {
             Account::new(
                 acc_type,
                 NonEmpty::collect(
-                    once(sub).chain(colon_sub_pairs.into_iter().map(|(_colon, sub)| sub)),
+                    once(name).chain(colon_name_pairs.into_iter().map(|(_colon, name)| name)),
                 )
                 .unwrap(),
             )
@@ -57,14 +57,14 @@ pub fn account_type(i: Span) -> IResult<Span, AccountType, ErrorTree<Span>> {
     ))(i)
 }
 
-/// Matches `SubAccount`.
-pub fn sub_account(i: Span) -> IResult<Span, SubAccount, ErrorTree<Span>> {
+/// Matches `AccountName`.
+pub fn account_name(i: Span) -> IResult<Span, AccountName, ErrorTree<Span>> {
     map_res(
         recognize(tuple((
-            satisfy(|c| SubAccount::is_valid_initial(&c)),
-            many0_count(satisfy(|c| SubAccount::is_valid_subsequent(&c))),
+            satisfy(|c| AccountName::is_valid_initial(&c)),
+            many0_count(satisfy(|c| AccountName::is_valid_subsequent(&c))),
         ))),
-        |s: Span| s.parse::<SubAccount>(),
+        |s: Span| s.parse::<AccountName>(),
     )(i)
 }
 

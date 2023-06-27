@@ -12,16 +12,13 @@ pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<
     account_type()
         .then(
             just(':')
-                .ignore_then(sub_account())
+                .ignore_then(account_name())
                 .repeated()
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
-        .map(|(acc_type, sub_accounts)| {
-            Account::new(
-                acc_type,
-                NonEmpty::collect(sub_accounts.into_iter()).unwrap(),
-            )
+        .map(|(acc_type, names)| {
+            Account::new(acc_type, NonEmpty::collect(names.into_iter()).unwrap())
         })
 }
 
@@ -39,15 +36,15 @@ pub fn account_type<'src>(
     ))
 }
 
-/// Matches `SubAccount`.
-pub fn sub_account<'src>(
-) -> impl Parser<'src, &'src str, SubAccount, extra::Err<Rich<'src, char, Span>>> {
+/// Matches `AccountName`.
+pub fn account_name<'src>(
+) -> impl Parser<'src, &'src str, AccountName, extra::Err<Rich<'src, char, Span>>> {
     any()
-        .filter(SubAccount::is_valid_initial)
-        .then(any().filter(SubAccount::is_valid_subsequent).repeated())
+        .filter(AccountName::is_valid_initial)
+        .then(any().filter(AccountName::is_valid_subsequent).repeated())
         .slice()
         .try_map(|s: &str, span| {
-            s.parse::<SubAccount>()
+            s.parse::<AccountName>()
                 .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }

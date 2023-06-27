@@ -1,5 +1,6 @@
 // TODO remove suppression for dead code warning
 #![allow(dead_code)]
+#![recursion_limit = "256"]
 
 use chrono::NaiveDate;
 use nonempty::NonEmpty;
@@ -11,19 +12,19 @@ use std::{
     iter::empty,
     str::FromStr,
 };
-use strum_macros::Display;
+use strum_macros::{Display, EnumString};
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Account {
     account_type: AccountType,
-    sub_accounts: NonEmpty<SubAccount>,
+    names: NonEmpty<AccountName>,
 }
 
 impl Account {
-    pub fn new(account_type: AccountType, sub_accounts: NonEmpty<SubAccount>) -> Account {
+    pub fn new(account_type: AccountType, names: NonEmpty<AccountName>) -> Account {
         Account {
             account_type,
-            sub_accounts,
+            names,
         }
     }
 }
@@ -35,7 +36,7 @@ impl Display for Account {
             "{}:{}",
             self.account_type,
             itertools::Itertools::intersperse(
-                self.sub_accounts.iter().map(|s| format!("{}", s)),
+                self.names.iter().map(|s| format!("{}", s)),
                 ":".to_string()
             )
             .collect::<String>()
@@ -43,7 +44,7 @@ impl Display for Account {
     }
 }
 
-#[derive(PartialEq, Eq, Display, Clone, Debug)]
+#[derive(PartialEq, Eq, Display, Clone, EnumString, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -53,9 +54,9 @@ pub enum AccountType {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct SubAccount(String);
+pub struct AccountName(String);
 
-impl SubAccount {
+impl AccountName {
     pub fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || c.is_ascii_digit()
     }
@@ -65,34 +66,34 @@ impl SubAccount {
     }
 }
 
-impl Display for SubAccount {
+impl Display for AccountName {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct SubAccountError(SubAccountErrorKind);
+pub struct AccountNameError(AccountNameErrorKind);
 
 #[derive(PartialEq, Eq, Debug)]
-enum SubAccountErrorKind {
+enum AccountNameErrorKind {
     Empty,
     Initial(char),
     Subsequent(Vec<char>),
 }
 
-impl Display for SubAccountError {
+impl Display for AccountNameError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use SubAccountErrorKind::*;
+        use AccountNameErrorKind::*;
         match &self.0 {
-            Empty => write!(f, "empty subaccount"),
+            Empty => write!(f, "empty account name"),
             Initial(bad_char) => write!(
                 f,
-                "invalid character '{}' for subaccount initial - must be uppercase ASCII letter or digit",
+                "invalid character '{}' for account name initial - must be uppercase ASCII letter or digit",
                 bad_char
             ),
             Subsequent(bad_chars) => write!(f,
-                                            "invalid characters {} for subaccount - must be alphanumeric or '-'",
+                                            "invalid characters {} for account name - must be alphanumeric or '-'",
                                             itertools::Itertools::intersperse(
                                                 bad_chars.iter().map(|c| format!("'{}'", c)),
                                                 ", ".to_string())
@@ -101,28 +102,28 @@ impl Display for SubAccountError {
     }
 }
 
-impl Error for SubAccountError {}
+impl Error for AccountNameError {}
 
-impl FromStr for SubAccount {
-    type Err = SubAccountError;
+impl FromStr for AccountName {
+    type Err = AccountNameError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use SubAccountErrorKind::*;
+        use AccountNameErrorKind::*;
         if s.is_empty() {
-            Err(SubAccountError(Empty))
+            Err(AccountNameError(Empty))
         } else {
             let mut chars = s.chars();
             let initial = chars.next().unwrap();
-            if !SubAccount::is_valid_initial(&initial) {
-                Err(SubAccountError(Initial(initial)))
+            if !AccountName::is_valid_initial(&initial) {
+                Err(AccountNameError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter_map(|c| (!SubAccount::is_valid_subsequent(&c)).then_some(c))
+                    .filter_map(|c| (!AccountName::is_valid_subsequent(&c)).then_some(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
-                    Ok(SubAccount(s.to_owned()))
+                    Ok(AccountName(s.to_owned()))
                 } else {
-                    Err(SubAccountError(Subsequent(bad_chars)))
+                    Err(AccountNameError(Subsequent(bad_chars)))
                 }
             }
         }

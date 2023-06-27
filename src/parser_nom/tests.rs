@@ -8,10 +8,9 @@ use test_case::test_case;
 #[test_case("Assets:oops", None)]
 #[test_case("Assets:Bike:oops", Some((AccountType::Assets, vec!["Bike"])))]
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
-    let expected = expected_raw.map(|(account_type, subs)| Account {
+    let expected = expected_raw.map(|(account_type, names)| Account {
         account_type,
-        sub_accounts: NonEmpty::collect(subs.iter().map(|sub| SubAccount(sub.to_string())))
-            .unwrap(),
+        names: NonEmpty::collect(names.iter().map(|name| AccountName(name.to_string()))).unwrap(),
     });
 
     match account(s.into()) {

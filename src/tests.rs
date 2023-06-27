@@ -3,15 +3,15 @@ use super::*;
 use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
-#[test_case("MySubAccount", Ok("MySubAccount"))]
-#[test_case("", Err(SubAccountErrorKind::Empty))]
-#[test_case("dySubAccount", Err(SubAccountErrorKind::Initial('d')))]
-#[test_case("My-Sub=Account?Bad", Err(SubAccountErrorKind::Subsequent(vec!['=', '?'])))]
-fn test_subaccount_from_str(s: &str, expected_raw: Result<&str, SubAccountErrorKind>) {
-    let result = SubAccount::from_str(s);
+#[test_case("MyAccountName", Ok("MyAccountName"))]
+#[test_case("", Err(AccountNameErrorKind::Empty))]
+#[test_case("dyAccountName", Err(AccountNameErrorKind::Initial('d')))]
+#[test_case("My-Sub=Account?Bad", Err(AccountNameErrorKind::Subsequent(vec!['=', '?'])))]
+fn test_account_name_from_str(s: &str, expected_raw: Result<&str, AccountNameErrorKind>) {
+    let result = AccountName::from_str(s);
     let expected = match expected_raw {
-        Ok(s) => Ok(SubAccount(s.to_string())),
-        Err(e) => Err(SubAccountError(e)),
+        Ok(s) => Ok(AccountName(s.to_string())),
+        Err(e) => Err(AccountNameError(e)),
     };
     // visually check the error display by making a bad test case
     if let Err(ref e) = result {

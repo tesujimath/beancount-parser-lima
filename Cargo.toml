@@ -19,7 +19,8 @@ nom-tracable = "0.9.0"
 nom_locate = "4.1.0"
 nonempty = "0.8.1"
 rust_decimal = "1.29.1"
-strum_macros = "0.24.3"
+strum = "0.25.0"
+strum_macros = "0.25.0"
 
 [dev-dependencies]
 anyhow = "1.0.71"
