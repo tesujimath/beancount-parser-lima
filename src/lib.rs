@@ -129,7 +129,7 @@ impl FromStr for SubAccount {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Currency(String);
 
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
@@ -533,6 +533,7 @@ impl Display for CompoundAmount {
     }
 }
 
+mod lexer;
 mod parser;
 mod parser_nom;
 mod tests;

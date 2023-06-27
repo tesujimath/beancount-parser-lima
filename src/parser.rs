@@ -1,13 +1,10 @@
-use super::*;
+use super::{lexer::Span, *};
 use chumsky::{
     prelude::*,
-    span::SimpleSpan,
     text::{inline_whitespace, keyword},
 };
 
 use expr::expr;
-
-pub type Span = SimpleSpan<usize>;
 
 /// Matches `Account`.
 pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<'src, char, Span>>>
