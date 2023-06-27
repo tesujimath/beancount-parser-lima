@@ -6,8 +6,6 @@ use chumsky::{
     text::{inline_whitespace, keyword},
 };
 
-pub type Span = SimpleSpan<usize>;
-
 #[derive(Clone)]
 pub enum Token {
     Currency(super::Currency),
@@ -51,8 +49,56 @@ pub enum Token {
     Include,
 }
 
-fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {
-    any().filter(char::is_ascii_digit)
+pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
+    use Token::*;
+
+    regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
+        .try_map(|s: &str, span| {
+            s.parse::<super::Currency>()
+                .map(Currency)
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
+        })
+        .or(just("|").to(Pipe))
+        .or(just("@@").to(AtAt))
+        .or(just("@").to(At))
+        .or(just("{{").to(LcurlCurl))
+        .or(just("}}").to(RcurlCurl))
+        .or(just("{").to(Lcurl))
+        .or(just("}").to(Rcurl))
+        .or(just(",").to(Comma))
+        .or(just("~").to(Tilde))
+        .or(just("+").to(Plus))
+        .or(just("-").to(Minus))
+        .or(just("/").to(Slash))
+        .or(just("(").to(Lparen))
+        .or(just(")").to(Rparen))
+        .or(just("#").to(Hash))
+        .or(just("*").to(Asterisk))
+        .or(just(":").to(Colon))
+        .or(one_of("!&?%").map(Flag))
+        .or(just("'")
+            .then(any().filter(char::is_ascii_uppercase))
+            .map(|(_, c)| Flag(c)))
+        .or(just("txn").to(Txn))
+        .or(just("balance").to(Balance))
+        .or(just("open").to(Open))
+        .or(just("close").to(Close))
+        .or(just("commodity").to(Commodity))
+        .or(just("pad").to(Pad))
+        .or(just("event").to(Event))
+        .or(just("query").to(Query))
+        .or(just("custom").to(Custom))
+        .or(just("price").to(Price))
+        .or(just("note").to(Note))
+        .or(just("document").to(Document))
+        .or(just("pushtag").to(Pushtag))
+        .or(just("poptag").to(Poptag))
+        .or(just("pushmeta").to(Pushmeta))
+        .or(just("popmeta").to(Popmeta))
+        .or(just("option").to(Option))
+        .or(just("options").to(Options))
+        .or(just("plugin").to(Plugin))
+        .or(just("include").to(Include))
 }
 
 fn date<'src>() -> impl Parser<'src, &'src str, NaiveDate, extra::Err<Rich<'src, char, Span>>> {
@@ -117,56 +163,10 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
     // const time_re: &str = r"\d{1,2}:\d{2}(:\d{2})?"
 }
 
-pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
-    use Token::*;
-
-    regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
-        .try_map(|s: &str, span| {
-            s.parse::<super::Currency>()
-                .map(Currency)
-                .map_err(|e| chumsky::error::Rich::custom(span, e))
-        })
-        .or(just("|").to(Pipe))
-        .or(just("@@").to(AtAt))
-        .or(just("@").to(At))
-        .or(just("{{").to(LcurlCurl))
-        .or(just("}}").to(RcurlCurl))
-        .or(just("{").to(Lcurl))
-        .or(just("}").to(Rcurl))
-        .or(just(",").to(Comma))
-        .or(just("~").to(Tilde))
-        .or(just("+").to(Plus))
-        .or(just("-").to(Minus))
-        .or(just("/").to(Slash))
-        .or(just("(").to(Lparen))
-        .or(just(")").to(Rparen))
-        .or(just("#").to(Hash))
-        .or(just("*").to(Asterisk))
-        .or(just(":").to(Colon))
-        .or(one_of("!&?%").map(Flag))
-        .or(just("'")
-            .then(any().filter(char::is_ascii_uppercase))
-            .map(|(_, c)| Flag(c)))
-        .or(just("txn").to(Txn))
-        .or(just("balance").to(Balance))
-        .or(just("open").to(Open))
-        .or(just("close").to(Close))
-        .or(just("commodity").to(Commodity))
-        .or(just("pad").to(Pad))
-        .or(just("event").to(Event))
-        .or(just("query").to(Query))
-        .or(just("custom").to(Custom))
-        .or(just("price").to(Price))
-        .or(just("note").to(Note))
-        .or(just("document").to(Document))
-        .or(just("pushtag").to(Pushtag))
-        .or(just("poptag").to(Poptag))
-        .or(just("pushmeta").to(Pushmeta))
-        .or(just("popmeta").to(Popmeta))
-        .or(just("option").to(Option))
-        .or(just("options").to(Options))
-        .or(just("plugin").to(Plugin))
-        .or(just("include").to(Include))
+fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {
+    any().filter(char::is_ascii_digit)
 }
+
+pub type Span = SimpleSpan<usize>;
 
 mod tests;
