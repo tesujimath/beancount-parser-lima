@@ -313,7 +313,7 @@ impl TryFrom<char> for FlagLetter {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Tag(TagOrLinkIdentifier);
 
 impl From<TagOrLinkIdentifier> for Tag {
@@ -336,7 +336,7 @@ impl Display for Tag {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Link(TagOrLinkIdentifier);
 
 impl From<TagOrLinkIdentifier> for Link {
@@ -359,7 +359,7 @@ impl Display for Link {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct TagOrLinkIdentifier(String);
 
 /// The valid characters for tags and links besides alphanumeric.
@@ -407,6 +407,86 @@ impl FromStr for TagOrLinkIdentifier {
             Ok(TagOrLinkIdentifier(s.to_owned()))
         } else {
             Err(TagOrLinkIdentifierError(bad_chars))
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Key(String);
+
+impl Key {
+    pub fn is_valid_initial(c: &char) -> bool {
+        c.is_ascii_lowercase()
+    }
+
+    pub fn is_valid_subsequent(c: &char) -> bool {
+        c.is_alphanumeric() || *c == '-'
+    }
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct KeyError(KeyErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum KeyErrorKind {
+    Empty,
+    Initial(char),
+    Subsequent(Vec<char>),
+}
+
+impl Display for KeyError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use KeyErrorKind::*;
+        match &self.0 {
+            Empty => write!(f, "empty key"),
+            Initial(bad_char) => write!(
+                f,
+                "invalid character '{}' for key initial - must be lowercase ASCII letter",
+                bad_char
+            ),
+            Subsequent(bad_chars) => write!(
+                f,
+                "invalid characters {} for key - must be alphanumeric or '-'",
+                itertools::Itertools::intersperse(
+                    bad_chars.iter().map(|c| format!("'{}'", c)),
+                    ", ".to_string()
+                )
+                .collect::<String>()
+            ),
+        }
+    }
+}
+
+impl Error for KeyError {}
+
+impl FromStr for Key {
+    type Err = KeyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use KeyErrorKind::*;
+        if s.is_empty() {
+            Err(KeyError(Empty))
+        } else {
+            let mut chars = s.chars();
+            let initial = chars.next().unwrap();
+            if !Key::is_valid_initial(&initial) {
+                Err(KeyError(Initial(initial)))
+            } else {
+                let bad_chars = chars
+                    .filter_map(|c| (!Key::is_valid_subsequent(&c)).then_some(c))
+                    .collect::<Vec<char>>();
+                if bad_chars.is_empty() {
+                    Ok(Key(s.to_owned()))
+                } else {
+                    Err(KeyError(Subsequent(bad_chars)))
+                }
+            }
         }
     }
 }

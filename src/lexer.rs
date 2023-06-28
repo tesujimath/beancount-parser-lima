@@ -55,6 +55,8 @@ pub enum Token {
     Account(Account),
     StringLiteral(String),
     Number(Decimal),
+    Tag(super::Tag),
+    Link(super::Link),
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
@@ -129,6 +131,9 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
         .or(string_literal().map(StringLiteral))
         //
         .or(number().map(Number))
+        //
+        .or(tag().map(Tag))
+        .or(link().map(Link))
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
@@ -263,6 +268,34 @@ fn number<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'src,
             let mut without_commas = s.to_string();
             without_commas.retain(|c| c != ',');
             FromStr::from_str(&without_commas).map_err(|e| chumsky::error::Rich::custom(span, e))
+        })
+}
+
+fn tag<'src>() -> impl Parser<'src, &'src str, Tag, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"#[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
+        s[1..]
+            .parse::<TagOrLinkIdentifier>()
+            .map(super::Tag)
+            .map_err(|e| chumsky::error::Rich::custom(span, e))
+    })
+}
+
+fn link<'src>() -> impl Parser<'src, &'src str, Link, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"\^[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
+        s[1..]
+            .parse::<TagOrLinkIdentifier>()
+            .map(super::Link)
+            .map_err(|e| chumsky::error::Rich::custom(span, e))
+    })
+}
+
+fn key<'src>() -> impl Parser<'src, &'src str, Key, extra::Err<Rich<'src, char, Span>>> {
+    regex(r"[a-z][a-zA-Z0-9\-_]+")
+        .then_ignore(just(':').rewind())
+        .try_map(|s: &str, span| {
+            s[1..]
+                .parse::<Key>()
+                .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
 
