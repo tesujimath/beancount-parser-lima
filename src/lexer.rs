@@ -11,6 +11,11 @@ use std::string::ToString;
 
 #[derive(Clone, Debug)]
 pub enum Token {
+    // invisible tokens for line-oriented parsing
+    Indent,
+    Eol,
+
+    // visible tokens
     True,
     False,
     Null,
@@ -62,30 +67,17 @@ pub enum Token {
     Link(super::Link),
 }
 
-#[derive(Clone, Debug)]
-pub enum InlineToken {
-    Indent,
-    Eol,
-    Token(Token),
-}
-
-impl Display for InlineToken {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use InlineToken::*;
-
-        match self {
-            Indent => write!(f, "    "),
-            Eol => writeln!(f),
-            Token(tok) => write!(f, "{:?} ", tok),
-        }
-    }
-}
-
 pub fn dump_tokens(s: &str) {
     match lexer().parse(s).into_result() {
         Ok(tok_spans) => {
             for (tok, _span) in tok_spans {
-                print!("{}", tok)
+                use Token::*;
+
+                match tok {
+                    Indent => print!("    "),
+                    Eol => println!(),
+                    _ => print!("{:?} ", tok),
+                }
             }
         }
         Err(e) => println!("failed: {:?}", e),
@@ -93,7 +85,7 @@ pub fn dump_tokens(s: &str) {
 }
 
 pub fn lexer<'src>(
-) -> impl Parser<'src, &'src str, Vec<(InlineToken, Span)>, extra::Err<Rich<'src, char, Span>>> {
+) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
     line().foldl(line().repeated(), |mut all, mut next_line| {
         all.append(&mut next_line);
         all
@@ -101,18 +93,17 @@ pub fn lexer<'src>(
 }
 
 fn line<'src>(
-) -> impl Parser<'src, &'src str, Vec<(InlineToken, Span)>, extra::Err<Rich<'src, char, Span>>> {
-    use InlineToken::*;
+) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
+    use Token::*;
 
     group((
         nonempty_inline_whitespace()
             .to(Indent)
             .map_with_span(|tok, span| (tok, span))
             .or_not(),
-        token()
-            .padded_by(inline_whitespace())
-            .map(Token)
+        visible_token()
             .map_with_span(|tok, span| (tok, span))
+            .padded_by(inline_whitespace())
             .repeated()
             .collect::<Vec<_>>(),
         just('\n').to(Eol).map_with_span(|tok, span| (tok, span)),
@@ -138,7 +129,8 @@ fn nonempty_inline_whitespace<'src>(
         .at_least(1)
 }
 
-fn token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
+fn visible_token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>>
+{
     use Token::*;
 
     choice((
