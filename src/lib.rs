@@ -614,6 +614,8 @@ impl Display for CompoundAmount {
     }
 }
 
+pub use lexer::dump_tokens;
+
 mod lexer;
 mod parser;
 mod parser_nom;

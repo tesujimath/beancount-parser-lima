@@ -8,7 +8,7 @@ use chumsky::{
     text::{inline_whitespace, keyword},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Token {
     True,
     False,
@@ -61,11 +61,22 @@ pub enum Token {
     Link(super::Link),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum InlineToken {
     Indent,
     Eol,
     Token(Token),
+}
+
+pub fn dump_tokens(s: &str) {
+    match lexer().parse(s).into_result() {
+        Ok(tok_spans) => {
+            for (tok, _span) in tok_spans {
+                println!("{:?}", tok)
+            }
+        }
+        Err(e) => println!("failed: {:?}", e),
+    };
 }
 
 pub fn lexer<'src>(
