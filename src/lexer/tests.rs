@@ -80,3 +80,23 @@ fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
         }
     }
 }
+
+#[test_case(r#""hello world"""#, "hello world", r#"""#)]
+#[test_case(r#""hello \t world" "#, "hello \t world", " ")]
+#[test_case(r#""hello newline\nworld" "#, "hello newline\nworld", " ")]
+#[test_case(r#""hello quoted \"world\"" "#, "hello quoted \"world\"", " ")]
+#[test_case(
+    r#""hello multiline quoted \"world\"
+ok" extras"#,
+    r#"hello multiline quoted "world"
+ok"#,
+    " extras"
+)]
+fn test_string_literal(s: &str, expected: &str, unparsed: &str) {
+    let result = string_literal()
+        .then(any().repeated().collect::<String>())
+        .parse(s)
+        .into_result();
+
+    assert_eq!(result, Ok((expected.to_owned(), unparsed.to_owned())));
+}

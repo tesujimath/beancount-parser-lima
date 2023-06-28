@@ -53,6 +53,7 @@ pub enum Token {
     DateTime(NaiveDateTime),
     Date(NaiveDate),
     Account(Account),
+    StringLiteral(String),
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
@@ -124,6 +125,7 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
         //
         // account
         .or(account().map(Account))
+        .or(string_literal().map(StringLiteral))
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
@@ -222,6 +224,27 @@ fn account_name<'src>(
     regex(r"[\p{Lu}\p{Lo}\p{N}][\p{L}\p{N}\-]*").try_map(|s: &str, span| {
         s.parse::<AccountName>()
             .map_err(|e| chumsky::error::Rich::custom(span, e))
+    })
+}
+
+/// Matches a quoted string supporting embedded newlines and character escapes for `\\`, `\"`, `\n`, `\t`.
+fn string_literal<'src>() -> impl Parser<'src, &'src str, String, extra::Err<Rich<'src, char, Span>>>
+{
+    regex(r#""([^\\"]|\\.)*""#).try_map(|s: &str, span| {
+        if s.len() >= 16384 {
+            Err(chumsky::error::Rich::custom(span, "string too long"))
+        } else {
+            let content = &s[1..s.len() - 1];
+            if content.contains('\\') {
+                Ok(content
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\"))
+            } else {
+                Ok(content.to_owned())
+            }
+        }
     })
 }
 
