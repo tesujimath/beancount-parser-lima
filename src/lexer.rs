@@ -65,6 +65,7 @@ pub enum Token {
     Number(Decimal),
     Tag(super::Tag),
     Link(super::Link),
+    Key(super::Key),
 }
 
 // TODO remove this temporary diagnostic
@@ -212,6 +213,7 @@ fn visible_token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
         //
         tag().map(Tag),
         link().map(Link),
+        key().map(Key),
     ))
 }
 
@@ -371,8 +373,7 @@ fn key<'src>() -> impl Parser<'src, &'src str, Key, extra::Err<Rich<'src, char, 
     regex(r"[a-z][a-zA-Z0-9\-_]+")
         .then_ignore(just(':').rewind())
         .try_map(|s: &str, span| {
-            s[1..]
-                .parse::<Key>()
+            s.parse::<Key>()
                 .map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
