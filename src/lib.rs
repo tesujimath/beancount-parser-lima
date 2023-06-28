@@ -618,5 +618,4 @@ pub use lexer::dump_tokens;
 
 mod lexer;
 mod parser;
-mod parser_nom;
 mod tests;
