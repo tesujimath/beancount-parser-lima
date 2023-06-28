@@ -118,7 +118,7 @@ fn test_string_literal(s: &str, expected: &str, unparsed: &str) {
         .parse(s)
         .into_result();
 
-    assert_eq!(result, Ok((expected.to_owned(), unparsed.to_owned())));
+    assert_eq!(result, Ok((Cow::Borrowed(expected), unparsed.to_owned())));
 }
 
 #[test_case("123,456,789", dec!(123456789))]

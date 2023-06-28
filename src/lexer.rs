@@ -1,4 +1,4 @@
-use std::iter::once;
+use std::{borrow::Cow, iter::once};
 
 use super::*;
 use chrono::{NaiveDateTime, NaiveTime};
@@ -61,7 +61,7 @@ pub enum Token<'a> {
     DateTime(NaiveDateTime),
     Date(NaiveDate),
     Account(Account<'a>),
-    StringLiteral(String),
+    StringLiteral(Cow<'a, str>),
     Number(Decimal),
     Tag(super::Tag<'a>),
     Link(super::Link<'a>),
@@ -326,21 +326,23 @@ fn account_name<'src>(
 }
 
 /// Matches a quoted string supporting embedded newlines and character escapes for `\\`, `\"`, `\n`, `\t`.
-fn string_literal<'src>() -> impl Parser<'src, &'src str, String, extra::Err<Rich<'src, char, Span>>>
-{
+fn string_literal<'src>(
+) -> impl Parser<'src, &'src str, Cow<'src, str>, extra::Err<Rich<'src, char, Span>>> {
     regex(r#""([^\\"]|\\.)*""#).try_map(|s: &str, span| {
         if s.len() >= 16384 {
             Err(chumsky::error::Rich::custom(span, "string too long"))
         } else {
             let content = &s[1..s.len() - 1];
             if content.contains('\\') {
-                Ok(content
-                    .replace("\\n", "\n")
-                    .replace("\\t", "\t")
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\"))
+                Ok(Cow::Owned(
+                    content
+                        .replace("\\n", "\n")
+                        .replace("\\t", "\t")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\"),
+                ))
             } else {
-                Ok(content.to_owned())
+                Ok(Cow::Borrowed(content))
             }
         }
     })
