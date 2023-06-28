@@ -1,3 +1,5 @@
+use std::iter::once;
+
 use super::*;
 use chrono::{NaiveDateTime, NaiveTime};
 use chumsky::{
@@ -59,7 +61,60 @@ pub enum Token {
     Link(super::Link),
 }
 
-pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
+#[derive(Clone)]
+pub enum InlineToken {
+    Indent,
+    Eol,
+    Token(Token),
+}
+
+pub fn lexer<'src>(
+) -> impl Parser<'src, &'src str, Vec<(InlineToken, Span)>, extra::Err<Rich<'src, char, Span>>> {
+    line().foldl(line().repeated(), |mut all, mut next_line| {
+        all.append(&mut next_line);
+        all
+    })
+}
+
+fn line<'src>(
+) -> impl Parser<'src, &'src str, Vec<(InlineToken, Span)>, extra::Err<Rich<'src, char, Span>>> {
+    use InlineToken::*;
+
+    group((
+        nonempty_inline_whitespace()
+            .to(Indent)
+            .map_with_span(|tok, span| (tok, span))
+            .or_not(),
+        token()
+            .padded_by(inline_whitespace())
+            .map(Token)
+            .map_with_span(|tok, span| (tok, span))
+            .repeated()
+            .collect::<Vec<_>>(),
+        just('\n').to(Eol).map_with_span(|tok, span| (tok, span)),
+    ))
+    .map(|(indent, tokens, eol)| {
+        indent
+            .into_iter()
+            .chain(tokens.into_iter().chain(once(eol)))
+            .collect::<Vec<_>>()
+    })
+}
+
+fn nonempty_inline_whitespace<'src>(
+) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+    fn is_inline_whitespace(c: &char) -> bool {
+        *c == ' ' || *c == '\t'
+    }
+
+    any()
+        .filter(is_inline_whitespace)
+        .ignored()
+        .repeated()
+        .at_least(1)
+}
+
+fn token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
     choice((
