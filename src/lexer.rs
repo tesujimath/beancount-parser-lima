@@ -32,7 +32,7 @@ pub enum Token {
     Hash,
     Asterisk,
     Colon,
-    OtherFlag(char),
+    DedicatedFlag(Flag),
     Txn,
     Balance,
     Open,
@@ -75,7 +75,7 @@ impl Display for InlineToken {
 
         match self {
             Indent => write!(f, "    "),
-            Eol => write!(f, "\n"),
+            Eol => writeln!(f),
             Token(tok) => write!(f, "{:?} ", tok),
         }
     }
@@ -175,10 +175,18 @@ fn token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, ch
         //
         // flag characters other than * #
         choice((
-            one_of("!&?%").map(OtherFlag),
+            just("!").to(DedicatedFlag(Flag::Exclamation)),
+            just("&").to(DedicatedFlag(Flag::Ampersand)),
+            just("?").to(DedicatedFlag(Flag::Question)),
+            just("%").to(DedicatedFlag(Flag::Percent)),
             just("'")
                 .ignore_then(any().filter(char::is_ascii_uppercase))
-                .map(OtherFlag),
+                .try_map(|c, span| {
+                    FlagLetter::try_from(c)
+                        .map(Flag::Letter)
+                        .map_err(|e| chumsky::error::Rich::custom(span, e))
+                        .map(DedicatedFlag)
+                }),
         )),
         //
         // other keywords
