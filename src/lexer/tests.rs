@@ -18,7 +18,7 @@ use {rust_decimal::Decimal, rust_decimal_macros::dec};
 #[test_case("abc", None)]
 #[test_case("", None)]
 fn test_currency(s: &str, expected: Option<&str>) {
-    let expected = expected.map(|s| s.parse::<Currency>().unwrap());
+    let expected = expected.map(|s| Currency::try_from(s).unwrap());
 
     assert_eq!(currency().parse(s).into_output(), expected);
 }

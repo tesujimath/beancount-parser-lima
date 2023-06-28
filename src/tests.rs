@@ -36,9 +36,9 @@ use CurrencyErrorKind::*;
 #[test_case("abc", Err(Initial('a')))]
 #[test_case("A?=.-BJ", Err(Intermediate(vec!['?', '='])))]
 #[test_case("", Err(Empty))]
-fn test_currency_from_str(s: &str, expected: Result<&str, CurrencyErrorKind>) {
-    match (Currency::from_str(s), expected) {
-        (Ok(actual), Ok(expected)) => assert_eq!(actual, Currency(expected.to_owned())),
+fn test_currency_try_from(s: &str, expected: Result<&str, CurrencyErrorKind>) {
+    match (Currency::try_from(s), expected) {
+        (Ok(actual), Ok(expected)) => assert_eq!(actual, Currency(expected)),
         (Err(actual), Err(kind)) => assert_eq!(actual, CurrencyError(kind)),
         (Err(actual), Ok(_)) => panic!("unexpected failure: {}", actual),
         (Ok(actual), Err(_)) => panic!("unexpected success: {}", actual),

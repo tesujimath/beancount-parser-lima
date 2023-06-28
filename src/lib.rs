@@ -131,12 +131,12 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Currency(String);
+pub struct Currency<'a>(&'a str);
 
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
 const CURRENCY_INTERMEDIATE_EXTRA_CHARS: [char; 4] = ['\'', '.', '_', '-'];
 
-impl Currency {
+impl<'a> Currency<'a> {
     fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || *c == '/'
     }
@@ -152,7 +152,7 @@ impl Currency {
     }
 }
 
-impl Display for Currency {
+impl<'a> Display for Currency<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -202,10 +202,10 @@ impl Display for CurrencyError {
 
 impl Error for CurrencyError {}
 
-impl FromStr for Currency {
-    type Err = CurrencyError;
+impl<'a> TryFrom<&'a str> for Currency<'a> {
+    type Error = CurrencyError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         use CurrencyErrorKind::*;
         if s.is_empty() {
             Err(CurrencyError(Empty))
@@ -238,7 +238,7 @@ impl FromStr for Currency {
                 } else if s.find(|c: char| c.is_ascii_uppercase()).is_none() {
                     Err(CurrencyError(MissingLetter))
                 } else {
-                    Ok(Currency(s.to_owned()))
+                    Ok(Currency(s))
                 }
             }
         }
@@ -597,13 +597,13 @@ impl Display for CompoundExpr {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum CompoundAmount {
-    BareCurrency(Currency),
+pub enum CompoundAmount<'a> {
+    BareCurrency(Currency<'a>),
     BareAmount(CompoundExpr),
-    CurrencyAmount(CompoundExpr, Currency),
+    CurrencyAmount(CompoundExpr, Currency<'a>),
 }
 
-impl Display for CompoundAmount {
+impl<'a> Display for CompoundAmount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::CompoundAmount::*;
         match self {

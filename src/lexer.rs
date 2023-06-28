@@ -19,7 +19,7 @@ pub enum Token<'a> {
     True,
     False,
     Null,
-    Currency(super::Currency),
+    Currency(super::Currency<'a>),
     Pipe,
     AtAt,
     At,
@@ -227,11 +227,11 @@ fn visible_token<'src>(
     ))
 }
 
-fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
+fn currency<'src>(
+) -> impl Parser<'src, &'src str, Currency<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"[A-Z][A-Z0-9'\._-]*[A-Z0-9]?\b|/[A-Z0-9'\._-]*[A-Z]([A-Z0-9'\._-]*[A-Z0-9])?").try_map(
         |s: &str, span| {
-            s.parse::<super::Currency>()
-                .map_err(|e| chumsky::error::Rich::custom(span, e))
+            super::Currency::try_from(s).map_err(|e| chumsky::error::Rich::custom(span, e))
         },
     )
 }
