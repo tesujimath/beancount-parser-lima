@@ -162,21 +162,21 @@ fn date<'src>() -> impl Parser<'src, &'src str, NaiveDate, extra::Err<Rich<'src,
         .repeated()
         .exactly(4)
         .map_slice(|s| s.parse::<i32>().unwrap())
-        .then(one_of(DATE_SEP))
+        .then_ignore(one_of(DATE_SEP))
         .then(
             digit()
                 .repeated()
                 .exactly(2)
                 .map_slice(|s| s.parse::<u32>().unwrap()),
         )
-        .then(one_of(DATE_SEP))
+        .then_ignore(one_of(DATE_SEP))
         .then(
             digit()
                 .repeated()
                 .exactly(2)
                 .map_slice(|s| s.parse::<u32>().unwrap()),
         )
-        .try_map(|((((year, _), month), _), day), span| {
+        .try_map(|((year, month), day), span| {
             NaiveDate::from_ymd_opt(year, month, day)
                 .ok_or(chumsky::error::Rich::custom(span, "date out of range"))
         })
@@ -190,7 +190,7 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
         .at_least(1)
         .at_most(2)
         .map_slice(|s| s.parse::<u32>().unwrap())
-        .then(one_of(TIME_SEP))
+        .then_ignore(one_of(TIME_SEP))
         .then(
             digit()
                 .repeated()
@@ -199,16 +199,15 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
         )
         .then(
             just(TIME_SEP)
-                .then(
+                .ignore_then(
                     digit()
                         .repeated()
                         .exactly(2)
                         .map_slice(|s| s.parse::<u32>().unwrap()),
                 )
-                .map(|(_, sec)| sec)
                 .or_not(),
         )
-        .try_map(|(((hour, _), min), sec), span| {
+        .try_map(|((hour, min), sec), span| {
             NaiveTime::from_hms_opt(hour, min, sec.unwrap_or(0))
                 .ok_or(chumsky::error::Rich::custom(span, "time out of range"))
         })
