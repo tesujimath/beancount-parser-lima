@@ -54,6 +54,7 @@ pub enum Token {
     Date(NaiveDate),
     Account(Account),
     StringLiteral(String),
+    Number(Decimal),
 }
 
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
@@ -123,9 +124,11 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
             .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))))
         .or(date().then_ignore(end_of_word()).map(Date))
         //
-        // account
         .or(account().map(Account))
+        //
         .or(string_literal().map(StringLiteral))
+        //
+        .or(number().map(Number))
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
@@ -246,6 +249,20 @@ fn string_literal<'src>() -> impl Parser<'src, &'src str, String, extra::Err<Ric
             }
         }
     })
+}
+
+fn number<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'src, char, Span>>> {
+    digit()
+        .repeated()
+        .at_least(1)
+        .then((just(',').then(digit().repeated().exactly(3))).repeated())
+        .then((just('.').then(digit().repeated().at_least(1))).or_not())
+        .slice()
+        .try_map(|s: &'src str, span| {
+            let mut without_commas = s.to_string();
+            without_commas.retain(|c| c != ',');
+            FromStr::from_str(&without_commas).map_err(|e| chumsky::error::Rich::custom(span, e))
+        })
 }
 
 fn digit<'src>() -> impl Parser<'src, &'src str, char, extra::Err<Rich<'src, char, Span>>> {

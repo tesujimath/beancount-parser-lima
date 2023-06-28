@@ -1,6 +1,7 @@
 #![cfg(test)]
 use super::*;
 use test_case::test_case;
+use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 #[test_case("2023-03-23", Some((2023, 3, 23, "")))]
 #[test_case("2023-3-2", None)]
@@ -99,4 +100,10 @@ fn test_string_literal(s: &str, expected: &str, unparsed: &str) {
         .into_result();
 
     assert_eq!(result, Ok((expected.to_owned(), unparsed.to_owned())));
+}
+
+#[test_case("123,456,789", dec!(123456789))]
+#[test_case("123,456,789.12", dec!(123456789.12))]
+fn number_test(s: &str, expected: Decimal) {
+    assert_eq!(number().parse(s).into_result(), Ok(expected));
 }
