@@ -63,8 +63,8 @@ pub enum Token<'a> {
     Account(Account<'a>),
     StringLiteral(String),
     Number(Decimal),
-    Tag(super::Tag),
-    Link(super::Link),
+    Tag(super::Tag<'a>),
+    Link(super::Link<'a>),
     Key(super::Key),
 }
 
@@ -360,19 +360,17 @@ fn number<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'src,
         })
 }
 
-fn tag<'src>() -> impl Parser<'src, &'src str, Tag, extra::Err<Rich<'src, char, Span>>> {
+fn tag<'src>() -> impl Parser<'src, &'src str, Tag<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"#[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
-        s[1..]
-            .parse::<TagOrLinkIdentifier>()
+        TagOrLinkIdentifier::try_from(&s[1..])
             .map(super::Tag)
             .map_err(|e| chumsky::error::Rich::custom(span, e))
     })
 }
 
-fn link<'src>() -> impl Parser<'src, &'src str, Link, extra::Err<Rich<'src, char, Span>>> {
+fn link<'src>() -> impl Parser<'src, &'src str, Link<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"\^[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
-        s[1..]
-            .parse::<TagOrLinkIdentifier>()
+        TagOrLinkIdentifier::try_from(&s[1..])
             .map(super::Link)
             .map_err(|e| chumsky::error::Rich::custom(span, e))
     })

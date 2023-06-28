@@ -314,58 +314,58 @@ impl TryFrom<char> for FlagLetter {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Tag(TagOrLinkIdentifier);
+pub struct Tag<'a>(TagOrLinkIdentifier<'a>);
 
-impl From<TagOrLinkIdentifier> for Tag {
-    fn from(id: TagOrLinkIdentifier) -> Self {
+impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
+    fn from(id: TagOrLinkIdentifier<'a>) -> Self {
         Self(id)
     }
 }
 
-impl FromStr for Tag {
-    type Err = TagOrLinkIdentifierError;
+impl<'a> TryFrom<&'a str> for Tag<'a> {
+    type Error = TagOrLinkIdentifierError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        TagOrLinkIdentifier::from_str(s).map(Tag)
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        TagOrLinkIdentifier::try_from(s).map(Tag)
     }
 }
 
-impl Display for Tag {
+impl<'a> Display for Tag<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "#{}", self.0 .0)
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Link(TagOrLinkIdentifier);
+pub struct Link<'a>(TagOrLinkIdentifier<'a>);
 
-impl From<TagOrLinkIdentifier> for Link {
-    fn from(id: TagOrLinkIdentifier) -> Self {
+impl<'a> From<TagOrLinkIdentifier<'a>> for Link<'a> {
+    fn from(id: TagOrLinkIdentifier<'a>) -> Self {
         Self(id)
     }
 }
 
-impl FromStr for Link {
-    type Err = TagOrLinkIdentifierError;
+impl<'a> TryFrom<&'a str> for Link<'a> {
+    type Error = TagOrLinkIdentifierError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        TagOrLinkIdentifier::from_str(s).map(Link)
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        TagOrLinkIdentifier::try_from(s).map(Link)
     }
 }
 
-impl Display for Link {
+impl<'a> Display for Link<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "^{}", self.0 .0)
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct TagOrLinkIdentifier(String);
+pub struct TagOrLinkIdentifier<'a>(&'a str);
 
 /// The valid characters for tags and links besides alphanumeric.
 const TAG_OR_LINK_EXTRA_CHARS: [char; 4] = ['-', '_', '/', '.'];
 
-impl TagOrLinkIdentifier {
+impl<'a> TagOrLinkIdentifier<'a> {
     pub fn is_valid_char(c: &char) -> bool {
         c.is_alphanumeric() || TAG_OR_LINK_EXTRA_CHARS.contains(c)
     }
@@ -395,16 +395,16 @@ impl Display for TagOrLinkIdentifierError {
 
 impl Error for TagOrLinkIdentifierError {}
 
-impl FromStr for TagOrLinkIdentifier {
-    type Err = TagOrLinkIdentifierError;
+impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
+    type Error = TagOrLinkIdentifierError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         let bad_chars = s
             .chars()
             .filter_map(|c| (!TagOrLinkIdentifier::is_valid_char(&c)).then_some(c))
             .collect::<Vec<char>>();
         if bad_chars.is_empty() {
-            Ok(TagOrLinkIdentifier(s.to_owned()))
+            Ok(TagOrLinkIdentifier(s))
         } else {
             Err(TagOrLinkIdentifierError(bad_chars))
         }
