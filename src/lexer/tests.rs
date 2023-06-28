@@ -89,8 +89,7 @@ fn test_time(s: &str, expected: Option<(u32, u32, u32, &str)>) {
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
     let expected = expected_raw.map(|(account_type, names)| Account {
         account_type,
-        names: NonEmpty::collect(names.into_iter().map(|name| AccountName(name.to_string())))
-            .unwrap(),
+        names: NonEmpty::collect(names.into_iter().map(AccountName)).unwrap(),
     });
 
     match account().parse(s).into_result() {

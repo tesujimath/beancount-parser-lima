@@ -7,10 +7,10 @@ use {rust_decimal::Decimal, rust_decimal_macros::dec};
 #[test_case("", Err(AccountNameErrorKind::Empty))]
 #[test_case("dyAccountName", Err(AccountNameErrorKind::Initial('d')))]
 #[test_case("My-Sub=Account?Bad", Err(AccountNameErrorKind::Subsequent(vec!['=', '?'])))]
-fn test_account_name_from_str(s: &str, expected_raw: Result<&str, AccountNameErrorKind>) {
-    let result = AccountName::from_str(s);
+fn test_account_name_try_from(s: &str, expected_raw: Result<&str, AccountNameErrorKind>) {
+    let result = AccountName::try_from(s);
     let expected = match expected_raw {
-        Ok(s) => Ok(AccountName(s.to_string())),
+        Ok(s) => Ok(AccountName(s)),
         Err(e) => Err(AccountNameError(e)),
     };
     // visually check the error display by making a bad test case

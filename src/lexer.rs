@@ -10,7 +10,7 @@ use chumsky::{
 use std::string::ToString;
 
 #[derive(Clone, Debug)]
-pub enum Token {
+pub enum Token<'a> {
     // invisible tokens for line-oriented parsing
     Indent,
     Eol,
@@ -60,7 +60,7 @@ pub enum Token {
     Include,
     DateTime(NaiveDateTime),
     Date(NaiveDate),
-    Account(Account),
+    Account(Account<'a>),
     StringLiteral(String),
     Number(Decimal),
     Tag(super::Tag),
@@ -87,7 +87,7 @@ pub fn dump_tokens(s: &str) {
 }
 
 pub fn lexer<'src>(
-) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
+) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     line().foldl(line().repeated(), |mut all, mut next_line| {
         all.append(&mut next_line);
         all
@@ -96,7 +96,7 @@ pub fn lexer<'src>(
 
 /// match a whole lines worth of visible tokens, up until `Eol` or `end()`
 fn line<'src>(
-) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
+) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
     // skip comments to end-of-line
@@ -130,8 +130,8 @@ fn line<'src>(
 }
 
 /// match a single visible token
-fn visible_token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>>
-{
+fn visible_token<'src>(
+) -> impl Parser<'src, &'src str, Token<'src>, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
     choice((
@@ -295,8 +295,8 @@ fn time<'src>() -> impl Parser<'src, &'src str, NaiveTime, extra::Err<Rich<'src,
 }
 
 /// Matches `Account`.
-pub fn account<'src>() -> impl Parser<'src, &'src str, Account, extra::Err<Rich<'src, char, Span>>>
-{
+pub fn account<'src>(
+) -> impl Parser<'src, &'src str, Account<'src>, extra::Err<Rich<'src, char, Span>>> {
     account_type()
         .then(
             just(':')
@@ -319,10 +319,9 @@ fn account_type<'src>(
 }
 
 fn account_name<'src>(
-) -> impl Parser<'src, &'src str, AccountName, extra::Err<Rich<'src, char, Span>>> {
+) -> impl Parser<'src, &'src str, AccountName<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"[\p{Lu}\p{Lo}\p{N}][\p{L}\p{N}\-]*").try_map(|s: &str, span| {
-        s.parse::<AccountName>()
-            .map_err(|e| chumsky::error::Rich::custom(span, e))
+        AccountName::try_from(s).map_err(|e| chumsky::error::Rich::custom(span, e))
     })
 }
 

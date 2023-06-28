@@ -15,12 +15,12 @@ use std::{
 use strum_macros::{Display, EnumString};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Account {
+pub struct Account<'a> {
     account_type: AccountType,
-    names: NonEmpty<AccountName>,
+    names: NonEmpty<AccountName<'a>>,
 }
 
-impl Account {
+impl<'a> Account<'a> {
     pub fn new(account_type: AccountType, names: NonEmpty<AccountName>) -> Account {
         Account {
             account_type,
@@ -29,7 +29,7 @@ impl Account {
     }
 }
 
-impl Display for Account {
+impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -54,9 +54,9 @@ pub enum AccountType {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct AccountName(String);
+pub struct AccountName<'a>(&'a str);
 
-impl AccountName {
+impl<'a> AccountName<'a> {
     pub fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || c.is_ascii_digit()
     }
@@ -66,7 +66,7 @@ impl AccountName {
     }
 }
 
-impl Display for AccountName {
+impl<'a> Display for AccountName<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -104,10 +104,10 @@ impl Display for AccountNameError {
 
 impl Error for AccountNameError {}
 
-impl FromStr for AccountName {
-    type Err = AccountNameError;
+impl<'a> TryFrom<&'a str> for AccountName<'a> {
+    type Error = AccountNameError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         use AccountNameErrorKind::*;
         if s.is_empty() {
             Err(AccountNameError(Empty))
@@ -121,7 +121,7 @@ impl FromStr for AccountName {
                     .filter_map(|c| (!AccountName::is_valid_subsequent(&c)).then_some(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
-                    Ok(AccountName(s.to_owned()))
+                    Ok(AccountName(s))
                 } else {
                     Err(AccountNameError(Subsequent(bad_chars)))
                 }
