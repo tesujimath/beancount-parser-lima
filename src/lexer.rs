@@ -62,78 +62,88 @@ pub enum Token {
 pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
-    // keywords which look like currencies, so must be first
-    keyword("TRUE")
-        .to(True)
-        .or(keyword("FALSE").to(False))
-        .or(keyword("NULL").to(Null))
+    choice((
+        // keywords which look like currencies, so must be first
+        choice((
+            keyword("TRUE").to(True),
+            keyword("FALSE").to(False),
+            keyword("NULL").to(Null),
+        )),
         //
         // currency
-        .or(currency().map(Currency))
+        currency().map(Currency),
         //
         // special characters
-        .or(just("|").to(Pipe))
-        .or(just("@@").to(AtAt))
-        .or(just("@").to(At))
-        .or(just("{{").to(LcurlCurl))
-        .or(just("}}").to(RcurlCurl))
-        .or(just("{").to(Lcurl))
-        .or(just("}").to(Rcurl))
-        .or(just(",").to(Comma))
-        .or(just("~").to(Tilde))
-        .or(just("+").to(Plus))
-        .or(just("-").to(Minus))
-        .or(just("/").to(Slash))
-        .or(just("(").to(Lparen))
-        .or(just(")").to(Rparen))
-        .or(just("#").to(Hash))
-        .or(just("*").to(Asterisk))
-        .or(just(":").to(Colon))
+        choice((
+            just("|").to(Pipe),
+            just("@@").to(AtAt),
+            just("@").to(At),
+            just("{{").to(LcurlCurl),
+            just("}}").to(RcurlCurl),
+            just("{").to(Lcurl),
+            just("}").to(Rcurl),
+            just(",").to(Comma),
+            just("~").to(Tilde),
+            just("+").to(Plus),
+            just("-").to(Minus),
+            just("/").to(Slash),
+            just("(").to(Lparen),
+            just(")").to(Rparen),
+            just("#").to(Hash),
+            just("*").to(Asterisk),
+            just(":").to(Colon),
+        )),
         //
         // flag characters other than * #
-        .or(one_of("!&?%").map(OtherFlag))
-        .or(just("'")
-            .then(any().filter(char::is_ascii_uppercase))
-            .map(|(_, c)| OtherFlag(c)))
+        choice((
+            one_of("!&?%").map(OtherFlag),
+            just("'")
+                .ignore_then(any().filter(char::is_ascii_uppercase))
+                .map(OtherFlag),
+        )),
         //
         // other keywords
-        .or(keyword("txn").to(Txn))
-        .or(keyword("balance").to(Balance))
-        .or(keyword("open").to(Open))
-        .or(keyword("close").to(Close))
-        .or(keyword("commodity").to(Commodity))
-        .or(keyword("pad").to(Pad))
-        .or(keyword("event").to(Event))
-        .or(keyword("query").to(Query))
-        .or(keyword("custom").to(Custom))
-        .or(keyword("price").to(Price))
-        .or(keyword("note").to(Note))
-        .or(keyword("document").to(Document))
-        .or(keyword("pushtag").to(Pushtag))
-        .or(keyword("poptag").to(Poptag))
-        .or(keyword("pushmeta").to(Pushmeta))
-        .or(keyword("popmeta").to(Popmeta))
-        .or(keyword("option").to(Option))
-        .or(keyword("options").to(Options))
-        .or(keyword("plugin").to(Plugin))
-        .or(keyword("include").to(Include))
+        choice((
+            keyword("txn").to(Txn),
+            keyword("balance").to(Balance),
+            keyword("open").to(Open),
+            keyword("close").to(Close),
+            keyword("commodity").to(Commodity),
+            keyword("pad").to(Pad),
+            keyword("event").to(Event),
+            keyword("query").to(Query),
+            keyword("custom").to(Custom),
+            keyword("price").to(Price),
+            keyword("note").to(Note),
+            keyword("document").to(Document),
+            keyword("pushtag").to(Pushtag),
+            keyword("poptag").to(Poptag),
+            keyword("pushmeta").to(Pushmeta),
+            keyword("popmeta").to(Popmeta),
+            keyword("option").to(Option),
+            keyword("options").to(Options),
+            keyword("plugin").to(Plugin),
+            keyword("include").to(Include),
+        )),
         //
         // date/time or bare date
-        .or(date()
-            .then_ignore(inline_whitespace())
-            .then(time())
-            .then_ignore(end_of_word())
-            .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))))
-        .or(date().then_ignore(end_of_word()).map(Date))
+        choice((
+            date()
+                .then_ignore(inline_whitespace())
+                .then(time().then_ignore(end_of_word()))
+                .map(|(d, t)| DateTime(NaiveDateTime::new(d, t))),
+            date().then_ignore(end_of_word()).map(Date),
+        )),
         //
-        .or(account().map(Account))
+        account().map(Account),
         //
-        .or(string_literal().map(StringLiteral))
+        string_literal().map(StringLiteral),
         //
-        .or(number().map(Number))
+        number().map(Number),
         //
-        .or(tag().map(Tag))
-        .or(link().map(Link))
+        tag().map(Tag),
+        link().map(Link),
+    ))
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
