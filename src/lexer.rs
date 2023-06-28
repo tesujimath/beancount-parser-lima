@@ -65,7 +65,7 @@ pub enum Token<'a> {
     Number(Decimal),
     Tag(super::Tag<'a>),
     Link(super::Link<'a>),
-    Key(super::Key),
+    Key(super::Key<'a>),
 }
 
 // TODO remove this temporary diagnostic
@@ -376,12 +376,11 @@ fn link<'src>() -> impl Parser<'src, &'src str, Link<'src>, extra::Err<Rich<'src
     })
 }
 
-fn key<'src>() -> impl Parser<'src, &'src str, Key, extra::Err<Rich<'src, char, Span>>> {
+fn key<'src>() -> impl Parser<'src, &'src str, Key<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"[a-z][a-zA-Z0-9\-_]+")
         .then_ignore(just(':').rewind())
         .try_map(|s: &str, span| {
-            s.parse::<Key>()
-                .map_err(|e| chumsky::error::Rich::custom(span, e))
+            Key::try_from(s).map_err(|e| chumsky::error::Rich::custom(span, e))
         })
 }
 

@@ -412,9 +412,9 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Key(String);
+pub struct Key<'a>(&'a str);
 
-impl Key {
+impl<'a> Key<'a> {
     pub fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_lowercase()
     }
@@ -424,7 +424,7 @@ impl Key {
     }
 }
 
-impl Display for Key {
+impl<'a> Display for Key<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -465,10 +465,10 @@ impl Display for KeyError {
 
 impl Error for KeyError {}
 
-impl FromStr for Key {
-    type Err = KeyError;
+impl<'a> TryFrom<&'a str> for Key<'a> {
+    type Error = KeyError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         use KeyErrorKind::*;
         if s.is_empty() {
             Err(KeyError(Empty))
@@ -482,7 +482,7 @@ impl FromStr for Key {
                     .filter_map(|c| (!Key::is_valid_subsequent(&c)).then_some(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
-                    Ok(Key(s.to_owned()))
+                    Ok(Key(s))
                 } else {
                     Err(KeyError(Subsequent(bad_chars)))
                 }
