@@ -27,6 +27,7 @@
             devShells.default = mkShell {
               nativeBuildInputs = [
                 # build dependencies
+                cargo-flamegraph
                 cargo-modules
                 cargo-nightly
                 cargo-udeps
@@ -37,8 +38,6 @@
                 rustfmt
 
                 # runtime dependencies
-                pkg-config
-                openssl # for git2 crate
               ];
             };
           }
