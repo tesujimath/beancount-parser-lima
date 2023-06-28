@@ -67,6 +67,7 @@ pub enum Token {
     Link(super::Link),
 }
 
+// TODO remove this temporary diagnostic
 pub fn dump_tokens(s: &str) {
     match lexer().parse(s).into_result() {
         Ok(tok_spans) => {
@@ -92,6 +93,7 @@ pub fn lexer<'src>(
     })
 }
 
+/// match a whole lines worth of visible tokens, up until `Eol` or `end()`
 fn line<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
@@ -116,19 +118,7 @@ fn line<'src>(
     })
 }
 
-fn nonempty_inline_whitespace<'src>(
-) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
-    fn is_inline_whitespace(c: &char) -> bool {
-        *c == ' ' || *c == '\t'
-    }
-
-    any()
-        .filter(is_inline_whitespace)
-        .ignored()
-        .repeated()
-        .at_least(1)
-}
-
+/// match a single visible token
 fn visible_token<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char, Span>>>
 {
     use Token::*;
@@ -398,6 +388,19 @@ fn end_of_word<'src>() -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src,
         .ignored()
         .or(end())
         .rewind()
+}
+
+fn nonempty_inline_whitespace<'src>(
+) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+    fn is_inline_whitespace(c: &char) -> bool {
+        *c == ' ' || *c == '\t'
+    }
+
+    any()
+        .filter(is_inline_whitespace)
+        .ignored()
+        .repeated()
+        .at_least(1)
 }
 
 pub type Span = SimpleSpan<usize>;
