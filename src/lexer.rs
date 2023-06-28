@@ -7,6 +7,7 @@ use chumsky::{
     span::SimpleSpan,
     text::{inline_whitespace, keyword},
 };
+use std::string::ToString;
 
 #[derive(Clone, Debug)]
 pub enum Token {
@@ -68,11 +69,23 @@ pub enum InlineToken {
     Token(Token),
 }
 
+impl Display for InlineToken {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use InlineToken::*;
+
+        match self {
+            Indent => write!(f, "    "),
+            Eol => write!(f, "\n"),
+            Token(tok) => write!(f, "{:?} ", tok),
+        }
+    }
+}
+
 pub fn dump_tokens(s: &str) {
     match lexer().parse(s).into_result() {
         Ok(tok_spans) => {
             for (tok, _span) in tok_spans {
-                println!("{:?}", tok)
+                print!("{}", tok)
             }
         }
         Err(e) => println!("failed: {:?}", e),
