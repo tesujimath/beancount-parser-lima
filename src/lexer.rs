@@ -132,11 +132,12 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src
 }
 
 fn currency<'src>() -> impl Parser<'src, &'src str, Currency, extra::Err<Rich<'src, char, Span>>> {
-    regex(r"[A-Z][A-Z0-9\'\.\_\-]*[A-Z0-9]?\b|\/[A-Z0-9\'\.\_\-]*[A-Z]([A-Z0-9\'\.\_\-]*[A-Z0-9])?")
-        .try_map(|s: &str, span| {
+    regex(r"[A-Z][A-Z0-9'\._-]*[A-Z0-9]?\b|/[A-Z0-9'\._-]*[A-Z]([A-Z0-9'\._-]*[A-Z0-9])?").try_map(
+        |s: &str, span| {
             s.parse::<super::Currency>()
                 .map_err(|e| chumsky::error::Rich::custom(span, e))
-        })
+        },
+    )
 }
 
 fn date<'src>() -> impl Parser<'src, &'src str, NaiveDate, extra::Err<Rich<'src, char, Span>>> {
