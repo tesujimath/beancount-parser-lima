@@ -99,6 +99,15 @@ fn line<'src>(
 ) -> impl Parser<'src, &'src str, Vec<(Token, Span)>, extra::Err<Rich<'src, char, Span>>> {
     use Token::*;
 
+    // skip comments to end-of-line
+    fn comment_to_end_of_line<'src>(
+    ) -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+        just(";")
+            .then(any().filter(|c: &char| *c != '\n').repeated())
+            .then(end_of_line())
+            .ignored()
+    }
+
     group((
         nonempty_inline_whitespace()
             .to(Indent)
@@ -108,7 +117,8 @@ fn line<'src>(
             .map_with_span(|tok, span| (tok, span))
             .padded_by(inline_whitespace())
             .repeated()
-            .collect::<Vec<_>>(),
+            .collect::<Vec<_>>()
+            .then_ignore(comment_to_end_of_line().or_not()),
         just('\n').to(Eol).map_with_span(|tok, span| (tok, span)),
     ))
     .map(|(indent, tokens, eol)| {
@@ -389,6 +399,11 @@ fn end_of_word<'src>() -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src,
         .ignored()
         .or(end())
         .rewind()
+}
+
+/// match only at the end of a line, without consuming the newline itself
+fn end_of_line<'src>() -> impl Parser<'src, &'src str, (), extra::Err<Rich<'src, char, Span>>> {
+    just("\n").ignored().or(end()).rewind()
 }
 
 fn nonempty_inline_whitespace<'src>(
