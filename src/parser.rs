@@ -1,4 +1,4 @@
-use super::{lexer::Span, *};
+use super::{lexer_chumsky::Span, *};
 use chumsky::{prelude::*, text::inline_whitespace};
 
 use expr::expr;
