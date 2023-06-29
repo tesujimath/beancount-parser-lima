@@ -140,17 +140,14 @@ pub enum Token<'a> {
      // TODO only in trailing colon context
     #[regex(r"(?&key)", |lex| Key::try_from(lex.slice()))]
     Key(super::Key<'a>),
-
-    #[regex(r".", priority = 0, callback = |lex| println!("unrecognized token '{}' at {:?}", lex.slice(), lex.span()))]
-    Unrecognized,
 }
 
 // TODO remove this temporary diagnostic
 pub fn dump(s: &str) {
-    for tok in Token::lexer(s) {
+    for (tok, span) in Token::lexer(s).spanned() {
         match tok {
-            Ok(tok) => println!("{:?} ", tok),
-            Err(e) => println!("failed{:?}", e),
+            Ok(tok) => println!("{:?}", tok),
+            Err(e) => println!("{:?} at {:?}", e, span),
         }
     }
 }
@@ -229,7 +226,7 @@ impl LexerError {
 
 impl Default for LexerError {
     fn default() -> Self {
-        LexerError::new("unspecified lexer failure")
+        LexerError::new("unrecognized token")
     }
 }
 
