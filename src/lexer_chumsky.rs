@@ -69,7 +69,7 @@ pub enum Token<'a> {
 }
 
 // TODO remove this temporary diagnostic
-pub fn dump_tokens(s: &str) {
+pub fn dump(s: &str) {
     match lexer().parse(s).into_result() {
         Ok(tok_spans) => {
             for (tok, _span) in tok_spans {

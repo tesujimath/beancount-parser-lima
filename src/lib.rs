@@ -614,8 +614,10 @@ impl<'a> Display for CompoundAmount<'a> {
     }
 }
 
-pub use lexer_chumsky::dump_tokens;
+pub use lexer::dump as logos_dump;
+pub use lexer_chumsky::dump as chumsky_dump;
 
+mod lexer;
 mod lexer_chumsky;
 mod parser;
 mod tests;

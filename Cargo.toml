@@ -9,6 +9,7 @@ edition = "2021"
 chrono = "0.4.25"
 chumsky = { version = "1.0.0-alpha.4", features = ["regex"] }
 itertools = "0.10.5"
+logos = "0.13.0"
 nonempty = "0.8.1"
 rust_decimal = "1.29.1"
 strum = "0.25.0"
