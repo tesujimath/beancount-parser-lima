@@ -140,16 +140,26 @@ pub enum Token<'a> {
      // TODO only in trailing colon context
     #[regex(r"(?&key)", |lex| Key::try_from(lex.slice()))]
     Key(super::Key<'a>),
+
+    // errors are returned as an error token
+    Error(LexerError)
 }
 
 // TODO remove this temporary diagnostic
 pub fn dump(s: &str) {
-    for (tok, span) in Token::lexer(s).spanned() {
+    for (tok, span) in lex(s) {
         match tok {
-            Ok(tok) => println!("{:?}", tok),
-            Err(e) => println!("{:?} at {:?}", e, span),
+            Token::Error(e) => println!("{:?} at {:?}", e, span),
+            tok => println!("{:?}", tok),
         }
     }
+}
+
+pub fn lex(s: &str) -> impl Iterator<Item=(Token, std::ops::Range<usize>)> {
+    Token::lexer(s).spanned().map(|(tok, span)| match tok {
+        Ok(tok) => (tok, span),
+        Err(e) => (Token::Error(e), span),
+    })
 }
 
 fn parse_date(s: &str) -> Result<NaiveDate, LexerError> {

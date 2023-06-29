@@ -1,10 +1,10 @@
 use std::{borrow::Cow, iter::once};
 
+use super::parser::Span;
 use super::*;
 use chrono::{NaiveDateTime, NaiveTime};
 use chumsky::{
     prelude::*,
-    span::SimpleSpan,
     text::{inline_whitespace, keyword},
 };
 use std::string::ToString;
@@ -416,7 +416,5 @@ fn nonempty_inline_whitespace<'src>(
         .repeated()
         .at_least(1)
 }
-
-pub type Span = SimpleSpan<usize>;
 
 mod tests;
