@@ -6,8 +6,13 @@ use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(error = LexerError, skip r"[ \t\n]+")] // TODO don't skip on newline, need Eol and Indent tokens
+#[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
+#[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
+#[logos(subpattern time = r"\d{1,2}:\d{2}(:\d{2})?")]
 #[logos(subpattern account_type = r"[\p{Lu}\p{Lo}][\p{L}\p{N}\-]*")]
 #[logos(subpattern account_name = r"[\p{Lu}\p{Lo}\p{N}][\p{L}\p{N}\-]*")]
+#[logos(subpattern string_literal = r#""([^\\"]|\\.)*""#)]
+#[logos(subpattern number = r"\d+(,\d{3})*(\.\d+)?")]
 #[logos(subpattern tag_or_link_identifier = r"[A-Za-z0-9\-_/.]+")]
 #[logos(subpattern key = r"[a-z][a-zA-Z0-9\-_]+")]
 pub enum Token<'a> {
@@ -18,8 +23,7 @@ pub enum Token<'a> {
     #[token("NULL")]
     Null,
 
-    // not all matches are valid so we lean on the validation provided by try_from
-    #[regex(r#"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+"#, |lex| super::Currency::try_from(lex.slice()) )]
+    #[regex(r#"(?&currency)"#, |lex| super::Currency::try_from(lex.slice()) )]
     Currency(super::Currency<'a>),
 
     #[token("|")]
@@ -105,16 +109,16 @@ pub enum Token<'a> {
     #[token("include")]
     Include,
 
-    #[regex(r"\d{4}[\-/]\d{2}[\-/]\d{2}", |lex| parse_date(lex.slice()))]
+    #[regex(r"(?&date)", |lex| parse_date(lex.slice()))]
     Date(NaiveDate),
 
-    #[regex(r"\d{1,2}:\d{2}(:\d{2})?", |lex| parse_time(lex.slice()))]
+    #[regex(r"(?&time)", |lex| parse_time(lex.slice()))]
     Time(NaiveTime),
 
     #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_account(lex.slice()))]
     Account(super::Account<'a>),
 
-    #[regex(r#""([^\\"]|\\.)*""#, |lex| {
+    #[regex(r"(?&string_literal)", |lex| {
         let len = lex.slice().len();  
         if len >= 16384 {
             Err(LexerError::new("string too long"))
@@ -124,7 +128,7 @@ pub enum Token<'a> {
     })]
     StringLiteral(Cow<'a, str>),
 
-    #[regex(r"\d+(,\d{3})*(\.\d+)?", |lex| parse_number(lex.slice()))]
+    #[regex(r"(?&number)", |lex| parse_number(lex.slice()))]
     Number(Decimal),
 
     #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag))]
