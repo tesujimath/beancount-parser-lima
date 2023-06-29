@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::*;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
@@ -108,8 +108,8 @@ pub enum Token<'a> {
     #[regex(r"\d{4}[\-/]\d{2}[\-/]\d{2}", |lex| parse_date(lex.slice()))]
     Date(NaiveDate),
 
-    #[regex(r"\d{4}[\-/]\d{2}[\-/]\d{2}[ \t]+\d{1,2}:\d{2}(:\d{2})?", |lex| parse_datetime(lex.slice()))]
-    DateTime(NaiveDateTime),
+    #[regex(r"\d{1,2}:\d{2}(:\d{2})?", |lex| parse_time(lex.slice()))]
+    Time(NaiveTime),
 
     #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_account(lex.slice()))]
     Account(super::Account<'a>),
@@ -159,10 +159,8 @@ fn parse_date(s: &str) -> Result<NaiveDate, LexerError> {
     NaiveDate::from_ymd_opt(year, month, day).ok_or(LexerError::new("date out of range"))
 }
 
-fn parse_datetime(s: &str) -> Result<NaiveDateTime, LexerError> {
-    let mut datetime = s.split_ascii_whitespace();
-    let date = parse_date(datetime.by_ref().next().unwrap())?;
-    let mut time = datetime.by_ref().next().unwrap().split(':');
+fn parse_time(s: &str) -> Result<NaiveTime, LexerError> {
+    let mut time = s.split(':');
     let hour = time.by_ref().next().unwrap().parse::<u32>().unwrap();
     let min = time.by_ref().next().unwrap().parse::<u32>().unwrap();
     let sec = time
@@ -170,10 +168,8 @@ fn parse_datetime(s: &str) -> Result<NaiveDateTime, LexerError> {
         .next()
         .map(|s| s.parse::<u32>().unwrap())
         .unwrap_or(0);
-    let time =
-        NaiveTime::from_hms_opt(hour, min, sec).ok_or(LexerError::new("time out of range"))?;
 
-    Ok(NaiveDateTime::new(date, time))
+    NaiveTime::from_hms_opt(hour, min, sec).ok_or(LexerError::new("time out of range"))
 }
 
 fn parse_account(s: &str) -> Result<Account, LexerError> {
