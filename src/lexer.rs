@@ -220,13 +220,13 @@ pub struct LexerError {
 
 impl LexerError {
     fn new<T: Into<String>>(s: T) -> Self {
-        LexerError { message: s.into() }
+        Self { message: s.into() }
     }
 }
 
 impl Default for LexerError {
     fn default() -> Self {
-        LexerError::new("unrecognized token")
+        Self::new("unrecognized token")
     }
 }
 
@@ -239,37 +239,37 @@ impl Display for LexerError {
 impl Error for LexerError {}
 
 impl From<CurrencyError> for LexerError {
-    fn from(e: CurrencyError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: CurrencyError) -> Self {
+        Self::new(e.to_string())
     }
 }
 
 impl From<FlagLetterError> for LexerError {
-    fn from(e: FlagLetterError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: FlagLetterError) -> Self {
+        Self::new(e.to_string())
     }
 }
 
 impl From<AccountNameError> for LexerError {
-    fn from(e: AccountNameError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: AccountNameError) -> Self {
+        Self::new(e.to_string())
     }
 }
 
 impl From<TagOrLinkIdentifierError> for LexerError {
-    fn from(e: TagOrLinkIdentifierError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: TagOrLinkIdentifierError) -> Self {
+        Self::new(e.to_string())
     }
 }
 
 impl From<KeyError> for LexerError {
-    fn from(e: KeyError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: KeyError) -> Self {
+        Self::new(e.to_string())
     }
 }
 
 impl From<strum::ParseError> for LexerError {
-    fn from(e: strum::ParseError) -> LexerError {
-        LexerError::new(e.to_string())
+    fn from(e: strum::ParseError) -> Self {
+        Self::new(e.to_string())
     }
 }
