@@ -520,11 +520,20 @@ pub enum Expr {
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+    Neg(Box<Expr>),
     Paren(Box<Expr>),
 }
 
 impl Expr {
     fn evaluate(&self) -> (Decimal, u32) {
+        fn evaluate_unary<F>(op: F, e1: &Expr) -> (Decimal, u32)
+        where
+            F: Fn(Decimal) -> Decimal,
+        {
+            let (d1, s1) = e1.evaluate();
+            (op(d1), s1)
+        }
+
         fn evaluate_binary<F>(op: F, e1: &Expr, e2: &Expr) -> (Decimal, u32)
         where
             F: Fn(Decimal, Decimal) -> Decimal,
@@ -541,6 +550,7 @@ impl Expr {
             Sub(e1, e2) => evaluate_binary(std::ops::Sub::sub, e1, e2),
             Mul(e1, e2) => evaluate_binary(std::ops::Mul::mul, e1, e2),
             Div(e1, e2) => evaluate_binary(std::ops::Div::div, e1, e2),
+            Neg(e1) => evaluate_unary(std::ops::Neg::neg, e1),
             Paren(e) => e.evaluate(),
         }
     }
@@ -559,6 +569,7 @@ impl Display for Expr {
             Sub(ref left, ref right) => write!(format, "{} - {}", left, right),
             Mul(ref left, ref right) => write!(format, "{} * {}", left, right),
             Div(ref left, ref right) => write!(format, "{} / {}", left, right),
+            Neg(ref expr) => write!(format, "-{}", expr),
             Paren(ref expr) => write!(format, "({})", expr),
         }
     }
@@ -573,6 +584,7 @@ impl Debug for Expr {
             Sub(ref left, ref right) => write!(format, "({:?} - {:?})", left, right),
             Mul(ref left, ref right) => write!(format, "({:?} * {:?})", left, right),
             Div(ref left, ref right) => write!(format, "({:?} / {:?})", left, right),
+            Neg(ref expr) => write!(format, "(-{:?})", expr),
             Paren(ref expr) => write!(format, "[{:?}]", expr),
         }
     }

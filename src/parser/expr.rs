@@ -19,14 +19,20 @@ where
     recursive(|expr| {
         // Match a parenthesized expression
         let parens = expr
+            .clone()
             .delimited_by(just(Lparen), just(Rparen))
             .map(|x| Expr::Paren(Box::new(x)));
+
+        // Match a negated expression
+        let negated = just(Minus)
+            .ignore_then(expr)
+            .map(|x| Expr::Neg(Box::new(x)));
 
         // Match a bare number
         let number = select! { Number(x) => Expr::Value(x) };
 
         // Match a factor of an expression
-        let factor = number.or(parens.clone());
+        let factor = number.or(negated).or(parens.clone());
 
         // Match a product of factors
         let product = factor.clone().foldl(
@@ -58,7 +64,8 @@ where
 #[test_case("(1 + 2) *  3 / (4 - 6)", "(([(1 + 2)] * 3) / [(4 - 6)])", "")]
 #[test_case("72 / 2 / 3", "((72 / 2) / 3)", "")]
 #[test_case("10 - 1", "(10 - 1)", "")]
-#[test_case("10 - -2", "(10 - -2)", "")]
+#[test_case("10 - -2", "(10 - (-2))", "")]
+#[test_case("6 - --7", "(6 - (-(-7)))", "")]
 #[test_case("4 + 2 *  3 XYZ", "(4 + (2 * 3))", " XYZ")]
 #[test_case("4 + 2 *  3 # freddy", "(4 + (2 * 3))", " # freddy")]
 #[test_case("2.718 #", "2.718", " #")]
