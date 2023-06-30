@@ -4,7 +4,7 @@ use super::*;
 use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Clone, Debug, PartialEq)]
 #[logos(error = LexerError, skip r";[^\n]*\n|[ \t\n]+")] // TODO don't skip on newline, need Eol and Indent tokens
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]

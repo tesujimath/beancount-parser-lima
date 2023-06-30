@@ -1,12 +1,19 @@
-use chumsky::prelude::*;
+use chumsky::{
+    input::{SpannedInput, Stream, ValueInput},
+    prelude::*,
+};
 
 use crate::lexer::{lex, Token};
 
 pub type Span = SimpleSpan<usize>;
+type ParserError<'a> = extra::Err<Rich<'a, Token<'a>, Span>>;
 
-fn tokenize(s: &str) -> Vec<(Token, Span)> {
-    lex(s).map(|(tok, span)| (tok, span.into())).collect()
-}
+// fn parse<'src>(s: &'src str) -> () {
+//     let token_iter = lex(s).map(|(tok, span)| (tok, span.into()));
+//     let token_stream = Stream::from_iter(token_iter).spanned(s.len()..s.len());
+
+//     let result = expr::expr(token_stream);
+// }
 
 // pub fn compound_expr<'src>(
 // ) -> impl Parser<'src, &'src str, CompoundExpr, extra::Err<Rich<'src, char, Span>>> {
