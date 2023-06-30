@@ -1,19 +1,35 @@
+use super::Expr;
+use crate::lexer::{lex, Token};
 use chumsky::{
-    input::{SpannedInput, Stream, ValueInput},
+    input::{Stream, ValueInput},
     prelude::*,
 };
 
-use crate::lexer::{lex, Token};
-
 pub type Span = SimpleSpan<usize>;
-type ParserError<'a> = extra::Err<Rich<'a, Token<'a>, Span>>;
+type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
-// fn parse<'src>(s: &'src str) -> () {
-//     let token_iter = lex(s).map(|(tok, span)| (tok, span.into()));
-//     let token_stream = Stream::from_iter(token_iter).spanned(s.len()..s.len());
+// can't quite get the types or traits or constraints to match up here
+// fn parse<'src, F, P, I, O>(s: &'src str, f: F) -> ParseResult<O, ParserError<'src>>
+// where
+//     F: Fn() -> P,
+//     P: Parser<'src, I, O, extra::Err<ParserError<'src>>>,
+//     I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+// {
+//     let token_iter = lex(s).map(|(tok, span)| (tok, SimpleSpan::from(span)));
+//     let token_stream = Stream::from_iter(token_iter).spanned((s.len()..s.len()).into());
 
-//     let result = expr::expr(token_stream);
+//     f().parse(token_stream)
 // }
+
+fn parse_expr<'src, I>(s: &'src str) -> ParseResult<Expr, ParserError<'src>>
+where
+    I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let token_iter = lex(s).map(|(tok, span)| (tok, SimpleSpan::from(span)));
+    let token_stream = Stream::from_iter(token_iter).spanned((s.len()..s.len()).into());
+
+    expr::expr().parse(token_stream)
+}
 
 // pub fn compound_expr<'src>(
 // ) -> impl Parser<'src, &'src str, CompoundExpr, extra::Err<Rich<'src, char, Span>>> {

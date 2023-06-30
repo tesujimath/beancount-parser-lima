@@ -2,15 +2,12 @@ use super::super::lexer::Token;
 use super::super::*;
 use super::*;
 
-#[cfg(test)]
-use {rust_decimal::Decimal, rust_decimal_macros::dec};
-
 use chumsky::input::ValueInput;
 #[cfg(test)]
 use test_case::test_case;
 
 /// Match an expression
-pub fn expr<'src, I>() -> impl Parser<'src, I, Expr, ParserError<'src>>
+pub fn expr<'src, I>() -> impl Parser<'src, I, Expr, extra::Err<ParserError<'src>>>
 where
     I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
@@ -89,10 +86,3 @@ fn expr_test(s: &str, expected: &str, expected_unparsed: &str) {
     //     Ok((expected.to_owned(), expected_unparsed.to_owned()))
     // )
 }
-
-// #[cfg(test)]
-// #[test_case("123,456,789", dec!(123456789))]
-// #[test_case("-123,456,789.12", dec!(-123456789.12))]
-// fn value_test(s: &str, expected: Decimal) {
-//     assert_eq!(expr().parse(s).into_result(), Ok(Expr::Value(expected)));
-// }
