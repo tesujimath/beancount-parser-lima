@@ -2,14 +2,14 @@ use super::super::lexer::Token;
 use super::super::*;
 use super::*;
 
-use chumsky::input::ValueInput;
+use chumsky::input::BorrowInput;
 #[cfg(test)]
 use test_case::test_case;
 
 /// Match an expression
 pub fn expr<'src, I>() -> impl Parser<'src, I, Expr, extra::Err<ParserError<'src>>>
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     use Token::*;
 
@@ -26,7 +26,7 @@ where
             .map(|x| Expr::Neg(Box::new(x)));
 
         // Match a bare number
-        let number = select! { Number(x) => Expr::Value(x) };
+        let number = select_ref! { Number(x) => Expr::Value(*x) };
 
         // Match a factor of an expression
         let factor = number.or(negated).or(parens.clone());
@@ -68,15 +68,16 @@ where
 #[test_case("2.718 #", "2.718", " #")]
 #[test_case("3.141 # pi", "3.141", " # pi")]
 fn expr_test(s: &str, expected: &str, expected_unparsed: &str) {
-    let token_iter = lex(s).map(|(tok, span)| (tok, SimpleSpan::from(span)));
-    let token_stream = Stream::from_iter(token_iter).spanned((s.len()..s.len()).into());
+    let tokens = tokenize(s);
+    let spanned = tokens.spanned(end_of_input(s));
 
-    match expr()
+    let result = expr()
         .map(|x| format!("{:?}", x))
         .then(any().repeated().collect::<Vec<Token>>())
-        .parse(token_stream)
-        .into_result()
-    {
+        .parse(spanned)
+        .into_result();
+
+    match result {
         Ok((value, unparsed)) => assert_eq!(value, expected.to_owned()),
         Err(e) => panic!("oops"),
     }
