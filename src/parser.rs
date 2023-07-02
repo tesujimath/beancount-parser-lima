@@ -15,6 +15,22 @@ fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
 
+pub fn compound_amount<'src, I>(
+) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use CompoundAmount::*;
+
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    choice((
+        (compound_expr().then(currency)).map(|(amount, cur)| CurrencyAmount(amount, cur)),
+        compound_expr().map(BareAmount),
+        currency.map(BareCurrency),
+    ))
+}
+
 pub fn compound_expr<'src, I>() -> impl Parser<'src, I, CompoundExpr, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,

@@ -610,9 +610,9 @@ impl Display for CompoundExpr {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum CompoundAmount<'a> {
-    BareCurrency(Currency<'a>),
+    BareCurrency(&'a Currency<'a>),
     BareAmount(CompoundExpr),
-    CurrencyAmount(CompoundExpr, Currency<'a>),
+    CurrencyAmount(CompoundExpr, &'a Currency<'a>),
 }
 
 impl<'a> Display for CompoundAmount<'a> {
