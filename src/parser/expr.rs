@@ -56,34 +56,26 @@ where
 }
 
 #[cfg(test)]
-#[test_case("1 + 2 *  3", "(1 + (2 * 3))", "")]
-#[test_case("1 + 2 *  3 / 4 - 5", "((1 + ((2 * 3) / 4)) - 5)", "")]
-#[test_case("(1 + 2) *  3 / (4 - 6)", "(([(1 + 2)] * 3) / [(4 - 6)])", "")]
-#[test_case("72 / 2 / 3", "((72 / 2) / 3)", "")]
-#[test_case("10 - 1", "(10 - 1)", "")]
-#[test_case("10 - -2", "(10 - (-2))", "")]
-#[test_case("6 - --7", "(6 - (-(-7)))", "")]
-#[test_case("4 + 2 *  3 XYZ", "(4 + (2 * 3))", " XYZ")]
-#[test_case("4 + 2 *  3 # freddy", "(4 + (2 * 3))", " # freddy")]
-#[test_case("2.718 #", "2.718", " #")]
-#[test_case("3.141 # pi", "3.141", " # pi")]
-fn expr_test(s: &str, expected: &str, expected_unparsed: &str) {
+#[test_case("1 + 2 *  3", "(1 + (2 * 3))")]
+#[test_case("1 + 2 *  3 / 4 - 5", "((1 + ((2 * 3) / 4)) - 5)")]
+#[test_case("(1 + 2) *  3 / (4 - 6)", "(([(1 + 2)] * 3) / [(4 - 6)])")]
+#[test_case("72 / 2 / 3", "((72 / 2) / 3)")]
+#[test_case("10 - 1", "(10 - 1)")]
+#[test_case("10 - -2", "(10 - (-2))")]
+#[test_case("6 - --7", "(6 - (-(-7)))")]
+#[test_case("4 + 2 *  3 XYZ", "(4 + (2 * 3))")]
+#[test_case("4 + 2 *  3 # freddy", "(4 + (2 * 3))")]
+#[test_case("2.718 #", "2.718")]
+#[test_case("3.141 # pi", "3.141")]
+fn expr_test(s: &str, expected: &str) {
     let tokens = tokenize(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = expr()
         .map(|x| format!("{:?}", x))
-        .then(any().repeated().collect::<Vec<Token>>())
+        .then_ignore(any().repeated().collect::<Vec<Token>>())
         .parse(spanned)
         .into_result();
 
-    match result {
-        Ok((value, unparsed)) => assert_eq!(value, expected.to_owned()),
-        Err(e) => panic!("oops"),
-    }
-
-    // assert_eq!(
-    //     result,
-    //     Ok((expected.to_owned(), expected_unparsed.to_owned()))
-    // )
+    assert_eq!(result, Ok(expected.to_owned()))
 }
