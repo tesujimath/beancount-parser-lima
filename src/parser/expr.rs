@@ -1,7 +1,7 @@
 use super::super::lexer::Token;
-use super::super::*;
 use super::*;
 
+#[cfg(test)]
 use chumsky::input::BorrowInput;
 #[cfg(test)]
 use test_case::test_case;
