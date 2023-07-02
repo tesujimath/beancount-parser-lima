@@ -245,7 +245,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Default, Clone, Debug)]
+#[derive(PartialEq, Eq, Default, Clone, Copy, Debug)]
 pub enum Flag {
     #[default]
     Asterisk,
@@ -277,7 +277,7 @@ impl Display for Flag {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct FlagLetter(char);
 
 impl FlagLetter {

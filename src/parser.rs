@@ -15,6 +15,28 @@ fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
 
+/// Matches the `txn` keyword or a flag.
+pub fn txn<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    choice((just(Token::Txn).to(Flag::default()), flag()))
+}
+
+/// Matches any flag, dedicated or overloaded
+pub fn flag<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let dedicated_flag = select_ref!(Token::DedicatedFlag(flag) => *flag);
+
+    choice((
+        dedicated_flag,
+        just(Token::Asterisk).to(Flag::Asterisk),
+        just(Token::Hash).to(Flag::Hash),
+    ))
+}
+
 pub fn compound_amount<'src, I>(
 ) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
 where
