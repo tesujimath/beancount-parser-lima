@@ -1,5 +1,5 @@
 #![cfg(test)]
-use super::*;
+use super::{super::lexer::lex, *};
 use rust_decimal_macros::dec;
 use test_case::test_case;
 
@@ -13,12 +13,12 @@ fn test_transaction(
     expected_tags: Vec<&str>,
     expected_links: Vec<&str>,
 ) {
-    let tokens = tokenize(s);
+    let tokens = lex(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = transaction().parse(spanned).into_result();
-    let expected_payee = expected_payee.map(|s| Cow::Borrowed(s));
-    let expected_narration = expected_narration.map(|s| Cow::Borrowed(s));
+    let expected_payee = expected_payee.map(Cow::Borrowed);
+    let expected_narration = expected_narration.map(Cow::Borrowed);
     let expected_tags = expected_tags
         .into_iter()
         .map(|s| Tag::try_from(s).unwrap())
@@ -45,7 +45,7 @@ fn test_transaction(
 #[test_case("456.78 NZD", CompoundAmount::CurrencyAmount(CompoundExpr::PerUnit(Expr::Value(dec!(456.78))), &Currency("NZD")))]
 #[test_case("# 1456.98 USD", CompoundAmount::CurrencyAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98))), &Currency("USD")))]
 fn test_compound_amount(s: &str, expected: CompoundAmount) {
-    let tokens = tokenize(s);
+    let tokens = lex(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = compound_amount().parse(spanned).into_result();
@@ -57,7 +57,7 @@ fn test_compound_amount(s: &str, expected: CompoundAmount) {
 #[test_case("789.45 #", CompoundExpr::PerUnit(Expr::Value(dec!(789.45))))]
 #[test_case("# 123.45", CompoundExpr::Total(Expr::Value(dec!(123.45))))]
 fn test_compound_expr(s: &str, expected: CompoundExpr) {
-    let tokens = tokenize(s);
+    let tokens = lex(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = compound_expr().parse(spanned).into_result();
@@ -67,7 +67,7 @@ fn test_compound_expr(s: &str, expected: CompoundExpr) {
 
 #[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec!["a", "c-is-my-tag"], vec!["b", "d.is_my/link"])]
 fn test_tags_links(s: &str, expected_tags: Vec<&str>, expected_links: Vec<&str>) {
-    let tokens = tokenize(s);
+    let tokens = lex(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let expected_tags = expected_tags

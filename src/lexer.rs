@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::*;
+use super::{parser::Span, *};
 use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 
@@ -120,7 +120,7 @@ pub enum Token<'a> {
     Account(super::Account<'a>),
 
     #[regex(r"(?&string_literal)", |lex| {
-        let len = lex.slice().len();  
+        let len = lex.slice().len();
         if len >= 16384 {
             Err(LexerError::new("string too long"))
         } else {
@@ -159,13 +159,10 @@ pub enum Token<'a> {
 impl<'a> Token<'a> {
     fn is_eol(&self) -> bool {
         use Token::*;
-        
+
         *self == EolThenIndent || *self == Eol
     }
 }
-
-/// Lexer span.
-type LSpan = std::ops::Range<usize>;
 
 // TODO remove this temporary diagnostic
 pub fn dump(s: &str) {
@@ -177,53 +174,56 @@ pub fn dump(s: &str) {
     }
 }
 
-/// Lex the input discarding empty lines.
-pub fn lex(s: &str) -> impl Iterator<Item = (Token, LSpan)> {
+/// Lex the input discarding empty lines, and mapping `Range` span into `Span`
+pub fn lex(s: &str) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
         .map(|(tok, span)| match tok {
-            Ok(tok) => (tok, span),
-            Err(e) => (Token::Error(e), span),
+            Ok(tok) => (tok, Span::from(span)),
+            Err(e) => (Token::Error(e), Span::from(span)),
         })
-    .fold(EmptyLineFolder::new(), EmptyLineFolder::fold).finalize().into_iter()
+        .fold(EmptyLineFolder::new(), EmptyLineFolder::fold)
+        .finalize()
 }
 
 struct EmptyLineFolder<'a> {
-    committed: Vec<(Token<'a>, LSpan)>,
-    pending_eol: Option<(Token<'a>, LSpan)>,
+    committed: Vec<(Token<'a>, Span)>,
+    pending_eol: Option<(Token<'a>, Span)>,
 }
 
 impl<'a> EmptyLineFolder<'a> {
     fn new() -> Self {
-        EmptyLineFolder { committed: Vec::new(), pending_eol: None }
+        EmptyLineFolder {
+            committed: Vec::new(),
+            pending_eol: None,
+        }
     }
 
-    fn finalize(mut self) -> Vec<(Token<'a>, LSpan)> {
+    fn finalize(mut self) -> Vec<(Token<'a>, Span)> {
         if let Some(pending) = self.pending_eol.take() {
             self.committed.push(pending)
         }
         self.committed
     }
-    
-    fn fold(mut self: Self, item: (Token<'a>, LSpan)) -> Self {
-        if item.0.is_eol() { 
+
+    fn fold(mut self, item: (Token<'a>, Span)) -> Self {
+        if item.0.is_eol() {
             if let Some((_, span)) = self.pending_eol.take() {
-                self.pending_eol = Some((item.0, span.start .. item.1.end))
+                self.pending_eol = Some((item.0, Span::new(span.start, item.1.end)))
             } else {
                 self.pending_eol = Some(item)
             }
         } else {
             if let Some(pending) = self.pending_eol.take() {
                 use Token::*;
-                
+
                 // don't push an initial empty line
                 if !self.committed.is_empty() {
                     if pending.0 == EolThenIndent {
                         // expand into separate tokens
                         let (start, end) = (pending.1.start, pending.1.end);
-                        self.committed.push((Eol, start..end - 1));
-                        self.committed.push((Indent, end - 1..end));
-                        
+                        self.committed.push((Eol, Span::new(start, end - 1)));
+                        self.committed.push((Indent, Span::new(end - 1, end)));
                     } else {
                         self.committed.push(pending);
                     }
@@ -274,8 +274,7 @@ fn unescape_string_literal(s: &str) -> Result<Cow<str>, LexerError> {
     if s.contains('\\') {
         // TODO be more careful here to check for malformed backslash escapes - maybe there's a crate for this?
         Ok(Cow::Owned(
-            s
-                .replace("\\n", "\n")
+            s.replace("\\n", "\n")
                 .replace("\\t", "\t")
                 .replace("\\\"", "\"")
                 .replace("\\\\", "\\"),
@@ -294,7 +293,9 @@ fn parse_number(s: &str) -> Result<Decimal, LexerError> {
         FromStr::from_str(s)
     };
 
-    result.map_err(|e: <rust_decimal::Decimal as std::str::FromStr>::Err| LexerError::new(e.to_string()))
+    result.map_err(|e: <rust_decimal::Decimal as std::str::FromStr>::Err| {
+        LexerError::new(e.to_string())
+    })
 }
 
 #[derive(PartialEq, Clone, Debug)]
