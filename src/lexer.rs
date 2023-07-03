@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use super::{parser::Span, *};
+use super::{
+    parser::{end_of_input, Span},
+    *,
+};
 use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 
@@ -182,18 +185,23 @@ pub fn lex(s: &str) -> Vec<(Token, Span)> {
             Ok(tok) => (tok, Span::from(span)),
             Err(e) => (Token::Error(e), Span::from(span)),
         })
-        .fold(EmptyLineFolder::new(), EmptyLineFolder::fold)
+        .fold(
+            EmptyLineFolder::new(Some(end_of_input(s))),
+            EmptyLineFolder::fold,
+        )
         .finalize()
 }
 
 struct EmptyLineFolder<'a> {
+    forced_final_eol_span: Option<Span>,
     committed: Vec<(Token<'a>, Span)>,
     pending_eol: Option<(Token<'a>, Span)>,
 }
 
 impl<'a> EmptyLineFolder<'a> {
-    fn new() -> Self {
+    fn new(forced_final_eol_span: Option<Span>) -> Self {
         EmptyLineFolder {
+            forced_final_eol_span,
             committed: Vec::new(),
             pending_eol: None,
         }
@@ -202,6 +210,9 @@ impl<'a> EmptyLineFolder<'a> {
     fn finalize(mut self) -> Vec<(Token<'a>, Span)> {
         if let Some(pending) = self.pending_eol.take() {
             self.committed.push(pending)
+        } else if let Some(eol_span) = self.forced_final_eol_span.take() {
+            // force a final newline
+            self.committed.push((Token::Eol, eol_span))
         }
         self.committed
     }

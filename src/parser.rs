@@ -7,11 +7,11 @@ use either::Either;
 
 pub type Span = SimpleSpan<usize>;
 
-type ParserError<'a> = Rich<'a, Token<'a>, Span>;
-
-fn end_of_input(s: &str) -> Span {
+pub fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
+
+type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
 /// Matches a transaction.
 // TODO EOL and metadata/postings
