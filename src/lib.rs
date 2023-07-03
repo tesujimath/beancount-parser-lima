@@ -6,6 +6,7 @@ use chrono::NaiveDate;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
+    borrow::Cow,
     cmp::max,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
@@ -13,6 +14,60 @@ use std::{
     str::FromStr,
 };
 use strum_macros::{Display, EnumString};
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Transaction<'a> {
+    date: NaiveDate,
+    flag: Flag,
+    payee: Option<&'a Cow<'a, str>>,
+    narration: Option<&'a Cow<'a, str>>,
+    tags: Vec<&'a Tag<'a>>,
+    links: Vec<&'a Link<'a>>,
+    // TODO complete
+}
+
+impl<'a> Transaction<'a> {
+    pub fn new(
+        date: NaiveDate,
+        flag: Flag,
+        payee: Option<&'a Cow<'a, str>>,
+        narration: Option<&'a Cow<'a, str>>,
+        tags: Vec<&'a Tag<'a>>,
+        links: Vec<&'a Link<'a>>,
+    ) -> Self {
+        Transaction {
+            date,
+            flag,
+            payee,
+            narration,
+            tags,
+            links,
+        }
+    }
+}
+
+impl<'a> Display for Transaction<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {} {}",
+            self.date,
+            self.flag,
+            self.payee.as_ref().map(|s| s.as_ref()).unwrap_or("-"),
+            self.narration.as_ref().map(|s| s.as_ref()).unwrap_or("-"),
+            itertools::Itertools::intersperse(
+                self.tags.iter().map(|tag| format!("{}", tag)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+            itertools::Itertools::intersperse(
+                self.links.iter().map(|link| format!("{}", link)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+        )
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account<'a> {

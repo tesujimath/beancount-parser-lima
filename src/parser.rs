@@ -16,6 +16,25 @@ fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
 
+/// Matches a transaction.
+// TODO EOL and metadata/postings
+pub fn transaction<'src, I>(
+) -> impl Parser<'src, I, Transaction<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let string = select_ref!(Token::StringLiteral(s) => s);
+
+    group((date, txn(), string.or_not(), string.or_not(), tags_links())).map(
+        |(date, flag, s1, s2, (tags, links))| match (s1, s2) {
+            // a single string is narration
+            (Some(s1), None) => Transaction::new(date, flag, None, Some(s1), tags, links),
+            (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links),
+        },
+    )
+}
+
 /// Matches the `txn` keyword or a flag.
 pub fn txn<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
 where
@@ -76,16 +95,11 @@ where
     let tag = select_ref!(Token::Tag(tag) => tag);
     let link = select_ref!(Token::Link(link) => link);
 
-    choice((
-        tag.map(|tag| Either::Left(tag)),
-        link.map(|link| Either::Right(link)),
-    ))
-    .repeated()
-    .collect::<Vec<_>>()
-    .map(|tags_or_links| {
-        tags_or_links
-            .into_iter()
-            .fold(
+    choice((tag.map(Either::Left), link.map(Either::Right)))
+        .repeated()
+        .collect::<Vec<_>>()
+        .map(|tags_or_links| {
+            tags_or_links.into_iter().fold(
                 (Vec::new(), Vec::new()),
                 |(mut tags, mut links), item| match item {
                     Either::Left(tag) => (
@@ -101,7 +115,7 @@ where
                     }),
                 },
             )
-    })
+        })
 }
 
 use expr::expr;
