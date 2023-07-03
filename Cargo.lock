@@ -73,6 +73,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "chumsky",
+ "either",
  "itertools",
  "logos",
  "nonempty",

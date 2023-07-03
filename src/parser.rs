@@ -1,6 +1,7 @@
 use super::*;
 use crate::lexer::{lex, Token};
 use chumsky::{input::BorrowInput, prelude::*};
+use either::Either;
 
 pub type Span = SimpleSpan<usize>;
 
@@ -64,6 +65,43 @@ where
         expr().map(PerUnit),
         just(Token::Hash).ignore_then(expr()).map(Total),
     ))
+}
+
+/// Matches zero or more tags or links.
+pub fn tags_links<'src, I>(
+) -> impl Parser<'src, I, (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>), extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let tag = select_ref!(Token::Tag(tag) => tag);
+    let link = select_ref!(Token::Link(link) => link);
+
+    choice((
+        tag.map(|tag| Either::Left(tag)),
+        link.map(|link| Either::Right(link)),
+    ))
+    .repeated()
+    .collect::<Vec<_>>()
+    .map(|tags_or_links| {
+        tags_or_links
+            .into_iter()
+            .fold(
+                (Vec::new(), Vec::new()),
+                |(mut tags, mut links), item| match item {
+                    Either::Left(tag) => (
+                        {
+                            tags.push(tag);
+                            tags
+                        },
+                        links,
+                    ),
+                    Either::Right(link) => (tags, {
+                        links.push(link);
+                        links
+                    }),
+                },
+            )
+    })
 }
 
 use expr::expr;

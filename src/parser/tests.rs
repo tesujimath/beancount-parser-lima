@@ -28,3 +28,25 @@ fn test_compound_expr(s: &str, expected: CompoundExpr) {
 
     assert_eq!(result, Ok(expected));
 }
+
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec!["a", "c-is-my-tag"], vec!["b", "d.is_my/link"])]
+fn test_tags_links(s: &str, expected_tags: Vec<&str>, expected_links: Vec<&str>) {
+    let tokens = tokenize(s);
+    let spanned = tokens.spanned(end_of_input(s));
+
+    let expected_tags = expected_tags
+        .into_iter()
+        .map(|s| Tag::try_from(s).unwrap())
+        .collect::<Vec<_>>();
+    let expected_tags = expected_tags.iter().collect::<Vec<_>>();
+
+    let expected_links = expected_links
+        .into_iter()
+        .map(|s| Link::try_from(s).unwrap())
+        .collect::<Vec<_>>();
+    let expected_links = expected_links.iter().collect::<Vec<_>>();
+
+    let result = tags_links().parse(spanned).into_result();
+
+    assert_eq!(result, Ok((expected_tags, expected_links)));
+}
