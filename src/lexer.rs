@@ -5,7 +5,8 @@ use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 
 #[derive(Logos, Clone, Debug, PartialEq)]
-#[logos(error = LexerError, skip r";[^\n]*\n|[ \t\n]+")] // TODO don't skip on newline, need Eol and Indent tokens
+#[logos(error = LexerError, skip r"[ \t]+")]
+#[logos(subpattern comment_to_eol= r"(;[^\n]*)")] // rolled into end-of-line handling below
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
 #[logos(subpattern time = r"\d{1,2}:\d{2}(:\d{2})?")]
@@ -137,13 +138,34 @@ pub enum Token<'a> {
     #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link))]
     Link(super::Link<'a>),
 
-     // TODO only in trailing colon context
+    // TODO only in trailing colon context
     #[regex(r"(?&key)", |lex| Key::try_from(lex.slice()))]
     Key(super::Key<'a>),
 
+    // end-of-line and indent, which is the only significant whitespace
+    #[regex(r"(?&comment_to_eol)?\n[ \t]+")]
+    EolThenIndent,
+
+    #[regex(r"(?&comment_to_eol)?\n")]
+    Eol,
+
+    // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`
+    Indent,
+
     // errors are returned as an error token
-    Error(LexerError)
+    Error(LexerError),
 }
+
+impl<'a> Token<'a> {
+    fn is_eol(&self) -> bool {
+        use Token::*;
+        
+        *self == EolThenIndent || *self == Eol
+    }
+}
+
+/// Lexer span.
+type LSpan = std::ops::Range<usize>;
 
 // TODO remove this temporary diagnostic
 pub fn dump(s: &str) {
@@ -155,11 +177,63 @@ pub fn dump(s: &str) {
     }
 }
 
-pub fn lex(s: &str) -> impl Iterator<Item=(Token, std::ops::Range<usize>)> {
-    Token::lexer(s).spanned().map(|(tok, span)| match tok {
-        Ok(tok) => (tok, span),
-        Err(e) => (Token::Error(e), span),
-    })
+/// Lex the input discarding empty lines.
+pub fn lex(s: &str) -> impl Iterator<Item = (Token, LSpan)> {
+    Token::lexer(s)
+        .spanned()
+        .map(|(tok, span)| match tok {
+            Ok(tok) => (tok, span),
+            Err(e) => (Token::Error(e), span),
+        })
+    .fold(EmptyLineFolder::new(), EmptyLineFolder::fold).finalize().into_iter()
+}
+
+struct EmptyLineFolder<'a> {
+    committed: Vec<(Token<'a>, LSpan)>,
+    pending_eol: Option<(Token<'a>, LSpan)>,
+}
+
+impl<'a> EmptyLineFolder<'a> {
+    fn new() -> Self {
+        EmptyLineFolder { committed: Vec::new(), pending_eol: None }
+    }
+
+    fn finalize(mut self) -> Vec<(Token<'a>, LSpan)> {
+        if let Some(pending) = self.pending_eol.take() {
+            self.committed.push(pending)
+        }
+        self.committed
+    }
+    
+    fn fold(mut self: Self, item: (Token<'a>, LSpan)) -> Self {
+        if item.0.is_eol() { 
+            if let Some((_, span)) = self.pending_eol.take() {
+                self.pending_eol = Some((item.0, span.start .. item.1.end))
+            } else {
+                self.pending_eol = Some(item)
+            }
+        } else {
+            if let Some(pending) = self.pending_eol.take() {
+                use Token::*;
+                
+                // don't push an initial empty line
+                if !self.committed.is_empty() {
+                    if pending.0 == EolThenIndent {
+                        // expand into separate tokens
+                        let (start, end) = (pending.1.start, pending.1.end);
+                        self.committed.push((Eol, start..end - 1));
+                        self.committed.push((Indent, end - 1..end));
+                        
+                    } else {
+                        self.committed.push(pending);
+                    }
+                }
+            }
+            self.committed.push(item);
+        }
+
+        self
+    }
 }
 
 fn parse_date(s: &str) -> Result<NaiveDate, LexerError> {
