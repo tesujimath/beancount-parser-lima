@@ -54,6 +54,55 @@ where
     ))
 }
 
+/// Matches a `MetaValue`.
+pub fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use MetaValue::*;
+
+    choice((simple_value().map(Simple), amount().map(Amount)))
+}
+
+/// Matches a `SimpleValue`.
+/// TODO: the original parser allowed for the SimpleValue to be empty, which we don't support here,
+/// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
+pub fn simple_value<'src, I>(
+) -> impl Parser<'src, I, SimpleValue<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use SimpleValue::*;
+
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+    let currency = select_ref!(Token::Currency(cur) => cur);
+    let account = select_ref!(Token::Account(acc) => acc);
+    let tag = select_ref!(Token::Tag(tag) => tag);
+    let link = select_ref!(Token::Link(link) => link);
+    let date = select_ref!(Token::Date(date) => *date);
+
+    choice((
+        string.map(String),
+        currency.map(Currency),
+        account.map(Account),
+        tag.map(Tag),
+        link.map(Link),
+        date.map(Date),
+        bool().map(Bool),
+        just(Token::Null).to(None),
+        expr().map(Expr),
+    ))
+}
+
+pub fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    group((expr(), currency)).map(Amount::new)
+}
+
 pub fn compound_amount<'src, I>(
 ) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
 where
@@ -113,6 +162,14 @@ where
                 },
             )
         })
+}
+
+/// Matches a bool
+pub fn bool<'src, I>() -> impl Parser<'src, I, bool, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    choice((just(Token::True).to(true), just(Token::False).to(false)))
 }
 
 use expr::expr;

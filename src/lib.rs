@@ -368,6 +368,25 @@ impl TryFrom<char> for FlagLetter {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub enum MetaValue<'a> {
+    Simple(SimpleValue<'a>),
+    Amount(Amount<'a>),
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum SimpleValue<'a> {
+    String(&'a str),
+    Currency(&'a Currency<'a>),
+    Account(&'a Account<'a>),
+    Tag(&'a Tag<'a>),
+    Link(&'a Link<'a>),
+    Date(NaiveDate),
+    Bool(bool),
+    None,
+    Expr(Expr),
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Tag<'a>(TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
@@ -567,7 +586,7 @@ impl Display for ExprValue {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum Expr {
     Value(Decimal),
     Add(Box<Expr>, Box<Expr>),
@@ -658,6 +677,21 @@ impl Display for CompoundExpr {
         match self {
             PerUnit(e) => write!(format, "{}", e),
             Total(e) => write!(format, "# {}", e),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Amount<'a> {
+    quantity: Expr,
+    currency: &'a Currency<'a>,
+}
+
+impl<'a> Amount<'a> {
+    fn new(amount: (Expr, &'a Currency<'a>)) -> Self {
+        Amount {
+            quantity: amount.0,
+            currency: amount.1,
         }
     }
 }
