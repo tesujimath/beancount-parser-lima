@@ -17,8 +17,6 @@ fn test_transaction(
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = transaction().parse(spanned).into_result();
-    let expected_payee = expected_payee.map(Cow::Borrowed);
-    let expected_narration = expected_narration.map(Cow::Borrowed);
     let expected_tags = expected_tags
         .into_iter()
         .map(|s| Tag::try_from(s).unwrap())
@@ -30,8 +28,8 @@ fn test_transaction(
     let expected = Transaction::new(
         NaiveDate::from_ymd_opt(expected_date.0, expected_date.1, expected_date.2).unwrap(),
         expected_flag,
-        expected_payee.as_ref(),
-        expected_narration.as_ref(),
+        expected_payee,
+        expected_narration,
         expected_tags.iter().collect(),
         expected_links.iter().collect(),
     );

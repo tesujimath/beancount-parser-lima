@@ -6,7 +6,6 @@ use chrono::NaiveDate;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
-    borrow::Cow,
     cmp::max,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
@@ -19,8 +18,8 @@ use strum_macros::{Display, EnumString};
 pub struct Transaction<'a> {
     date: NaiveDate,
     flag: Flag,
-    payee: Option<&'a Cow<'a, str>>,
-    narration: Option<&'a Cow<'a, str>>,
+    payee: Option<&'a str>,
+    narration: Option<&'a str>,
     tags: Vec<&'a Tag<'a>>,
     links: Vec<&'a Link<'a>>,
     // TODO complete
@@ -30,8 +29,8 @@ impl<'a> Transaction<'a> {
     pub fn new(
         date: NaiveDate,
         flag: Flag,
-        payee: Option<&'a Cow<'a, str>>,
-        narration: Option<&'a Cow<'a, str>>,
+        payee: Option<&'a str>,
+        narration: Option<&'a str>,
         tags: Vec<&'a Tag<'a>>,
         links: Vec<&'a Link<'a>>,
     ) -> Self {
@@ -53,8 +52,8 @@ impl<'a> Display for Transaction<'a> {
             "{} {} {} {} {} {}",
             self.date,
             self.flag,
-            self.payee.as_ref().map(|s| s.as_ref()).unwrap_or("-"),
-            self.narration.as_ref().map(|s| s.as_ref()).unwrap_or("-"),
+            self.payee.unwrap_or("-"),
+            self.narration.unwrap_or("-"),
             itertools::Itertools::intersperse(
                 self.tags.iter().map(|tag| format!("{}", tag)),
                 " ".to_string()

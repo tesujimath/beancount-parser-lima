@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use super::*;
 use crate::lexer::Token;
 use chumsky::{input::BorrowInput, prelude::*};
@@ -19,7 +21,7 @@ where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s);
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
     group((date, txn(), string.or_not(), string.or_not(), tags_links())).map(
         |(date, flag, s1, s2, (tags, links))| match (s1, s2) {
