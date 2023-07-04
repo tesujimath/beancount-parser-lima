@@ -202,6 +202,34 @@ where
     ))
 }
 
+#[derive(PartialEq, Eq, Clone, Debug)]
+/// One component of a cost specification.
+/// Setting a field type multiple times is rejected by methods in `CostSpec`.
+enum CostComp<'a> {
+    CompoundAmount(CompoundAmount<'a>),
+    Date(NaiveDate),
+    Label(&'a str),
+    Merge,
+}
+
+/// Matches one component of a `CostSpec`.
+fn cost_comp<'src, I>() -> impl Parser<'src, I, CostComp<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use CostComp::*;
+
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+    let date = select_ref!(Token::Date(date) => *date);
+
+    choice((
+        compound_amount().map(CompoundAmount),
+        date.map(Date),
+        string.map(Label),
+        just(Token::Asterisk).to(Merge),
+    ))
+}
+
 /// Matches zero or more tags or links.
 pub fn tags_links<'src, I>(
 ) -> impl Parser<'src, I, (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>), extra::Err<ParserError<'src>>>

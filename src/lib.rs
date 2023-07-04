@@ -682,7 +682,7 @@ impl Debug for Expr {
 
 /// TODO It's unclear to me whether a compound expression is simply either per-unit or total, or whether it can be both.
 /// For now I assume one or the other.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum CompoundExpr {
     PerUnit(Expr),
     Total(Expr),
@@ -729,7 +729,7 @@ impl<'a> LooseAmount<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum CompoundAmount<'a> {
     BareCurrency(&'a Currency<'a>),
     BareAmount(CompoundExpr),
@@ -746,6 +746,111 @@ impl<'a> Display for CompoundAmount<'a> {
         }
     }
 }
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct CostSpec<'a> {
+    number_per: Option<Expr>,
+    number_total: Option<Expr>,
+    currency: Option<&'a Currency<'a>>,
+    date: Option<NaiveDate>,
+    label: Option<&'a str>,
+    merge: bool,
+}
+
+impl<'a> CostSpec<'a> {
+    fn new() -> Self {
+        CostSpec {
+            number_per: None,
+            number_total: None,
+            currency: None,
+            date: None,
+            label: None,
+            merge: false,
+        }
+    }
+
+    // only allow setting a field once
+    fn set_number_per(&mut self, value: Expr) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::PerUnit.unless(self.number_per.is_none())?;
+        self.number_per = Some(value);
+        Ok(())
+    }
+
+    fn set_number_total(&mut self, value: Expr) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::Total.unless(self.number_total.is_none())?;
+        self.number_total = Some(value);
+        Ok(())
+    }
+
+    fn set_currency(&mut self, value: &'a Currency<'a>) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::Currency.unless(self.currency.is_none())?;
+        self.currency = Some(value);
+        Ok(())
+    }
+
+    fn set_date(&mut self, value: NaiveDate) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::Date.unless(self.date.is_none())?;
+        self.date = Some(value);
+        Ok(())
+    }
+
+    fn set_label(&mut self, value: &'a str) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::Label.unless(self.label.is_none())?;
+        self.label = Some(value);
+        Ok(())
+    }
+
+    fn set_merge(&mut self) -> Result<(), CostSpecError> {
+        CostSpecErrorKind::Merge.unless(!self.merge)?;
+        self.merge = true;
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct CostSpecError(CostSpecErrorKind);
+
+fn cost_spec_error_unless(condition: bool, kind: CostSpecErrorKind) -> Result<(), CostSpecError> {
+    if condition {
+        Ok(())
+    } else {
+        Err(CostSpecError(kind))
+    }
+}
+
+#[derive(PartialEq, Eq, Display, Debug)]
+enum CostSpecErrorKind {
+    #[strum(to_string = "per-unit")]
+    PerUnit,
+    #[strum(to_string = "total")]
+    Total,
+    #[strum(to_string = "currency")]
+    Currency,
+    #[strum(to_string = "date")]
+    Date,
+    #[strum(to_string = "label")]
+    Label,
+    #[strum(to_string = "merge-cost")]
+    Merge,
+}
+
+impl CostSpecErrorKind {
+    fn unless(self, condition: bool) -> Result<(), CostSpecError> {
+        if condition {
+            Ok(())
+        } else {
+            Err(CostSpecError(self))
+        }
+    }
+}
+
+impl Display for CostSpecError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "duplicate {} field in cost specification", self.0)
+    }
+}
+
+impl Error for CostSpecError {}
 
 pub use lexer::dump as logos_dump;
 pub use lexer_chumsky::dump as chumsky_dump;
