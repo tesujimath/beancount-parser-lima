@@ -700,14 +700,30 @@ impl Display for CompoundExpr {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Amount<'a> {
-    quantity: Expr,
+    number: Expr,
     currency: &'a Currency<'a>,
 }
 
 impl<'a> Amount<'a> {
     fn new(amount: (Expr, &'a Currency<'a>)) -> Self {
         Amount {
-            quantity: amount.0,
+            number: amount.0,
+            currency: amount.1,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+/// An amount where each element may not actually be specified.
+pub struct LooseAmount<'a> {
+    number: Option<Expr>,
+    currency: Option<&'a Currency<'a>>,
+}
+
+impl<'a> LooseAmount<'a> {
+    fn new(amount: (Option<Expr>, Option<&'a Currency<'a>>)) -> Self {
+        LooseAmount {
+            number: amount.0,
             currency: amount.1,
         }
     }

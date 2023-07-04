@@ -163,6 +163,16 @@ where
     group((expr(), currency)).map(Amount::new)
 }
 
+pub fn loose_amount<'src, I>(
+) -> impl Parser<'src, I, LooseAmount<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    group((expr().or_not(), currency.or_not())).map(LooseAmount::new)
+}
+
 pub fn compound_amount<'src, I>(
 ) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
 where
