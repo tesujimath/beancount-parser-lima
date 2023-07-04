@@ -368,6 +368,23 @@ impl TryFrom<char> for FlagLetter {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Metadata<'a> {
+    key_values: Vec<(&'a Key<'a>, MetaValue<'a>)>,
+    tags: Vec<&'a Tag<'a>>,
+    links: Vec<&'a Link<'a>>,
+}
+
+impl<'a> Metadata<'a> {
+    fn new() -> Self {
+        Metadata {
+            key_values: Vec::new(),
+            tags: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MetaValue<'a> {
     Simple(SimpleValue<'a>),
     Amount(Amount<'a>),

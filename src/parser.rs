@@ -54,6 +54,66 @@ where
     ))
 }
 
+/// Matches `Metadata`, over several lines.
+fn metadata<'src, I>() -> impl Parser<'src, I, Metadata<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use Metadatum::*;
+
+    metadatum_line()
+        .repeated()
+        .collect::<Vec<_>>()
+        .map(|metadata| {
+            // collate by type of metadatum
+            metadata
+                .into_iter()
+                .fold(Metadata::new(), |mut m, item| match item {
+                    KeyValue(kv) => {
+                        m.key_values.push(kv);
+                        m
+                    }
+                    Tag(tag) => {
+                        m.tags.push(tag);
+                        m
+                    }
+                    Link(link) => {
+                        m.links.push(link);
+                        m
+                    }
+                })
+        })
+}
+
+/// A single instance of `Metadata`
+enum Metadatum<'a> {
+    KeyValue((&'a Key<'a>, MetaValue<'a>)),
+    Tag(&'a Tag<'a>),
+    Link(&'a Link<'a>),
+}
+
+/// Matches a single Metadatum on a single line.
+fn metadatum_line<'src, I>() -> impl Parser<'src, I, Metadatum<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use Metadatum::*;
+
+    let key = select_ref!(Token::Key(key) => key);
+    let tag = select_ref!(Token::Tag(tag) => tag);
+    let link = select_ref!(Token::Link(link) => link);
+
+    just(Token::Indent).ignore_then(
+        choice((
+            key.then(just(Token::Colon).ignore_then(meta_value()))
+                .map(KeyValue),
+            tag.map(Tag),
+            link.map(Link),
+        ))
+        .then_ignore(just(Token::Eol)),
+    )
+}
+
 /// Matches a `MetaValue`.
 pub fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, extra::Err<ParserError<'src>>>
 where
