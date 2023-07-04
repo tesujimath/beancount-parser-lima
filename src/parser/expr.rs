@@ -2,7 +2,7 @@ use super::super::lexer::Token;
 use super::*;
 
 #[cfg(test)]
-use super::super::lexer::lex;
+use super::super::lexer::bare_lex;
 #[cfg(test)]
 use chumsky::input::BorrowInput;
 #[cfg(test)]
@@ -70,7 +70,7 @@ where
 #[test_case("2.718 #", "2.718")]
 #[test_case("3.141 # pi", "3.141")]
 fn expr_test(s: &str, expected: &str) {
-    let tokens = lex(s);
+    let tokens = bare_lex(s);
     let spanned = tokens.spanned(end_of_input(s));
 
     let result = expr()

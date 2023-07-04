@@ -1,13 +1,13 @@
-use std::{borrow::Cow, iter::once};
-
 use super::parser::Span;
 use super::*;
-use chrono::{NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use chumsky::{
     prelude::*,
     text::{inline_whitespace, keyword},
 };
-use std::string::ToString;
+use nonempty::NonEmpty;
+use rust_decimal::Decimal;
+use std::{borrow::Cow, fmt::Debug, iter::once, str::FromStr, string::ToString};
 
 #[derive(Clone, Debug)]
 pub enum Token<'a> {
@@ -365,7 +365,7 @@ fn number<'src>() -> impl Parser<'src, &'src str, Decimal, extra::Err<Rich<'src,
 fn tag<'src>() -> impl Parser<'src, &'src str, Tag<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"#[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
         TagOrLinkIdentifier::try_from(&s[1..])
-            .map(super::Tag)
+            .map(super::Tag::new)
             .map_err(|e| chumsky::error::Rich::custom(span, e))
     })
 }
@@ -373,7 +373,7 @@ fn tag<'src>() -> impl Parser<'src, &'src str, Tag<'src>, extra::Err<Rich<'src, 
 fn link<'src>() -> impl Parser<'src, &'src str, Link<'src>, extra::Err<Rich<'src, char, Span>>> {
     regex(r"\^[A-Za-z0-9\-_/.]+").try_map(|s: &str, span| {
         TagOrLinkIdentifier::try_from(&s[1..])
-            .map(super::Link)
+            .map(super::Link::new)
             .map_err(|e| chumsky::error::Rich::custom(span, e))
     })
 }

@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use super::*;
 use crate::lexer::Token;
+use chrono::NaiveDate;
 use chumsky::{input::BorrowInput, prelude::*};
 use either::Either;
 
@@ -68,7 +69,7 @@ where
             // collate by type of metadatum
             metadata
                 .into_iter()
-                .fold(Metadata::new(), |mut m, item| match item {
+                .fold(Metadata::default(), |mut m, item| match item {
                     KeyValue(kv) => {
                         m.key_values.push(kv);
                         m

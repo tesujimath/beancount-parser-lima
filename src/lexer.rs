@@ -1,11 +1,17 @@
-use std::borrow::Cow;
-
 use super::{
     parser::{end_of_input, Span},
     *,
 };
 use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
+use nonempty::NonEmpty;
+use rust_decimal::Decimal;
+use std::{
+    borrow::Cow,
+    error::Error,
+    fmt::{self, Debug, Display, Formatter},
+    str::FromStr,
+};
 
 #[derive(Logos, Clone, Debug, PartialEq)]
 #[logos(error = LexerError, skip r"[ \t]+")]
@@ -135,10 +141,10 @@ pub enum Token<'a> {
     #[regex(r"(?&number)", |lex| parse_number(lex.slice()))]
     Number(Decimal),
 
-    #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag))]
+    #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag::new))]
     Tag(super::Tag<'a>),
 
-    #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link))]
+    #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link::new))]
     Link(super::Link<'a>),
 
     // TODO only in trailing colon context
@@ -178,17 +184,25 @@ pub fn dump(s: &str) {
 }
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
+/// and forcing a final Eol in case missing.
 pub fn lex(s: &str) -> Vec<(Token, Span)> {
+    lex_with_final_eol(s, Some(end_of_input(s)))
+}
+
+/// Lex the input discarding empty lines, and mapping `Range` span into `Span`
+#[cfg(test)]
+pub fn bare_lex(s: &str) -> Vec<(Token, Span)> {
+    lex_with_final_eol(s, None)
+}
+
+fn lex_with_final_eol(s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
         .map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(e) => (Token::Error(e), Span::from(span)),
         })
-        .fold(
-            EmptyLineFolder::new(Some(end_of_input(s))),
-            EmptyLineFolder::fold,
-        )
+        .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
         .finalize()
 }
 

@@ -87,9 +87,12 @@ fn test_time(s: &str, expected: Option<(u32, u32, u32, &str)>) {
 #[test_case("Assets:Car:Fuel", Some((AccountType::Assets, vec!["Car", "Fuel"])))]
 #[test_case("Assets:oops", None)]
 fn test_account(s: &str, expected_raw: Option<(AccountType, Vec<&str>)>) {
-    let expected = expected_raw.map(|(account_type, names)| Account {
-        account_type,
-        names: NonEmpty::collect(names.into_iter().map(AccountName)).unwrap(),
+    let expected = expected_raw.map(|(account_type, names)| {
+        Account::new(
+            account_type,
+            NonEmpty::collect(names.into_iter().map(|s| AccountName::try_from(s).unwrap()))
+                .unwrap(),
+        )
     });
 
     match account().parse(s).into_result() {
