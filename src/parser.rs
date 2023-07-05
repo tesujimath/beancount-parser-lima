@@ -55,6 +55,37 @@ where
     ))
 }
 
+/// Matches a `Posting` complete with `Metadata` over several lines.
+fn posting<'src, I>() -> impl Parser<'src, I, Posting<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let account = select_ref!(Token::Account(acc) => acc);
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    just(Token::Indent).ignore_then(
+        group((
+            flag().or_not(),
+            account,
+            expr().or_not(),
+            currency.or_not(),
+            cost_spec().or_not(),
+        ))
+        .then_ignore(just(Token::Eol))
+        .then(metadata())
+        .map(
+            |((flag, account, amount, currency, cost_spec), metadata)| Posting {
+                flag,
+                account,
+                amount,
+                currency,
+                cost_spec,
+                metadata,
+            },
+        ),
+    )
+}
+
 /// Matches `Metadata`, over several lines.
 fn metadata<'src, I>() -> impl Parser<'src, I, Metadata<'src>, extra::Err<ParserError<'src>>>
 where

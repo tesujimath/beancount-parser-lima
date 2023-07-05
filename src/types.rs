@@ -363,6 +363,16 @@ impl TryFrom<char> for FlagLetter {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Posting<'a> {
+    pub flag: Option<Flag>,
+    pub account: &'a Account<'a>,
+    pub amount: Option<Expr>,
+    pub currency: Option<&'a Currency<'a>>,
+    pub cost_spec: Option<CostSpec<'a>>,
+    pub metadata: Metadata<'a>,
+}
+
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub key_values: Vec<(&'a Key<'a>, MetaValue<'a>)>,
