@@ -14,6 +14,20 @@ pub fn end_of_input(s: &str) -> Span {
 
 type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
+/// Matches a `Directive`.
+pub fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use Directive::*;
+
+    choice((
+        transaction().map(Transaction),
+        open().map(Open),
+        commodity().map(Commodity),
+    ))
+}
+
 /// Matches a transaction, including metadata and postings, over several lines.
 pub fn transaction<'src, I>(
 ) -> impl Parser<'src, I, Transaction<'src>, extra::Err<ParserError<'src>>>
@@ -57,6 +71,91 @@ where
 
     group((date, txn(), string.or_not(), string.or_not(), tags_links()))
         .then_ignore(just(Token::Eol))
+}
+
+/// Matches a open, including metadata, over several lines.
+pub fn open<'src, I>() -> impl Parser<'src, I, Open<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    group((open_header_line(), metadata())).map(
+        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
+            date,
+            account,
+            currencies,
+            booking,
+            tags,
+            links,
+            metadata,
+        },
+    )
+}
+
+/// Matches the first line of a open.
+fn open_header_line<'src, I>() -> impl Parser<
+    'src,
+    I,
+    (
+        NaiveDate,
+        &'src Account<'src>,
+        Vec<&'src Currency<'src>>,
+        Option<&'src str>,
+        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+    ),
+    extra::Err<ParserError<'src>>,
+>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+    let currency = select_ref!(Token::Currency(cur) => cur);
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    group((
+        date,
+        account,
+        currency.repeated().collect::<Vec<_>>(),
+        string.or_not(),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+}
+
+/// Matches a commodity, including metadata, over several lines.
+pub fn commodity<'src, I>() -> impl Parser<'src, I, Commodity<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    group((commodity_header_line(), metadata())).map(
+        |((date, currency, (tags, links)), metadata)| Commodity {
+            date,
+            currency,
+            tags,
+            links,
+            metadata,
+        },
+    )
+}
+
+/// Matches the first line of a commodity.
+fn commodity_header_line<'src, I>() -> impl Parser<
+    'src,
+    I,
+    (
+        NaiveDate,
+        &'src Currency<'src>,
+        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+    ),
+    extra::Err<ParserError<'src>>,
+>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    group((date, currency, tags_links())).then_ignore(just(Token::Eol))
 }
 
 /// Matches the `txn` keyword or a flag.

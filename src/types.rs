@@ -11,6 +11,14 @@ use std::{
 use strum_macros::{Display, EnumString};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Directive<'a> {
+    Transaction(Transaction<'a>),
+    Open(Open<'a>),
+    Commodity(Commodity<'a>),
+    // TODO other directives
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Transaction<'a> {
     date: NaiveDate,
     flag: Flag,
@@ -65,6 +73,115 @@ impl<'a> Display for Transaction<'a> {
                 " ".to_string()
             )
             .collect::<String>(),
+        )
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Open<'a> {
+    pub date: NaiveDate,
+    pub account: &'a Account<'a>,
+    pub currencies: Vec<&'a Currency<'a>>,
+    pub booking: Option<&'a str>,
+    pub tags: Vec<&'a Tag<'a>>,
+    pub links: Vec<&'a Link<'a>>,
+    pub metadata: Metadata<'a>,
+}
+
+impl<'a> Open<'a> {
+    pub fn new(
+        date: NaiveDate,
+        account: &'a Account<'a>,
+        currencies: Vec<&'a Currency<'a>>,
+        booking: Option<&'a str>,
+        tags: Vec<&'a Tag<'a>>,
+        links: Vec<&'a Link<'a>>,
+        metadata: Metadata<'a>,
+    ) -> Self {
+        Open {
+            date,
+            account,
+            currencies,
+            booking,
+            tags,
+            links,
+            metadata,
+        }
+    }
+}
+
+impl<'a> Display for Open<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {}",
+            self.date,
+            self.account,
+            itertools::Itertools::intersperse(
+                self.currencies.iter().map(|cur| format!("{}", cur)),
+                ", ".to_string()
+            )
+            .collect::<String>(),
+            itertools::Itertools::intersperse(
+                self.tags.iter().map(|tag| format!("{}", tag)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+            itertools::Itertools::intersperse(
+                self.links.iter().map(|link| format!("{}", link)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+            // TODO metadata
+        )
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Commodity<'a> {
+    pub date: NaiveDate,
+    pub currency: &'a Currency<'a>,
+    pub tags: Vec<&'a Tag<'a>>,
+    pub links: Vec<&'a Link<'a>>,
+    pub metadata: Metadata<'a>,
+}
+
+impl<'a> Commodity<'a> {
+    pub fn new(
+        date: NaiveDate,
+        currency: &'a Currency<'a>,
+        tags: Vec<&'a Tag<'a>>,
+        links: Vec<&'a Link<'a>>,
+        metadata: Metadata<'a>,
+    ) -> Self {
+        Commodity {
+            date,
+            currency,
+            tags,
+            links,
+            metadata,
+        }
+    }
+}
+
+impl<'a> Display for Commodity<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {}",
+            self.date,
+            self.currency,
+            itertools::Itertools::intersperse(
+                self.tags.iter().map(|tag| format!("{}", tag)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+            itertools::Itertools::intersperse(
+                self.links.iter().map(|link| format!("{}", link)),
+                " ".to_string()
+            )
+            .collect::<String>(),
+            // TODO metadata
         )
     }
 }
