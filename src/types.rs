@@ -6,6 +6,7 @@ use std::{
     error::Error,
     fmt::{self, Debug, Display, Formatter},
     iter::empty,
+    mem::swap,
 };
 use strum_macros::{Display, EnumString};
 
@@ -746,74 +747,133 @@ impl<'a> Display for CompoundAmount<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CostSpec<'a> {
-    number_per: Option<Expr>,
-    number_total: Option<Expr>,
+    per_unit: Option<Expr>,
+    total: Option<Expr>,
     currency: Option<&'a Currency<'a>>,
     date: Option<NaiveDate>,
     label: Option<&'a str>,
     merge: bool,
 }
 
-impl<'a> CostSpec<'a> {
-    fn new() -> Self {
-        CostSpec {
-            number_per: None,
-            number_total: None,
-            currency: None,
-            date: None,
-            label: None,
-            merge: false,
+#[derive(Default, Debug)]
+/// Only allows setting each field once, and requires at least one field to be set before building.
+pub struct CostSpecBuilder<'a> {
+    per_unit: Option<Expr>,
+    total: Option<Expr>,
+    currency: Option<&'a Currency<'a>>,
+    date: Option<NaiveDate>,
+    label: Option<&'a str>,
+    merge: bool,
+    errors: Vec<CostSpecError>,
+}
+
+impl<'a> CostSpecBuilder<'a> {
+    pub fn compound_expr(self, value: CompoundExpr) -> Self {
+        use CompoundExpr::*;
+
+        match value {
+            PerUnit(value) => self.per_unit(value),
+            Total(value) => self.total(value),
         }
     }
 
-    // only allow setting a field once
-    fn set_number_per(&mut self, value: Expr) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::PerUnit.unless(self.number_per.is_none())?;
-        self.number_per = Some(value);
-        Ok(())
+    fn per_unit(mut self, value: Expr) -> Self {
+        if self.per_unit.is_none() {
+            self.per_unit = Some(value);
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::PerUnit))
+        }
+        self
     }
 
-    fn set_number_total(&mut self, value: Expr) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::Total.unless(self.number_total.is_none())?;
-        self.number_total = Some(value);
-        Ok(())
+    fn total(mut self, value: Expr) -> Self {
+        if self.total.is_none() {
+            self.total = Some(value);
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::Total))
+        }
+        self
     }
 
-    fn set_currency(&mut self, value: &'a Currency<'a>) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::Currency.unless(self.currency.is_none())?;
-        self.currency = Some(value);
-        Ok(())
+    pub fn currency(mut self, value: &'a Currency<'a>) -> Self {
+        if self.currency.is_none() {
+            self.currency = Some(value);
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::Currency))
+        }
+        self
     }
 
-    fn set_date(&mut self, value: NaiveDate) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::Date.unless(self.date.is_none())?;
-        self.date = Some(value);
-        Ok(())
+    pub fn date(mut self, value: NaiveDate) -> Self {
+        if self.date.is_none() {
+            self.date = Some(value);
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::Date))
+        }
+        self
     }
 
-    fn set_label(&mut self, value: &'a str) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::Label.unless(self.label.is_none())?;
-        self.label = Some(value);
-        Ok(())
+    pub fn label(mut self, value: &'a str) -> Self {
+        if self.label.is_none() {
+            self.label = Some(value);
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::Label))
+        }
+        self
     }
 
-    fn set_merge(&mut self) -> Result<(), CostSpecError> {
-        CostSpecErrorKind::Merge.unless(!self.merge)?;
-        self.merge = true;
-        Ok(())
+    pub fn merge(mut self) -> Self {
+        if !self.merge {
+            self.merge = true;
+        } else {
+            self.errors.push(CostSpecError(CostSpecErrorKind::Merge))
+        }
+        self
+    }
+
+    // the lifetime `'a` of the CostSpec returned outlives the builder lifetime `'b`
+    pub fn build<'b>(&'b mut self) -> Result<CostSpec<'a>, CostSpecErrors>
+    where
+        'a: 'b,
+    {
+        let per_unit = self.per_unit.take();
+        let total = self.total.take();
+        let currency = self.currency.take();
+        let date = self.date.take();
+        let label = self.label.take();
+        let merge = self.merge;
+        self.merge = false;
+
+        if !self.errors.is_empty() {
+            let mut errors = Vec::new();
+            swap(&mut self.errors, &mut errors);
+            Err(CostSpecErrors(errors))
+        } else if per_unit.is_none()
+            && total.is_none()
+            && currency.is_none()
+            && date.is_none()
+            && label.is_none()
+            && !merge
+        {
+            Err(CostSpecErrors(vec![CostSpecError(
+                CostSpecErrorKind::Empty,
+            )]))
+        } else {
+            Ok(CostSpec {
+                per_unit,
+                total,
+                currency,
+                date,
+                label,
+                merge,
+            })
+        }
+        // let errors: Vec<CostSpecError>,
     }
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct CostSpecError(CostSpecErrorKind);
-
-fn cost_spec_error_unless(condition: bool, kind: CostSpecErrorKind) -> Result<(), CostSpecError> {
-    if condition {
-        Ok(())
-    } else {
-        Err(CostSpecError(kind))
-    }
-}
 
 #[derive(PartialEq, Eq, Display, Debug)]
 enum CostSpecErrorKind {
@@ -829,6 +889,8 @@ enum CostSpecErrorKind {
     Label,
     #[strum(to_string = "merge-cost")]
     Merge,
+    #[strum(to_string = "empty")]
+    Empty,
 }
 
 impl CostSpecErrorKind {
@@ -843,10 +905,33 @@ impl CostSpecErrorKind {
 
 impl Display for CostSpecError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "duplicate {} field in cost specification", self.0)
+        if self.0 == CostSpecErrorKind::Empty {
+            write!(f, "empty cost specification")
+        } else {
+            write!(f, "duplicate {} field in cost specification", self.0)
+        }
     }
 }
 
 impl Error for CostSpecError {}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct CostSpecErrors(Vec<CostSpecError>);
+
+impl Display for CostSpecErrors {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            itertools::Itertools::intersperse(
+                self.0.iter().map(|e| format!("{}", e)),
+                ", ".to_string()
+            )
+            .collect::<String>(),
+        )
+    }
+}
+
+impl Error for CostSpecErrors {}
 
 mod tests;

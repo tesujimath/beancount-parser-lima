@@ -203,6 +203,42 @@ where
     ))
 }
 
+/// Matches a `CostSpec`.
+/// For now we only match the new syntax of single braces.
+fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use self::CompoundAmount::*;
+    use CostComp::*;
+
+    just(Token::Lcurl)
+        .ignore_then(cost_comp().repeated().at_least(1).collect::<Vec<_>>())
+        .then_ignore(just(Token::Rcurl))
+        .try_map(move |cost_comps, span| {
+            cost_comps
+                .into_iter()
+                .fold(
+                    // accumulate the `CostComp`s in a `CostSpecBuilder`
+                    CostSpecBuilder::default(),
+                    |builder, cost_comp| match cost_comp {
+                        CompoundAmount(compound_amount) => match compound_amount {
+                            BareCurrency(cur) => builder.currency(cur),
+                            BareAmount(amount) => builder.compound_expr(amount),
+                            CurrencyAmount(amount, cur) => {
+                                builder.compound_expr(amount).currency(cur)
+                            }
+                        },
+                        Date(date) => builder.date(date),
+                        Label(s) => builder.label(s),
+                        Merge => builder.merge(),
+                    },
+                )
+                .build()
+                .map_err(|e| Rich::custom(span, e.to_string()))
+        })
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// One component of a cost specification.
 /// Setting a field type multiple times is rejected by methods in `CostSpec`.
