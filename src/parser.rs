@@ -14,23 +14,49 @@ pub fn end_of_input(s: &str) -> Span {
 
 type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
-/// Matches a transaction.
-// TODO EOL and metadata/postings
+/// Matches a transaction, including metadata and postings, over several lines.
 pub fn transaction<'src, I>(
 ) -> impl Parser<'src, I, Transaction<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    group((
+        transaction_header_line(),
+        metadata(),
+        posting().repeated().collect::<Vec<_>>(),
+    ))
+    .map(
+        |((date, flag, s1, s2, (tags, links)), metadata, postings)| match (s1, s2) {
+            // a single string is narration
+            (Some(s1), None) => {
+                Transaction::new(date, flag, None, Some(s1), tags, links, metadata, postings)
+            }
+            (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links, metadata, postings),
+        },
+    )
+}
+
+/// Matches the first line of a transaction.
+fn transaction_header_line<'src, I>() -> impl Parser<
+    'src,
+    I,
+    (
+        NaiveDate,
+        Flag,
+        Option<&'src str>,
+        Option<&'src str>,
+        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+    ),
+    extra::Err<ParserError<'src>>,
+>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     let date = select_ref!(Token::Date(date) => *date);
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
-    group((date, txn(), string.or_not(), string.or_not(), tags_links())).map(
-        |(date, flag, s1, s2, (tags, links))| match (s1, s2) {
-            // a single string is narration
-            (Some(s1), None) => Transaction::new(date, flag, None, Some(s1), tags, links),
-            (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links),
-        },
-    )
+    group((date, txn(), string.or_not(), string.or_not(), tags_links()))
+        .then_ignore(just(Token::Eol))
 }
 
 /// Matches the `txn` keyword or a flag.

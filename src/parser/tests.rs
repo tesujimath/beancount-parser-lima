@@ -3,7 +3,8 @@ use super::{super::lexer::bare_lex, *};
 use rust_decimal_macros::dec;
 use test_case::test_case;
 
-#[test_case(r##"2023-07-03 * "New World Gardens North East Va ;""##, (2023, 7, 3), Flag::Asterisk, None, Some("New World Gardens North East Va ;"), vec![], vec![])]
+#[test_case(r##"2023-07-03 * "New World Gardens North East Va ;"
+"##, (2023, 7, 3), Flag::Asterisk, None, Some("New World Gardens North East Va ;"), vec![], vec![])]
 fn test_transaction(
     s: &str,
     expected_date: (i32, u32, u32),
@@ -32,6 +33,8 @@ fn test_transaction(
         expected_narration,
         expected_tags.iter().collect(),
         expected_links.iter().collect(),
+        Metadata::default(),
+        Vec::new(),
     );
 
     assert_eq!(result, Ok(expected));

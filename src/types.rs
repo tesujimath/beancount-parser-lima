@@ -18,7 +18,8 @@ pub struct Transaction<'a> {
     narration: Option<&'a str>,
     tags: Vec<&'a Tag<'a>>,
     links: Vec<&'a Link<'a>>,
-    // TODO complete
+    metadata: Metadata<'a>,
+    postings: Vec<Posting<'a>>,
 }
 
 impl<'a> Transaction<'a> {
@@ -29,6 +30,8 @@ impl<'a> Transaction<'a> {
         narration: Option<&'a str>,
         tags: Vec<&'a Tag<'a>>,
         links: Vec<&'a Link<'a>>,
+        metadata: Metadata<'a>,
+        postings: Vec<Posting<'a>>,
     ) -> Self {
         Transaction {
             date,
@@ -37,6 +40,8 @@ impl<'a> Transaction<'a> {
             narration,
             tags,
             links,
+            metadata,
+            postings,
         }
     }
 }
