@@ -15,9 +15,9 @@ fn test_transaction(
     expected_links: Vec<&str>,
 ) {
     let tokens = bare_lex(s);
-    let spanned = tokens.spanned(end_of_input(s));
+    let spanned_tokens = tokens.spanned(end_of_input(s));
 
-    let result = transaction().parse(spanned).into_result();
+    let result = transaction().parse(spanned_tokens).into_result();
     let expected_tags = expected_tags
         .into_iter()
         .map(|s| Tag::try_from(s).unwrap())
@@ -47,9 +47,9 @@ fn test_transaction(
 #[test_case("# 1456.98 USD", CompoundAmount::CurrencyAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98))), &Currency::try_from("USD").unwrap()))]
 fn test_compound_amount(s: &str, expected: CompoundAmount) {
     let tokens = bare_lex(s);
-    let spanned = tokens.spanned(end_of_input(s));
+    let spanned_tokens = tokens.spanned(end_of_input(s));
 
-    let result = compound_amount().parse(spanned).into_result();
+    let result = compound_amount().parse(spanned_tokens).into_result();
 
     assert_eq!(result, Ok(expected));
 }
@@ -59,9 +59,9 @@ fn test_compound_amount(s: &str, expected: CompoundAmount) {
 #[test_case("# 123.45", CompoundExpr::Total(Expr::Value(dec!(123.45))))]
 fn test_compound_expr(s: &str, expected: CompoundExpr) {
     let tokens = bare_lex(s);
-    let spanned = tokens.spanned(end_of_input(s));
+    let spanned_tokens = tokens.spanned(end_of_input(s));
 
-    let result = compound_expr().parse(spanned).into_result();
+    let result = compound_expr().parse(spanned_tokens).into_result();
 
     assert_eq!(result, Ok(expected));
 }
@@ -69,7 +69,7 @@ fn test_compound_expr(s: &str, expected: CompoundExpr) {
 #[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec!["a", "c-is-my-tag"], vec!["b", "d.is_my/link"])]
 fn test_tags_links(s: &str, expected_tags: Vec<&str>, expected_links: Vec<&str>) {
     let tokens = bare_lex(s);
-    let spanned = tokens.spanned(end_of_input(s));
+    let spanned_tokens = tokens.spanned(end_of_input(s));
 
     let expected_tags = expected_tags
         .into_iter()
@@ -83,7 +83,7 @@ fn test_tags_links(s: &str, expected_tags: Vec<&str>, expected_links: Vec<&str>)
         .collect::<Vec<_>>();
     let expected_links = expected_links.iter().collect::<Vec<_>>();
 
-    let result = tags_links().parse(spanned).into_result();
+    let result = tags_links().parse(spanned_tokens).into_result();
 
     assert_eq!(result, Ok((expected_tags, expected_links)));
 }

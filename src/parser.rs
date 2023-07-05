@@ -12,7 +12,7 @@ pub fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
 
-type ParserError<'a> = Rich<'a, Token<'a>, Span>;
+pub type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
 /// Matches the whole file.
 pub fn file<'src, I>() -> impl Parser<'src, I, Vec<Declaration<'src>>, extra::Err<ParserError<'src>>>
@@ -54,7 +54,7 @@ where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     // TODO
-    todo()
+    just(Token::Option).to(Pragma::Placeholder("pragma parsing not yet implemented"))
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.

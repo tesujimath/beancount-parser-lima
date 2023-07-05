@@ -185,6 +185,8 @@ pub fn dump(s: &str) {
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
 /// and forcing a final Eol in case missing.
+///
+/// Lexing errors are returned as `Error` tokens.
 pub fn lex(s: &str) -> Vec<(Token, Span)> {
     lex_with_final_eol(s, Some(end_of_input(s)))
 }
