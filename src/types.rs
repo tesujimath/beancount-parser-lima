@@ -11,11 +11,24 @@ use std::{
 use strum_macros::{Display, EnumString};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Declaration<'a> {
+    Directive(Directive<'a>),
+    // TODO actually support Pragma
+    Pragma(Pragma<'a>),
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Directive<'a> {
     Transaction(Transaction<'a>),
     Open(Open<'a>),
     Commodity(Commodity<'a>),
     // TODO other directives
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Pragma<'a> {
+    // TODO
+    Placeholder(&'a str),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]

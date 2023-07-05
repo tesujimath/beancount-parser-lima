@@ -14,6 +14,25 @@ pub fn end_of_input(s: &str) -> Span {
 
 type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
+/// Matches the whole file.
+pub fn file<'src, I>() -> impl Parser<'src, I, Vec<Declaration<'src>>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    declaration().repeated().collect::<Vec<_>>()
+}
+
+/// Matches a `Declaration`.
+pub fn declaration<'src, I>(
+) -> impl Parser<'src, I, Declaration<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use Declaration::*;
+
+    choice((directive().map(Directive), pragma().map(Pragma)))
+}
+
 /// Matches a `Directive`.
 pub fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
@@ -25,7 +44,17 @@ where
         transaction().map(Transaction),
         open().map(Open),
         commodity().map(Commodity),
+        // TODO other directives
     ))
+}
+
+/// Matches a `Pragma`.
+pub fn pragma<'src, I>() -> impl Parser<'src, I, Pragma<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    // TODO
+    todo()
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.
