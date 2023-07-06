@@ -77,6 +77,8 @@ where
             (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links, metadata, postings),
         },
     )
+    .labelled("transaction")
+    .as_context()
 }
 
 /// Matches the first line of a transaction.
@@ -107,17 +109,20 @@ pub fn open<'src, I>() -> impl Parser<'src, I, Open<'src>, extra::Err<ParserErro
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    group((open_header_line(), metadata())).map(
-        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
-            date,
-            account,
-            currencies,
-            booking,
-            tags,
-            links,
-            metadata,
-        },
-    )
+    group((open_header_line(), metadata()))
+        .map(
+            |((date, account, currencies, booking, (tags, links)), metadata)| Open {
+                date,
+                account,
+                currencies,
+                booking,
+                tags,
+                links,
+                metadata,
+            },
+        )
+        .labelled("open")
+        .as_context()
 }
 
 /// Matches the first line of a open.
@@ -160,15 +165,16 @@ pub fn commodity<'src, I>() -> impl Parser<'src, I, Commodity<'src>, extra::Err<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    group((commodity_header_line(), metadata())).map(
-        |((date, currency, (tags, links)), metadata)| Commodity {
+    group((commodity_header_line(), metadata()))
+        .map(|((date, currency, (tags, links)), metadata)| Commodity {
             date,
             currency,
             tags,
             links,
             metadata,
-        },
-    )
+        })
+        .labelled("commodity")
+        .as_context()
 }
 
 /// Matches the first line of a commodity.
@@ -223,29 +229,34 @@ where
     let account = select_ref!(Token::Account(acc) => acc);
     let currency = select_ref!(Token::Currency(cur) => cur);
 
-    just(Token::Indent).ignore_then(
-        group((
-            flag().or_not(),
-            account,
-            expr().or_not(),
-            currency.or_not(),
-            cost_spec().or_not(),
-            price_annotation().or_not(),
-        ))
-        .then_ignore(just(Token::Eol))
-        .then(metadata())
-        .map(
-            |((flag, account, amount, currency, cost_spec, price_annotation), metadata)| Posting {
-                flag,
+    just(Token::Indent)
+        .ignore_then(
+            group((
+                flag().or_not(),
                 account,
-                amount,
-                currency,
-                cost_spec,
-                price_annotation,
-                metadata,
-            },
-        ),
-    )
+                expr().or_not(),
+                currency.or_not(),
+                cost_spec().or_not(),
+                price_annotation().or_not(),
+            ))
+            .then_ignore(just(Token::Eol))
+            .then(metadata())
+            .map(
+                |((flag, account, amount, currency, cost_spec, price_annotation), metadata)| {
+                    Posting {
+                        flag,
+                        account,
+                        amount,
+                        currency,
+                        cost_spec,
+                        price_annotation,
+                        metadata,
+                    }
+                },
+            ),
+        )
+        .labelled("posting")
+        .as_context()
 }
 
 /// Matches `Metadata`, over several lines.
@@ -297,15 +308,18 @@ where
     let tag = select_ref!(Token::Tag(tag) => tag);
     let link = select_ref!(Token::Link(link) => link);
 
-    just(Token::Indent).ignore_then(
-        choice((
-            key.then(just(Token::Colon).ignore_then(meta_value()))
-                .map(KeyValue),
-            tag.map(Tag),
-            link.map(Link),
-        ))
-        .then_ignore(just(Token::Eol)),
-    )
+    just(Token::Indent)
+        .ignore_then(
+            choice((
+                key.then(just(Token::Colon).ignore_then(meta_value()))
+                    .map(KeyValue),
+                tag.map(Tag),
+                link.map(Link),
+            ))
+            .then_ignore(just(Token::Eol)),
+        )
+        .labelled("metadata")
+        .as_context()
 }
 
 /// Matches a `MetaValue`.
