@@ -143,12 +143,16 @@ where
 
     group((
         date,
+        just(Token::Open),
         account,
         currency.repeated().collect::<Vec<_>>(),
         string.or_not(),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
+    .map(|(date, _, account, currency, booking, tags_links)| {
+        (date, account, currency, booking, tags_links)
+    })
 }
 
 /// Matches a commodity, including metadata, over several lines.
@@ -184,7 +188,9 @@ where
     let date = select_ref!(Token::Date(date) => *date);
     let currency = select_ref!(Token::Currency(cur) => cur);
 
-    group((date, currency, tags_links())).then_ignore(just(Token::Eol))
+    group((date, just(Token::Commodity), currency, tags_links()))
+        .then_ignore(just(Token::Eol))
+        .map(|(date, _, currency, tags_link)| (date, currency, tags_link))
 }
 
 /// Matches the `txn` keyword or a flag.
