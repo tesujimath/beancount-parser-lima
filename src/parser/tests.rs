@@ -40,12 +40,12 @@ fn test_transaction(
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case("GBP", CompoundAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]
-#[test_case("456.78", CompoundAmount::BareAmount(CompoundExpr::PerUnit(Expr::Value(dec!(456.78)))))]
-#[test_case("# 1456.98", CompoundAmount::BareAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98)))))]
-#[test_case("456.78 NZD", CompoundAmount::CurrencyAmount(CompoundExpr::PerUnit(Expr::Value(dec!(456.78))), &Currency::try_from("NZD").unwrap()))]
-#[test_case("# 1456.98 USD", CompoundAmount::CurrencyAmount(CompoundExpr::Total(Expr::Value(dec!(1456.98))), &Currency::try_from("USD").unwrap()))]
-fn test_compound_amount(s: &str, expected: CompoundAmount) {
+#[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]
+#[test_case("456.78", ScopedAmount::BareAmount(ScopedExpr::PerUnit(Expr::Value(dec!(456.78)))))]
+#[test_case("# 1456.98", ScopedAmount::BareAmount(ScopedExpr::Total(Expr::Value(dec!(1456.98)))))]
+#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExpr::PerUnit(Expr::Value(dec!(456.78))), &Currency::try_from("NZD").unwrap()))]
+#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExpr::Total(Expr::Value(dec!(1456.98))), &Currency::try_from("USD").unwrap()))]
+fn test_compound_amount(s: &str, expected: ScopedAmount) {
     let tokens = bare_lex(s);
     let spanned_tokens = tokens.spanned(end_of_input(s));
 
@@ -54,10 +54,10 @@ fn test_compound_amount(s: &str, expected: CompoundAmount) {
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case("123.45", CompoundExpr::PerUnit(Expr::Value(dec!(123.45))))]
-#[test_case("789.45 #", CompoundExpr::PerUnit(Expr::Value(dec!(789.45))))]
-#[test_case("# 123.45", CompoundExpr::Total(Expr::Value(dec!(123.45))))]
-fn test_compound_expr(s: &str, expected: CompoundExpr) {
+#[test_case("123.45", ScopedExpr::PerUnit(Expr::Value(dec!(123.45))))]
+#[test_case("789.45 #", ScopedExpr::PerUnit(Expr::Value(dec!(789.45))))]
+#[test_case("# 123.45", ScopedExpr::Total(Expr::Value(dec!(123.45))))]
+fn test_compound_expr(s: &str, expected: ScopedExpr) {
     let tokens = bare_lex(s);
     let spanned_tokens = tokens.spanned(end_of_input(s));
 

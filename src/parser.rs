@@ -368,11 +368,11 @@ where
 }
 
 pub fn compound_amount<'src, I>(
-) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
+) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    use CompoundAmount::*;
+    use ScopedAmount::*;
 
     let currency = select_ref!(Token::Currency(cur) => cur);
 
@@ -383,11 +383,11 @@ where
     ))
 }
 
-pub fn compound_expr<'src, I>() -> impl Parser<'src, I, CompoundExpr, extra::Err<ParserError<'src>>>
+pub fn compound_expr<'src, I>() -> impl Parser<'src, I, ScopedExpr, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    use CompoundExpr::*;
+    use ScopedExpr::*;
 
     choice((
         expr().then_ignore(just(Token::Hash)).map(PerUnit),
@@ -397,15 +397,15 @@ where
 }
 
 pub fn price_annotation<'src, I>(
-) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
+) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    use CompoundAmount::*;
+    use ScopedAmount::*;
 
     let currency = select_ref!(Token::Currency(cur) => cur);
-    fn compound(amount: Expr, is_total: bool) -> CompoundExpr {
-        use CompoundExpr::*;
+    fn scope(amount: Expr, is_total: bool) -> ScopedExpr {
+        use ScopedExpr::*;
 
         if is_total {
             Total(amount)
@@ -420,8 +420,8 @@ where
         currency.or_not(),
     ))
     .try_map(|(is_total, amount, cur), span| match (amount, cur) {
-        (Some(amount), Some(cur)) => Ok(CurrencyAmount(compound(amount, is_total), cur)),
-        (Some(amount), None) => Ok(BareAmount(compound(amount, is_total))),
+        (Some(amount), Some(cur)) => Ok(CurrencyAmount(scope(amount, is_total), cur)),
+        (Some(amount), None) => Ok(BareAmount(scope(amount, is_total))),
         (None, Some(cur)) => Ok(BareCurrency(cur)),
         (None, None) => Err(Rich::custom(span, "empty price annotation")),
     })
@@ -433,7 +433,7 @@ fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, extra::Err<Parse
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    use self::CompoundAmount::*;
+    use self::ScopedAmount::*;
     use CostComp::*;
 
     just(Token::Lcurl)
@@ -446,7 +446,7 @@ where
                     // accumulate the `CostComp`s in a `CostSpecBuilder`
                     CostSpecBuilder::default(),
                     |builder, cost_comp| match cost_comp {
-                        CompoundAmount(compound_amount) => match compound_amount {
+                        ScopedAmount(compound_amount) => match compound_amount {
                             BareCurrency(cur) => builder.currency(cur),
                             BareAmount(amount) => builder.compound_expr(amount),
                             CurrencyAmount(amount, cur) => {
@@ -467,7 +467,7 @@ where
 /// One component of a cost specification.
 /// Setting a field type multiple times is rejected by methods in `CostSpec`.
 enum CostComp<'a> {
-    CompoundAmount(CompoundAmount<'a>),
+    ScopedAmount(ScopedAmount<'a>),
     Date(NaiveDate),
     Label(&'a str),
     Merge,
@@ -484,7 +484,7 @@ where
     let date = select_ref!(Token::Date(date) => *date);
 
     choice((
-        compound_amount().map(CompoundAmount),
+        compound_amount().map(ScopedAmount),
         date.map(Date),
         string.map(Label),
         just(Token::Asterisk).to(Merge),

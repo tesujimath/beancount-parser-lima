@@ -505,7 +505,7 @@ pub struct Posting<'a> {
     pub amount: Option<Expr>,
     pub currency: Option<&'a Currency<'a>>,
     pub cost_spec: Option<CostSpec<'a>>,
-    pub price_annotation: Option<CompoundAmount<'a>>,
+    pub price_annotation: Option<ScopedAmount<'a>>,
     pub metadata: Metadata<'a>,
 }
 
@@ -824,17 +824,16 @@ impl Debug for Expr {
     }
 }
 
-/// TODO It's unclear to me whether a compound expression is simply either per-unit or total, or whether it can be both.
-/// For now I assume one or the other.
+/// An expression which quantifies a total or per-unit.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum CompoundExpr {
+pub enum ScopedExpr {
     PerUnit(Expr),
     Total(Expr),
 }
 
-impl Display for CompoundExpr {
+impl Display for ScopedExpr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::CompoundExpr::*;
+        use self::ScopedExpr::*;
         match self {
             PerUnit(e) => write!(format, "{}", e),
             Total(e) => write!(format, "# {}", e),
@@ -874,15 +873,16 @@ impl<'a> LooseAmount<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum CompoundAmount<'a> {
+/// An amount which specifies a total or per-unit, or simply just a currency.
+pub enum ScopedAmount<'a> {
     BareCurrency(&'a Currency<'a>),
-    BareAmount(CompoundExpr),
-    CurrencyAmount(CompoundExpr, &'a Currency<'a>),
+    BareAmount(ScopedExpr),
+    CurrencyAmount(ScopedExpr, &'a Currency<'a>),
 }
 
-impl<'a> Display for CompoundAmount<'a> {
+impl<'a> Display for ScopedAmount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::CompoundAmount::*;
+        use self::ScopedAmount::*;
         match self {
             BareCurrency(cur) => write!(format, "{}", cur),
             BareAmount(ce) => write!(format, "{}", ce),
@@ -914,8 +914,8 @@ pub struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: CompoundExpr) -> Self {
-        use CompoundExpr::*;
+    pub fn compound_expr(self, value: ScopedExpr) -> Self {
+        use ScopedExpr::*;
 
         match value {
             PerUnit(value) => self.per_unit(value),
