@@ -230,16 +230,18 @@ where
             expr().or_not(),
             currency.or_not(),
             cost_spec().or_not(),
+            price_annotation().or_not(),
         ))
         .then_ignore(just(Token::Eol))
         .then(metadata())
         .map(
-            |((flag, account, amount, currency, cost_spec), metadata)| Posting {
+            |((flag, account, amount, currency, cost_spec, price_annotation), metadata)| Posting {
                 flag,
                 account,
                 amount,
                 currency,
                 cost_spec,
+                price_annotation,
                 metadata,
             },
         ),
@@ -392,6 +394,37 @@ where
         expr().map(PerUnit),
         just(Token::Hash).ignore_then(expr()).map(Total),
     ))
+}
+
+pub fn price_annotation<'src, I>(
+) -> impl Parser<'src, I, CompoundAmount<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    use CompoundAmount::*;
+
+    let currency = select_ref!(Token::Currency(cur) => cur);
+    fn compound(amount: Expr, is_total: bool) -> CompoundExpr {
+        use CompoundExpr::*;
+
+        if is_total {
+            Total(amount)
+        } else {
+            PerUnit(amount)
+        }
+    }
+
+    group((
+        choice((just(Token::At).to(false), just(Token::AtAt).to(true))),
+        expr().or_not(),
+        currency.or_not(),
+    ))
+    .try_map(|(is_total, amount, cur), span| match (amount, cur) {
+        (Some(amount), Some(cur)) => Ok(CurrencyAmount(compound(amount, is_total), cur)),
+        (Some(amount), None) => Ok(BareAmount(compound(amount, is_total))),
+        (None, Some(cur)) => Ok(BareCurrency(cur)),
+        (None, None) => Err(Rich::custom(span, "empty price annotation")),
+    })
 }
 
 /// Matches a `CostSpec`.

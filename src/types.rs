@@ -505,6 +505,7 @@ pub struct Posting<'a> {
     pub amount: Option<Expr>,
     pub currency: Option<&'a Currency<'a>>,
     pub cost_spec: Option<CostSpec<'a>>,
+    pub price_annotation: Option<CompoundAmount<'a>>,
     pub metadata: Metadata<'a>,
 }
 
