@@ -173,6 +173,79 @@ impl<'a> Token<'a> {
     }
 }
 
+impl<'a> Display for Token<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Token::*;
+        const INDENT: &str = "    ";
+
+        match self {
+            True => f.write_str("TRUE"),
+            False => f.write_str("FALSE"),
+            Null => f.write_str("NULL"),
+
+            Currency(cur) => write!(f, "{}", cur),
+
+            Pipe => f.write_str("|"),
+            AtAt => f.write_str("@@"),
+            At => f.write_str("@"),
+            LcurlCurl => f.write_str("{{"),
+            RcurlCurl => f.write_str("}}"),
+            Lcurl => f.write_str("{"),
+            Rcurl => f.write_str("}"),
+            Comma => f.write_str(","),
+            Tilde => f.write_str("~"),
+            Plus => f.write_str("+"),
+            Minus => f.write_str("-"),
+            Slash => f.write_str("/"),
+            Lparen => f.write_str("("),
+            Rparen => f.write_str(")"),
+            Hash => f.write_str("#"),
+            Asterisk => f.write_str("*"),
+            Colon => f.write_str(":"),
+
+            DedicatedFlag(x) => write!(f, "{}", x),
+
+            Txn => f.write_str("txn"),
+            Balance => f.write_str("balance"),
+            Open => f.write_str("open"),
+            Close => f.write_str("close"),
+            Commodity => f.write_str("commodity"),
+            Pad => f.write_str("pad"),
+            Event => f.write_str("event"),
+            Query => f.write_str("query"),
+            Custom => f.write_str("custom"),
+            Price => f.write_str("price"),
+            Note => f.write_str("note"),
+            Document => f.write_str("document"),
+            Pushtag => f.write_str("pushtag"),
+            Poptag => f.write_str("poptag"),
+            Pushmeta => f.write_str("pushmeta"),
+            Popmeta => f.write_str("popmeta"),
+            Option => f.write_str("option"),
+            Options => f.write_str("options"),
+            Plugin => f.write_str("plugin"),
+            Include => f.write_str("include"),
+
+            Date(x) => write!(f, "{}", x),
+            Time(x) => write!(f, "{}", x),
+            Account(x) => write!(f, "{}", x),
+
+            // TODO escapes
+            StringLiteral(x) => write!(f, "\"{}\"", x),
+            Number(x) => write!(f, "{}", x),
+            Tag(x) => write!(f, "{}", x),
+            Link(x) => write!(f, "{}", x),
+            Key(x) => write!(f, "{}", x),
+
+            EolThenIndent => write!(f, "\n{}", INDENT),
+            Eol => writeln!(f),
+            Indent => write!(f, "{}", INDENT),
+
+            Error(e) => write!(f, "ERROR {}", e),
+        }
+    }
+}
+
 // TODO remove this temporary diagnostic
 pub fn dump(s: &str) {
     for (tok, span) in lex(s) {
