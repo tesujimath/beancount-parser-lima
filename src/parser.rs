@@ -48,10 +48,17 @@ where
     use Directive::*;
 
     choice((
-        transaction().map(Transaction),
-        open().map(Open),
-        commodity().map(Commodity),
-        // TODO other directives
+        transaction()
+            .map(Transaction)
+            .labelled("transaction")
+            .as_context(),
+        choice((
+            open().map(Open),
+            commodity().map(Commodity),
+            // TODO other directives
+        ))
+        .labelled("directive")
+        .as_context(),
     ))
 }
 
@@ -62,7 +69,10 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     // TODO
-    just(Token::Option).to(Pragma::Placeholder("pragma parsing not yet implemented"))
+    just(Token::Option)
+        .to(Pragma::Placeholder("pragma parsing not yet implemented"))
+        .labelled("pragma")
+        .as_context()
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.
@@ -86,8 +96,6 @@ where
             (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links, metadata, postings),
         },
     )
-    .labelled("transaction")
-    .as_context()
 }
 
 /// Matches the first line of a transaction.
@@ -120,20 +128,17 @@ where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    group((open_header_line(), metadata()))
-        .map(
-            |((date, account, currencies, booking, (tags, links)), metadata)| Open {
-                date,
-                account,
-                currencies,
-                booking,
-                tags,
-                links,
-                metadata,
-            },
-        )
-        .labelled("open")
-        .as_context()
+    group((open_header_line(), metadata())).map(
+        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
+            date,
+            account,
+            currencies,
+            booking,
+            tags,
+            links,
+            metadata,
+        },
+    )
 }
 
 /// Matches the first line of a open.
@@ -178,16 +183,15 @@ where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    group((commodity_header_line(), metadata()))
-        .map(|((date, currency, (tags, links)), metadata)| Commodity {
+    group((commodity_header_line(), metadata())).map(
+        |((date, currency, (tags, links)), metadata)| Commodity {
             date,
             currency,
             tags,
             links,
             metadata,
-        })
-        .labelled("commodity")
-        .as_context()
+        },
+    )
 }
 
 /// Matches the first line of a commodity.
