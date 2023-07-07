@@ -35,7 +35,7 @@ impl<'a> BeancountParser<'a> {
         })
     }
 
-    pub fn parse<W>(&'a mut self, w: Option<W>) -> Result<Vec<Declaration<'a>>, io::Result<()>>
+    pub fn parse<W>(&'a mut self, w: W) -> Result<Vec<Declaration<'a>>, io::Result<()>>
     where
         W: Write + Copy,
     {
@@ -49,9 +49,7 @@ impl<'a> BeancountParser<'a> {
         match file().parse(spanned_tokens).into_result() {
             Ok(declarations) => Ok(declarations),
             Err(errors) => {
-                if let Some(w) = w {
-                    self.write_errors(w, errors).map_err(Err)?
-                }
+                self.write_errors(w, errors).map_err(Err)?;
                 Err(Ok(()))
             }
         }
