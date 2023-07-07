@@ -237,8 +237,8 @@ impl<'a> Display for Token<'a> {
             Link(x) => write!(f, "{}", x),
             Key(x) => write!(f, "{}", x),
 
-            EolThenIndent => write!(f, "\n{}", INDENT),
-            Eol => writeln!(f),
+            EolThenIndent => write!(f, "\\n{}", INDENT),
+            Eol => write!(f, "\\n"),
             Indent => write!(f, "{}", INDENT),
 
             Error(e) => write!(f, "ERROR {}", e),
