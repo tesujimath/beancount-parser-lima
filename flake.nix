@@ -26,6 +26,8 @@
           {
             devShells.default = mkShell {
               nativeBuildInputs = [
+                beancount
+
                 # build dependencies
                 cargo-flamegraph
                 cargo-modules
