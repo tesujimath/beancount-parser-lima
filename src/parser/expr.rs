@@ -11,7 +11,8 @@ use test_case::test_case;
 /// Match an expression
 pub fn expr<'src, I>() -> impl Parser<'src, I, Expr, extra::Err<ParserError<'src>>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     use Token::*;
 

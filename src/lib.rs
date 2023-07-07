@@ -46,12 +46,14 @@ impl<'a> BeancountParser<'a> {
             .unwrap()
             .spanned(end_of_input(&self.file_content));
 
-        match file().parse(spanned_tokens).into_result() {
-            Ok(declarations) => Ok(declarations),
-            Err(errors) => {
-                self.write_errors(w, errors).map_err(Err)?;
-                Err(Ok(()))
-            }
+        let (parse_result, parse_errors) = file().parse(spanned_tokens).into_output_errors();
+        if !parse_errors.is_empty() {
+            self.write_errors(w, parse_errors).map_err(Err)?;
+            Err(Ok(()))
+        } else if let Some(declarations) = parse_result {
+            Ok(declarations)
+        } else {
+            Err(Ok(()))
         }
     }
 

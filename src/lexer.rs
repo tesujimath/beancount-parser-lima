@@ -13,7 +13,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Logos, Clone, Debug, PartialEq)]
+#[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(error = LexerError, skip r"[ \t]+")]
 #[logos(subpattern comment_to_eol= r"(;[^\n]*)")] // rolled into end-of-line handling below
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
@@ -398,7 +398,7 @@ fn parse_number(s: &str) -> Result<Decimal, LexerError> {
     })
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct LexerError {
     message: String,
 }
