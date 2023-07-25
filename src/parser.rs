@@ -17,6 +17,26 @@ pub fn end_of_input(s: &str) -> Span {
 
 pub type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
+/// Matches all the includes in the file, ignoring everything else.
+pub fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    (just(Token::Include).ignore_then(string).map(Some))
+        .or(any().map(|_| None))
+        .repeated()
+        .collect::<Vec<_>>()
+        .map(|includes| {
+            includes
+                .into_iter()
+                .filter_map(|s| s.as_ref().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+}
+
 /// Matches the whole file.
 pub fn file<'src, I>() -> impl Parser<'src, I, Vec<Declaration<'src>>, extra::Err<ParserError<'src>>>
 where
