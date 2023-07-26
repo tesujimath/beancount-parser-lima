@@ -3,13 +3,13 @@ use std::env;
 use std::io::{prelude::*, stderr};
 use std::path::PathBuf;
 
-use beancount_parser::{parse_tokens, Sources, Tokens};
+use beancount_parser::{BeancountParser, BeancountSources};
 
 fn main() -> Result<()> {
     let file_path = env::args().nth(1).unwrap();
-    let sources = Sources::get(PathBuf::from(file_path));
-    let tokens = Tokens::new(&sources);
-    match parse_tokens(&sources, &tokens, &stderr()) {
+    let sources = BeancountSources::new(PathBuf::from(file_path));
+    let mut beancount_parser = BeancountParser::new(&sources);
+    match beancount_parser.parse(&stderr()) {
         Ok(declarations) => {
             writeln!(&mut stderr(), "parsed {} declarations", declarations.len())?;
             Ok(())
