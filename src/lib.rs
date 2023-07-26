@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![recursion_limit = "256"]
 
-use ariadne::{sources, Color, Label, Report, ReportKind};
+use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lexer::{lex, Token};
 use parser::{end_of_input, file, includes, ParserError, Span};
@@ -15,15 +15,16 @@ use std::{
 pub use types::*;
 
 pub struct Sources {
+    root_path: PathBuf,
     content_paths: HashMap<PathBuf, String>,
     error_paths: HashMap<PathBuf, anyhow::Error>,
 }
 
 impl Sources {
-    pub fn get(source_path: PathBuf) -> Self {
+    pub fn get(root_path: PathBuf) -> Self {
         let mut content_paths = HashMap::new();
         let mut error_paths = HashMap::new();
-        let mut paths = VecDeque::from([source_path]);
+        let mut paths = VecDeque::from([root_path.clone()]);
 
         while !paths.is_empty() {
             let path = paths.pop_front().unwrap();
@@ -66,6 +67,7 @@ impl Sources {
         }
 
         Self {
+            root_path,
             content_paths,
             error_paths,
         }
@@ -84,86 +86,161 @@ where
     Ok(file_content)
 }
 
-pub struct BeancountParser<'a> {
-    file_path: String,
-    file_content: String,
-    tokens: Option<Vec<(Token<'a>, Span)>>,
-    parse_result: Option<Result<Vec<Declaration<'a>>, Vec<ParserError<'a>>>>,
+#[derive(Default, Debug)]
+pub struct Tokens<'a>(HashMap<&'a Path, Vec<(Token<'a>, Span)>>);
+
+impl<'a> Tokens<'a> {
+    pub fn new(sources: &Sources) -> Tokens {
+        let mut tokens = HashMap::new();
+
+        for (path, content) in sources.content_paths.iter() {
+            tokens.insert(path.as_path(), lex(content));
+        }
+
+        Tokens(tokens)
+    }
 }
 
-impl<'a> BeancountParser<'a> {
-    pub fn open(file_path: String) -> io::Result<Self> {
-        let mut f = File::open(&file_path)?;
-        let mut file_content = String::new();
+pub fn parse_tokens<'a, W>(
+    sources: &'a Sources,
+    tokens: &'a Tokens,
+    w: W,
+) -> Result<Vec<Declaration<'a>>, io::Result<()>>
+where
+    W: Write + Copy,
+{
+    let path: &Path = sources.root_path.as_ref();
+    match sources.content_paths.get(path) {
+        Some(content) => {
+            let spanned_tokens = tokens.0[path].spanned(end_of_input(content));
 
-        // read the whole file
-        f.read_to_string(&mut file_content)?;
+            let (parse_result, parse_errors) = file().parse(spanned_tokens).into_output_errors();
+            if !parse_errors.is_empty() {
+                write_errors(w, path, content, parse_errors).map_err(Err)?;
+                Err(Ok(()))
+            } else if let Some(declarations) = parse_result {
+                Ok(declarations)
+            } else {
+                Err(Ok(()))
+            }
+        }
 
-        Ok(BeancountParser {
-            file_path,
-            file_content,
-            tokens: None,
-            parse_result: None,
-        })
-    }
+        None => {
+            // TODO something better here
+            writeln!(&mut stderr(), "no content available for {}", path.display()).unwrap();
 
-    pub fn parse<W>(&'a mut self, w: W) -> Result<Vec<Declaration<'a>>, io::Result<()>>
-    where
-        W: Write + Copy,
-    {
-        self.tokens = Some(lex(&self.file_content));
-        let spanned_tokens = self
-            .tokens
-            .as_ref()
-            .unwrap()
-            .spanned(end_of_input(&self.file_content));
-
-        let (parse_result, parse_errors) = file().parse(spanned_tokens).into_output_errors();
-        if !parse_errors.is_empty() {
-            self.write_errors(w, parse_errors).map_err(Err)?;
-            Err(Ok(()))
-        } else if let Some(declarations) = parse_result {
-            Ok(declarations)
-        } else {
             Err(Ok(()))
         }
     }
+}
 
-    fn write_errors<W>(&self, w: W, errors: Vec<ParserError>) -> io::Result<()>
-    where
-        W: Write + Copy,
+fn write_errors<W>(w: W, path: &Path, content: &str, errors: Vec<ParserError>) -> io::Result<()>
+where
+    W: Write + Copy,
+{
+    let src_id = path.to_string_lossy().into_owned();
+
+    for error in errors
+        .into_iter()
+        .map(|e| e.map_token(|tok| tok.to_string()))
     {
-        for error in errors
-            .into_iter()
-            .map(|e| e.map_token(|tok| tok.to_string()))
-        {
-            Report::build(
-                ReportKind::Error,
-                self.file_path.clone(),
-                error.span().start,
-            )
+        Report::build(ReportKind::Error, src_id.clone(), error.span().start)
             .with_message(error.to_string())
             .with_label(
-                Label::new((self.file_path.clone(), error.span().into_range()))
+                Label::new((src_id.clone(), error.span().into_range()))
                     .with_message(error.reason().to_string())
                     .with_color(Color::Red),
             )
             .with_labels(error.contexts().map(|(label, span)| {
-                Label::new((self.file_path.clone(), span.into_range()))
+                Label::new((src_id.clone(), span.into_range()))
                     .with_message(format!("while parsing this {}", label))
                     .with_color(Color::Yellow)
             }))
             .finish()
-            // TODO cloning here seems crass, and also unwrap
-            .write(
-                sources([(self.file_path.clone(), self.file_content.clone())]),
-                w,
-            )
+            .write(ariadne::sources([(src_id.clone(), content.to_string())]), w)
             .unwrap()
-        }
-        Ok(())
     }
+    Ok(())
 }
+
+// #[derive(Default, Debug)]
+// pub struct BeancountParser<'a> {
+//     tokens: HashMap<&'a Path, Vec<(Token<'a>, Span)>>,
+// }
+
+// impl<'a> BeancountParser<'a> {
+//     pub fn parse<W>(
+//         &mut self,
+//         sources: &'a Sources,
+//         w: W,
+//     ) -> Result<Vec<Declaration<'a>>, io::Result<()>>
+//     where
+//         W: Write + Copy,
+//     {
+//         let path: &Path = sources.root_path.as_ref();
+//         match sources.content_paths.get(path) {
+//             Some(content) => {
+//                 self.tokens.insert(path, lex(content));
+//                 let tokens = self.tokens.get(path).unwrap();
+//                 let spanned_tokens = tokens.spanned(end_of_input(content));
+
+//                 let (parse_result, parse_errors) =
+//                     file().parse(spanned_tokens).into_output_errors();
+//                 if !parse_errors.is_empty() {
+//                     self.write_errors(w, path, content, parse_errors)
+//                         .map_err(Err)?;
+//                     Err(Ok(()))
+//                 } else if let Some(declarations) = parse_result {
+//                     Ok(declarations)
+//                 } else {
+//                     Err(Ok(()))
+//                 }
+//             }
+
+//             None => {
+//                 // TODO something better here
+//                 writeln!(&mut stderr(), "no content available for {}", path.display()).unwrap();
+
+//                 Err(Ok(()))
+//             }
+//         }
+//     }
+
+//     fn write_errors<W>(
+//         &self,
+//         w: W,
+//         path: &Path,
+//         content: &str,
+//         errors: Vec<ParserError>,
+//     ) -> io::Result<()>
+//     where
+//         W: Write + Copy,
+//     {
+//         let src_id = path.to_string_lossy().into_owned();
+
+//         for error in errors
+//             .into_iter()
+//             .map(|e| e.map_token(|tok| tok.to_string()))
+//         {
+//             Report::build(ReportKind::Error, src_id.clone(), error.span().start)
+//                 .with_message(error.to_string())
+//                 .with_label(
+//                     Label::new((src_id.clone(), error.span().into_range()))
+//                         .with_message(error.reason().to_string())
+//                         .with_color(Color::Red),
+//                 )
+//                 .with_labels(error.contexts().map(|(label, span)| {
+//                     Label::new((src_id.clone(), span.into_range()))
+//                         .with_message(format!("while parsing this {}", label))
+//                         .with_color(Color::Yellow)
+//                 }))
+//                 .finish()
+//                 .write(ariadne::sources([(src_id.clone(), content.to_string())]), w)
+//                 .unwrap()
+//         }
+//         Ok(())
+//     }
+// }
 
 pub use lexer::dump as logos_dump;
 mod lexer;
