@@ -88,9 +88,12 @@ where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
-    // TODO
-    just(Token::Option)
-        .to(Pragma::Placeholder("pragma parsing not yet implemented"))
+    use Pragma::*;
+
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    choice((just(Token::Include).ignore_then(string).map(Include),))
+        .then_ignore(just(Token::Eol))
         .labelled("pragma")
         .as_context()
 }

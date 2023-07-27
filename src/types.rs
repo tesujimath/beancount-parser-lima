@@ -29,6 +29,7 @@ pub enum Directive<'a> {
 pub enum Pragma<'a> {
     // TODO
     Placeholder(&'a str),
+    Include(&'a str),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]

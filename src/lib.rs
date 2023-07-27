@@ -122,6 +122,9 @@ where
         }
     }
 
+    /// Parse the sources, returning declarations or writing errors.
+    /// If parsing fails, errors are written to `w`, and the result is Err,
+    /// which may or may not include an I/O error from failing to write the errors.
     pub fn parse<'b, W>(&'b mut self, w: W) -> Result<Vec<Declaration<'b>>, io::Result<()>>
     where
         W: Write + Copy,
@@ -131,20 +134,12 @@ where
         let path: &Path = self.sources.root_path.as_ref();
         match self.sources.content_paths.get(path) {
             Some(content) => {
-                self.tokens.insert(path, lex(content));
-                let tokens = self.tokens.get(path).unwrap();
-                let spanned_tokens = tokens.spanned(end_of_input(content));
-
-                let (parse_result, parse_errors) =
-                    file().parse(spanned_tokens).into_output_errors();
-                if !parse_errors.is_empty() {
-                    self.write_errors(w, path, content, parse_errors)
-                        .map_err(Err)?;
+                let (output, errors) = self.parse_file(path, content);
+                if !errors.is_empty() {
+                    Self::write_errors(w, path, content, errors).map_err(Err)?;
                     Err(Ok(()))
-                } else if let Some(declarations) = parse_result {
-                    Ok(declarations)
                 } else {
-                    Err(Ok(()))
+                    Ok(output)
                 }
             }
 
@@ -157,13 +152,26 @@ where
         }
     }
 
-    fn write_errors<W>(
-        &self,
-        w: W,
-        path: &Path,
-        content: &str,
-        errors: Vec<ParserError>,
-    ) -> io::Result<()>
+    pub fn parse_file<'b>(
+        &'b mut self,
+        path: &'s Path,
+        content: &'s str,
+    ) -> (Vec<Declaration<'b>>, Vec<chumsky::error::Rich<Token>>)
+    where
+        's: 'a,
+        'a: 'b,
+    {
+        // Elegant HashMap entry insertion in stable Rust isn't quite ready, alas.
+        self.tokens.insert(path, lex(content));
+        let tokens = self.tokens.get(path).unwrap();
+        let spanned_tokens = tokens.spanned(end_of_input(content));
+
+        let (output, errors) = file().parse(spanned_tokens).into_output_errors();
+
+        (output.unwrap_or(Vec::new()), errors)
+    }
+
+    fn write_errors<W>(w: W, path: &Path, content: &str, errors: Vec<ParserError>) -> io::Result<()>
     where
         W: Write + Copy,
     {
