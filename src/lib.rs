@@ -8,6 +8,7 @@ use lexer::{lex, Token};
 use parser::{end_of_input, file, includes, ParserError, Span};
 use std::{
     collections::{HashMap, VecDeque},
+    fmt::{self, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
@@ -43,7 +44,9 @@ impl BeancountSources {
                     // TODO can we do this with &str for includes?
                     if let Some(includes) = includes().parse(spanned_tokens).into_output() {
                         for include in includes {
-                            let included_path = path.join(include);
+                            let included_path = path
+                                .parent()
+                                .map_or(PathBuf::from(&include), |parent| parent.join(include));
                             if !content_paths.contains_key(&included_path)
                                 && !error_paths.contains_key(&included_path)
                             {
@@ -72,6 +75,22 @@ impl BeancountSources {
             content_paths,
             error_paths,
         }
+    }
+}
+
+impl std::fmt::Debug for BeancountSources {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        writeln!(f, "BeancountSources(",)?;
+
+        for (path, content) in &self.content_paths {
+            writeln!(f, "    {} ok len {},", path.display(), content.len())?;
+        }
+
+        for (path, error) in &self.error_paths {
+            writeln!(f, "    {} {},", path.display(), error)?;
+        }
+
+        writeln!(f, ")",)
     }
 }
 
