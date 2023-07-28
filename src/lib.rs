@@ -8,7 +8,7 @@ use lexer::{lex, Token};
 use parser::{end_of_input, file, includes, ParserError, Span};
 use std::{
     collections::{HashMap, VecDeque},
-    fmt::{self, Formatter},
+    fmt::{self, Display, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
@@ -76,6 +76,64 @@ impl BeancountSources {
             error_paths,
         }
     }
+
+    fn write_parse_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
+    where
+        W: Write + Copy,
+    {
+        let src_id = path.to_string_lossy().into_owned();
+
+        for error in errors
+            .into_iter()
+            .map(|e| e.map_token(|tok| tok.to_string()))
+        {
+            Report::build(ReportKind::Error, src_id.clone(), error.span().start)
+                .with_message(error.to_string())
+                .with_label(
+                    Label::new((src_id.clone(), error.span().into_range()))
+                        .with_message(error.reason().to_string())
+                        .with_color(Color::Red),
+                )
+                .with_labels(error.contexts().map(|(label, span)| {
+                    Label::new((src_id.clone(), span.into_range()))
+                        .with_message(format!("while parsing this {}", label))
+                        .with_color(Color::Yellow)
+                }))
+                .finish()
+                .write(ariadne::sources(self.sources()), w)
+                .unwrap()
+        }
+        Ok(())
+    }
+
+    pub fn write_error<W, M, L>(&self, w: W, loc: &Location, message: M, label: L) -> io::Result<()>
+    where
+        W: Write + Copy,
+        M: Display,
+        L: Display,
+    {
+        let src_id = loc.path.to_string_lossy().into_owned();
+
+        Report::build(ReportKind::Error, src_id.clone(), loc.span.start)
+            .with_message(message.to_string())
+            .with_label(
+                Label::new((src_id, loc.span.into_range()))
+                    .with_message(label.to_string())
+                    .with_color(Color::Red),
+            )
+            .finish()
+            .write(ariadne::sources(self.sources()), w)
+            .unwrap();
+
+        Ok(())
+    }
+
+    fn sources(&self) -> Vec<(String, &str)> {
+        self.content_paths
+            .iter()
+            .map(|(path, content)| (path.to_string_lossy().into_owned(), content.as_str()))
+            .collect()
+    }
 }
 
 impl std::fmt::Debug for BeancountSources {
@@ -135,7 +193,10 @@ where
     /// Parse the sources, returning declarations or writing errors.
     /// If parsing fails, errors are written to `w`, and the result is Err,
     /// which may or may not include an I/O error from failing to write the errors.
-    pub fn parse<W>(&'t mut self, w: W) -> Result<Vec<Declaration<'t>>, io::Result<()>>
+    pub fn parse<W>(
+        &'t mut self,
+        w: W,
+    ) -> Result<Vec<(Declaration<'t>, Location<'s>)>, io::Result<()>>
     where
         W: Write + Copy,
         's: 't,
@@ -152,7 +213,12 @@ where
             let (output, errors) = file().parse(spanned_tokens).into_output_errors();
 
             if let Some(output) = output {
-                all_outputs.insert(path, output);
+                all_outputs.insert(
+                    path,
+                    output
+                        .into_iter()
+                        .map(|(d, span)| (d, Location::new(path, span))),
+                );
             }
 
             if !errors.is_empty() {
@@ -162,8 +228,10 @@ where
 
         let errors_occured = !all_errors.is_empty();
         for (path, errors) in all_errors.into_iter() {
-            let (source, _tokens) = self.tokenized_sources.get(path).unwrap();
-            write_errors(w, path, source, errors).map_err(Err)?;
+            let (_source, _tokens) = self.tokenized_sources.get(path).unwrap();
+            self.sources
+                .write_parse_errors(w, path, errors)
+                .map_err(Err)?;
         }
 
         if !errors_occured {
@@ -174,33 +242,16 @@ where
     }
 }
 
-fn write_errors<W>(w: W, path: &Path, source: &str, errors: Vec<ParserError>) -> io::Result<()>
-where
-    W: Write + Copy,
-{
-    let src_id = path.to_string_lossy().into_owned();
+/// Source location of a parsed node.
+pub struct Location<'s> {
+    path: &'s Path,
+    span: Span,
+}
 
-    for error in errors
-        .into_iter()
-        .map(|e| e.map_token(|tok| tok.to_string()))
-    {
-        Report::build(ReportKind::Error, src_id.clone(), error.span().start)
-            .with_message(error.to_string())
-            .with_label(
-                Label::new((src_id.clone(), error.span().into_range()))
-                    .with_message(error.reason().to_string())
-                    .with_color(Color::Red),
-            )
-            .with_labels(error.contexts().map(|(label, span)| {
-                Label::new((src_id.clone(), span.into_range()))
-                    .with_message(format!("while parsing this {}", label))
-                    .with_color(Color::Yellow)
-            }))
-            .finish()
-            .write(ariadne::sources([(src_id.clone(), source.to_string())]), w)
-            .unwrap()
+impl<'s> Location<'s> {
+    fn new(path: &'s Path, span: Span) -> Self {
+        Location { path, span }
     }
-    Ok(())
 }
 
 pub use lexer::dump as logos_dump;

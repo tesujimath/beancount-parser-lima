@@ -3,7 +3,7 @@ use std::env;
 use std::io::{prelude::*, stderr};
 use std::path::PathBuf;
 
-use beancount_parser::{BeancountParser, BeancountSources};
+use beancount_parser::{BeancountParser, BeancountSources, Declaration, Pragma};
 
 fn main() -> Result<()> {
     let file_path = env::args().nth(1).unwrap();
@@ -13,8 +13,29 @@ fn main() -> Result<()> {
 
     let mut beancount_parser = BeancountParser::new(&sources);
     match beancount_parser.parse(&stderr()) {
-        Ok(declarations) => {
-            writeln!(&mut stderr(), "parsed {} declarations", declarations.len())?;
+        Ok(located_declarations) => {
+            writeln!(
+                &mut stderr(),
+                "parsed {} declarations",
+                located_declarations.len()
+            )?;
+
+            for (d, loc) in &located_declarations {
+                writeln!(&mut stderr(), "{:?}", d)?;
+
+                // use Directive::*;
+                // use Pragma::*;
+
+                if let Declaration::Pragma(Pragma::Include(filename)) = d {
+                    writeln!(&mut stderr(), "Ooo, include spotted with {}", filename)?;
+                    sources.write_error(
+                        &stderr(),
+                        loc,
+                        "include",
+                        "something bad happened here",
+                    )?;
+                }
+            }
             Ok(())
         }
         Err(e) => match e {
