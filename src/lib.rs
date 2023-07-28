@@ -77,33 +77,33 @@ impl BeancountSources {
         }
     }
 
-    fn write_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
+    fn write_error_message<W, StringSpans>(
+        &self,
+        w: W,
+        src_id: String,
+        span: Span,
+        msg: String,
+        reason: String,
+        contexts: StringSpans,
+    ) -> io::Result<()>
     where
         W: Write + Copy,
+        StringSpans: IntoIterator<Item = (&'static str, Span)>,
     {
-        let src_id = source_id(path);
-
-        for error in errors
-            .into_iter()
-            .map(|e| e.map_token(|tok| tok.to_string()))
-        {
-            Report::build(ReportKind::Error, src_id.clone(), error.span().start)
-                .with_message(error.to_string())
-                .with_label(
-                    Label::new((src_id.clone(), error.span().into_range()))
-                        .with_message(error.reason().to_string())
-                        .with_color(Color::Red),
-                )
-                .with_labels(error.contexts().map(|(label, span)| {
-                    Label::new((src_id.clone(), span.into_range()))
-                        .with_message(format!("while parsing this {}", label))
-                        .with_color(Color::Yellow)
-                }))
-                .finish()
-                .write(ariadne::sources(self.sources()), w)
-                .unwrap()
-        }
-        Ok(())
+        Report::build(ReportKind::Error, src_id.clone(), span.start)
+            .with_message(msg)
+            .with_label(
+                Label::new((src_id.clone(), span.into_range()))
+                    .with_message(reason)
+                    .with_color(Color::Red),
+            )
+            .with_labels(contexts.into_iter().map(|(label, span)| {
+                Label::new((src_id.clone(), span.into_range()))
+                    .with_message(format!("while parsing this {}", label))
+                    .with_color(Color::Yellow)
+            }))
+            .finish()
+            .write(ariadne::sources(self.sources()), w)
     }
 
     fn write_parse_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
@@ -116,21 +116,29 @@ impl BeancountSources {
             .into_iter()
             .map(|e| e.map_token(|tok| tok.to_string()))
         {
-            Report::build(ReportKind::Error, src_id.clone(), error.span().start)
-                .with_message(error.to_string())
-                .with_label(
-                    Label::new((src_id.clone(), error.span().into_range()))
-                        .with_message(error.reason().to_string())
-                        .with_color(Color::Red),
-                )
-                .with_labels(error.contexts().map(|(label, span)| {
-                    Label::new((src_id.clone(), span.into_range()))
-                        .with_message(format!("while parsing this {}", label))
-                        .with_color(Color::Yellow)
-                }))
-                .finish()
-                .write(ariadne::sources(self.sources()), w)
-                .unwrap()
+            self.write_error_message(
+                w,
+                src_id.clone(),
+                *error.span(),
+                error.to_string(),
+                error.reason().to_string(),
+                error.contexts().map(|(label, span)| (*label, *span)),
+            )?;
+            //     Report::build(ReportKind::Error, src_id.clone(), error.span().start)
+            //         .with_message(error.to_string())
+            //         .with_label(
+            //             Label::new((src_id.clone(), error.span().into_range()))
+            //                 .with_message(error.reason().to_string())
+            //                 .with_color(Color::Red),
+            //         )
+            //         .with_labels(error.contexts().map(|(label, span)| {
+            //             Label::new((src_id.clone(), span.into_range()))
+            //                 .with_message(format!("while parsing this {}", label))
+            //                 .with_color(Color::Yellow)
+            //         }))
+            //         .finish()
+            //         .write(ariadne::sources(self.sources()), w)
+            //         .unwrap()
         }
         Ok(())
     }
