@@ -77,11 +77,40 @@ impl BeancountSources {
         }
     }
 
+    fn write_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
+    where
+        W: Write + Copy,
+    {
+        let src_id = source_id(path);
+
+        for error in errors
+            .into_iter()
+            .map(|e| e.map_token(|tok| tok.to_string()))
+        {
+            Report::build(ReportKind::Error, src_id.clone(), error.span().start)
+                .with_message(error.to_string())
+                .with_label(
+                    Label::new((src_id.clone(), error.span().into_range()))
+                        .with_message(error.reason().to_string())
+                        .with_color(Color::Red),
+                )
+                .with_labels(error.contexts().map(|(label, span)| {
+                    Label::new((src_id.clone(), span.into_range()))
+                        .with_message(format!("while parsing this {}", label))
+                        .with_color(Color::Yellow)
+                }))
+                .finish()
+                .write(ariadne::sources(self.sources()), w)
+                .unwrap()
+        }
+        Ok(())
+    }
+
     fn write_parse_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
     where
         W: Write + Copy,
     {
-        let src_id = path.to_string_lossy().into_owned();
+        let src_id = source_id(path);
 
         for error in errors
             .into_iter()
@@ -112,7 +141,7 @@ impl BeancountSources {
         M: Display,
         L: Display,
     {
-        let src_id = loc.path.to_string_lossy().into_owned();
+        let src_id = source_id(loc.path);
 
         Report::build(ReportKind::Error, src_id.clone(), loc.span.start)
             .with_message(message.to_string())
@@ -131,9 +160,16 @@ impl BeancountSources {
     fn sources(&self) -> Vec<(String, &str)> {
         self.content_paths
             .iter()
-            .map(|(path, content)| (path.to_string_lossy().into_owned(), content.as_str()))
+            .map(|(path, content)| (source_id(path), content.as_str()))
             .collect()
     }
+}
+
+fn source_id<P>(path: P) -> String
+where
+    P: AsRef<Path>,
+{
+    path.as_ref().to_string_lossy().into_owned()
 }
 
 impl std::fmt::Debug for BeancountSources {
