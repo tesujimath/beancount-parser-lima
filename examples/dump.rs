@@ -11,7 +11,7 @@ fn main() -> Result<()> {
     let sources = BeancountSources::new(PathBuf::from(file_path));
     writeln!(&mut stderr(), "{:?}", &sources)?;
 
-    let mut beancount_parser = BeancountParser::new(&sources);
+    let beancount_parser = BeancountParser::new(&sources);
     match beancount_parser.parse(&stderr()) {
         Ok(located_declarations) => {
             writeln!(

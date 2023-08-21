@@ -5,7 +5,7 @@
 use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lexer::{lex, Token};
-use parser::{end_of_input, file, includes, ParserError, Span};
+use parser::{end_of_input, file, includes, ParserError};
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{self, Display, Formatter},
@@ -237,10 +237,7 @@ where
     /// Parse the sources, returning declarations or writing errors.
     /// If parsing fails, errors are written to `w`, and the result is Err,
     /// which may or may not include an I/O error from failing to write the errors.
-    pub fn parse<W>(
-        &'t mut self,
-        w: W,
-    ) -> Result<Vec<(Declaration<'t>, Location<'s>)>, io::Result<()>>
+    pub fn parse<W>(&'t self, w: W) -> Result<Vec<(Declaration<'t>, Location<'s>)>, io::Result<()>>
     where
         W: Write + Copy,
         's: 't,

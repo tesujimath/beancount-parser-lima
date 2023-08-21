@@ -1,7 +1,4 @@
-use super::{
-    parser::{end_of_input, Span},
-    *,
-};
+use super::{parser::end_of_input, *};
 use chrono::{NaiveDate, NaiveTime};
 use logos::Logos;
 use nonempty::NonEmpty;

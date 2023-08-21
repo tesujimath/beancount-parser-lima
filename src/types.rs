@@ -1,4 +1,5 @@
 use chrono::NaiveDate;
+use chumsky::span::SimpleSpan;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
@@ -10,9 +11,39 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
+pub type Span = SimpleSpan<usize>;
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: Span,
+}
+
+pub fn spanned<T>(value: T, span: Span) -> Spanned<T> {
+    Spanned { value, span }
+}
+
+impl<T> Spanned<T> {
+    pub fn as_ref(&self) -> Spanned<&T> {
+        Spanned {
+            value: &self.value,
+            span: self.span,
+        }
+    }
+}
+
+impl<T> Display for Spanned<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value,)
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Declaration<'a> {
-    Directive(Directive<'a>),
+    Directive(Spanned<Directive<'a>>),
     // TODO actually support Pragma
     Pragma(Pragma<'a>),
 }
@@ -51,26 +82,27 @@ pub enum Pragma<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Transaction<'a> {
-    date: NaiveDate,
-    flag: Flag,
-    payee: Option<&'a str>,
-    narration: Option<&'a str>,
-    tags: Vec<&'a Tag<'a>>,
-    links: Vec<&'a Link<'a>>,
+    date: Spanned<NaiveDate>,
+    flag: Spanned<Flag>,
+    payee: Option<Spanned<&'a str>>,
+    narration: Option<Spanned<&'a str>>,
+    tags: Vec<Spanned<&'a Tag<'a>>>,
+    links: Vec<Spanned<&'a Link<'a>>>,
     metadata: Metadata<'a>,
-    postings: Vec<Posting<'a>>,
+    postings: Vec<Spanned<Posting<'a>>>,
 }
 
 impl<'a> Transaction<'a> {
     pub fn new(
-        date: NaiveDate,
-        flag: Flag,
-        payee: Option<&'a str>,
-        narration: Option<&'a str>,
-        tags: Vec<&'a Tag<'a>>,
-        links: Vec<&'a Link<'a>>,
+        date: Spanned<NaiveDate>,
+        flag: Spanned<Flag>,
+        payee: Option<Spanned<&'a str>>,
+        narration: Option<Spanned<&'a str>>,
+
+        tags: Vec<Spanned<&'a Tag<'a>>>,
+        links: Vec<Spanned<&'a Link<'a>>>,
         metadata: Metadata<'a>,
-        postings: Vec<Posting<'a>>,
+        postings: Vec<Spanned<Posting<'a>>>,
     ) -> Self {
         Transaction {
             date,
@@ -92,8 +124,8 @@ impl<'a> Display for Transaction<'a> {
             "{} {} {} {} {} {}",
             self.date,
             self.flag,
-            self.payee.unwrap_or("-"),
-            self.narration.unwrap_or("-"),
+            self.payee.as_ref().map_or("-", |s| s.value),
+            self.narration.as_ref().map_or("-", |s| s.value),
             itertools::Itertools::intersperse(
                 self.tags.iter().map(|tag| format!("{}", tag)),
                 " ".to_string()
@@ -110,29 +142,29 @@ impl<'a> Display for Transaction<'a> {
 
 impl<'a> Date for Transaction<'a> {
     fn date(&self) -> &NaiveDate {
-        &self.date
+        &self.date.value
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
-    pub date: NaiveDate,
-    pub account: &'a Account<'a>,
-    pub currencies: Vec<&'a Currency<'a>>,
-    pub booking: Option<&'a str>,
-    pub tags: Vec<&'a Tag<'a>>,
-    pub links: Vec<&'a Link<'a>>,
+    pub date: Spanned<NaiveDate>,
+    pub account: Spanned<&'a Account<'a>>,
+    pub currencies: Vec<Spanned<&'a Currency<'a>>>,
+    pub booking: Option<Spanned<&'a str>>,
+    pub tags: Vec<Spanned<&'a Tag<'a>>>,
+    pub links: Vec<Spanned<&'a Link<'a>>>,
     pub metadata: Metadata<'a>,
 }
 
 impl<'a> Open<'a> {
     pub fn new(
-        date: NaiveDate,
-        account: &'a Account<'a>,
-        currencies: Vec<&'a Currency<'a>>,
-        booking: Option<&'a str>,
-        tags: Vec<&'a Tag<'a>>,
-        links: Vec<&'a Link<'a>>,
+        date: Spanned<NaiveDate>,
+        account: Spanned<&'a Account<'a>>,
+        currencies: Vec<Spanned<&'a Currency<'a>>>,
+        booking: Option<Spanned<&'a str>>,
+        tags: Vec<Spanned<&'a Tag<'a>>>,
+        links: Vec<Spanned<&'a Link<'a>>>,
         metadata: Metadata<'a>,
     ) -> Self {
         Open {
@@ -176,25 +208,25 @@ impl<'a> Display for Open<'a> {
 
 impl<'a> Date for Open<'a> {
     fn date(&self) -> &NaiveDate {
-        &self.date
+        &self.date.value
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Commodity<'a> {
-    pub date: NaiveDate,
-    pub currency: &'a Currency<'a>,
-    pub tags: Vec<&'a Tag<'a>>,
-    pub links: Vec<&'a Link<'a>>,
+    pub date: Spanned<NaiveDate>,
+    pub currency: Spanned<&'a Currency<'a>>,
+    pub tags: Vec<Spanned<&'a Tag<'a>>>,
+    pub links: Vec<Spanned<&'a Link<'a>>>,
     pub metadata: Metadata<'a>,
 }
 
 impl<'a> Commodity<'a> {
     pub fn new(
-        date: NaiveDate,
-        currency: &'a Currency<'a>,
-        tags: Vec<&'a Tag<'a>>,
-        links: Vec<&'a Link<'a>>,
+        date: Spanned<NaiveDate>,
+        currency: Spanned<&'a Currency<'a>>,
+        tags: Vec<Spanned<&'a Tag<'a>>>,
+        links: Vec<Spanned<&'a Link<'a>>>,
         metadata: Metadata<'a>,
     ) -> Self {
         Commodity {
@@ -231,7 +263,7 @@ impl<'a> Display for Commodity<'a> {
 
 impl<'a> Date for Commodity<'a> {
     fn date(&self) -> &NaiveDate {
-        &self.date
+        &self.date.value
     }
 }
 
@@ -536,20 +568,20 @@ impl TryFrom<char> for FlagLetter {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Posting<'a> {
-    pub flag: Option<Flag>,
-    pub account: &'a Account<'a>,
-    pub amount: Option<Expr>,
-    pub currency: Option<&'a Currency<'a>>,
-    pub cost_spec: Option<CostSpec<'a>>,
-    pub price_annotation: Option<ScopedAmount<'a>>,
+    pub flag: Option<Spanned<Flag>>,
+    pub account: Spanned<&'a Account<'a>>,
+    pub amount: Option<Spanned<Expr>>,
+    pub currency: Option<Spanned<&'a Currency<'a>>>,
+    pub cost_spec: Option<Spanned<CostSpec<'a>>>,
+    pub price_annotation: Option<Spanned<ScopedAmount<'a>>>,
     pub metadata: Metadata<'a>,
 }
 
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
-    pub key_values: Vec<(&'a Key<'a>, MetaValue<'a>)>,
-    pub tags: Vec<&'a Tag<'a>>,
-    pub links: Vec<&'a Link<'a>>,
+    pub key_values: Vec<(Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>)>,
+    pub tags: Vec<Spanned<&'a Tag<'a>>>,
+    pub links: Vec<Spanned<&'a Link<'a>>>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -879,12 +911,12 @@ impl Display for ScopedExpr {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Amount<'a> {
-    number: Expr,
-    currency: &'a Currency<'a>,
+    number: Spanned<Expr>,
+    currency: Spanned<&'a Currency<'a>>,
 }
 
 impl<'a> Amount<'a> {
-    pub fn new(amount: (Expr, &'a Currency<'a>)) -> Self {
+    pub fn new(amount: (Spanned<Expr>, Spanned<&'a Currency<'a>>)) -> Self {
         Amount {
             number: amount.0,
             currency: amount.1,
@@ -895,12 +927,12 @@ impl<'a> Amount<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// An amount where each element may not actually be specified.
 pub struct LooseAmount<'a> {
-    number: Option<Expr>,
-    currency: Option<&'a Currency<'a>>,
+    number: Option<Spanned<Expr>>,
+    currency: Option<Spanned<&'a Currency<'a>>>,
 }
 
 impl<'a> LooseAmount<'a> {
-    pub fn new(amount: (Option<Expr>, Option<&'a Currency<'a>>)) -> Self {
+    pub fn new(amount: (Option<Spanned<Expr>>, Option<Spanned<&'a Currency<'a>>>)) -> Self {
         LooseAmount {
             number: amount.0,
             currency: amount.1,
@@ -929,37 +961,37 @@ impl<'a> Display for ScopedAmount<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CostSpec<'a> {
-    per_unit: Option<Expr>,
-    total: Option<Expr>,
-    currency: Option<&'a Currency<'a>>,
-    date: Option<NaiveDate>,
-    label: Option<&'a str>,
+    per_unit: Option<Spanned<Expr>>,
+    total: Option<Spanned<Expr>>,
+    currency: Option<Spanned<&'a Currency<'a>>>,
+    date: Option<Spanned<NaiveDate>>,
+    label: Option<Spanned<&'a str>>,
     merge: bool,
 }
 
 #[derive(Default, Debug)]
 /// Only allows setting each field once, and requires at least one field to be set before building.
 pub struct CostSpecBuilder<'a> {
-    per_unit: Option<Expr>,
-    total: Option<Expr>,
-    currency: Option<&'a Currency<'a>>,
-    date: Option<NaiveDate>,
-    label: Option<&'a str>,
+    per_unit: Option<Spanned<Expr>>,
+    total: Option<Spanned<Expr>>,
+    currency: Option<Spanned<&'a Currency<'a>>>,
+    date: Option<Spanned<NaiveDate>>,
+    label: Option<Spanned<&'a str>>,
     merge: bool,
     errors: Vec<CostSpecError>,
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: ScopedExpr) -> Self {
+    pub fn compound_expr(self, value: ScopedExpr, span: Span) -> Self {
         use ScopedExpr::*;
 
         match value {
-            PerUnit(value) => self.per_unit(value),
-            Total(value) => self.total(value),
+            PerUnit(value) => self.per_unit(spanned(value, span)),
+            Total(value) => self.total(spanned(value, span)),
         }
     }
 
-    fn per_unit(mut self, value: Expr) -> Self {
+    fn per_unit(mut self, value: Spanned<Expr>) -> Self {
         if self.per_unit.is_none() {
             self.per_unit = Some(value);
         } else {
@@ -968,7 +1000,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    fn total(mut self, value: Expr) -> Self {
+    fn total(mut self, value: Spanned<Expr>) -> Self {
         if self.total.is_none() {
             self.total = Some(value);
         } else {
@@ -977,35 +1009,36 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn currency(mut self, value: &'a Currency<'a>) -> Self {
+    pub fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
         if self.currency.is_none() {
-            self.currency = Some(value);
+            self.currency = Some(spanned(value, span));
         } else {
             self.errors.push(CostSpecError(CostSpecErrorKind::Currency))
         }
         self
     }
 
-    pub fn date(mut self, value: NaiveDate) -> Self {
+    pub fn date(mut self, value: NaiveDate, span: Span) -> Self {
         if self.date.is_none() {
-            self.date = Some(value);
+            self.date = Some(spanned(value, span));
         } else {
             self.errors.push(CostSpecError(CostSpecErrorKind::Date))
         }
         self
     }
 
-    pub fn label(mut self, value: &'a str) -> Self {
+    pub fn label(mut self, value: &'a str, span: Span) -> Self {
         if self.label.is_none() {
-            self.label = Some(value);
+            self.label = Some(spanned(value, span));
         } else {
             self.errors.push(CostSpecError(CostSpecErrorKind::Label))
         }
         self
     }
 
-    pub fn merge(mut self) -> Self {
+    pub fn merge(mut self, _span: Span) -> Self {
         if !self.merge {
+            // TODO find a way to keep a span iff merge is true
             self.merge = true;
         } else {
             self.errors.push(CostSpecError(CostSpecErrorKind::Merge))

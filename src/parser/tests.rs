@@ -4,35 +4,49 @@ use rust_decimal_macros::dec;
 use test_case::test_case;
 
 #[test_case(r##"2023-07-03 * "New World Gardens North East Va ;"
-"##, (2023, 7, 3), Flag::Asterisk, None, Some("New World Gardens North East Va ;"), vec![], vec![])]
+"##, spanned((2023, 7, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
 fn test_transaction(
     s: &str,
-    expected_date: (i32, u32, u32),
-    expected_flag: Flag,
-    expected_payee: Option<&str>,
-    expected_narration: Option<&str>,
-    expected_tags: Vec<&str>,
-    expected_links: Vec<&str>,
+    expected_date: Spanned<(i32, u32, u32)>,
+    expected_flag: Spanned<Flag>,
+    expected_payee: Option<Spanned<&str>>,
+    expected_narration: Option<Spanned<&str>>,
+    expected_tags: Vec<Spanned<&str>>,
+    expected_links: Vec<Spanned<&str>>,
 ) {
     let tokens = bare_lex(s);
     let spanned_tokens = tokens.spanned(end_of_input(s));
 
     let result = transaction().parse(spanned_tokens).into_result();
+    let expected_date = spanned(
+        NaiveDate::from_ymd_opt(
+            expected_date.value.0,
+            expected_date.value.1,
+            expected_date.value.2,
+        )
+        .unwrap(),
+        expected_date.span,
+    );
+
     let expected_tags = expected_tags
         .into_iter()
-        .map(|s| Tag::try_from(s).unwrap())
+        .map(|s| spanned(Tag::try_from(s.value).unwrap(), s.span))
         .collect::<Vec<_>>();
+    let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
+
     let expected_links = expected_links
         .into_iter()
-        .map(|s| Link::try_from(s).unwrap())
+        .map(|s| spanned(Link::try_from(s.value).unwrap(), s.span))
         .collect::<Vec<_>>();
+    let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
+
     let expected = Transaction::new(
-        NaiveDate::from_ymd_opt(expected_date.0, expected_date.1, expected_date.2).unwrap(),
+        expected_date,
         expected_flag,
         expected_payee,
         expected_narration,
-        expected_tags.iter().collect(),
-        expected_links.iter().collect(),
+        expected_tags,
+        expected_links,
         Metadata::default(),
         Vec::new(),
     );
@@ -66,22 +80,22 @@ fn test_compound_expr(s: &str, expected: ScopedExpr) {
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec!["a", "c-is-my-tag"], vec!["b", "d.is_my/link"])]
-fn test_tags_links(s: &str, expected_tags: Vec<&str>, expected_links: Vec<&str>) {
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec![spanned("a", SimpleSpan::new(0, 2)), spanned("c-is-my-tag", SimpleSpan::new(6, 18))], vec![spanned("b", SimpleSpan::new(3, 5)), spanned("d.is_my/link", SimpleSpan::new(19, 32))])]
+fn test_tags_links(s: &str, expected_tags: Vec<Spanned<&str>>, expected_links: Vec<Spanned<&str>>) {
     let tokens = bare_lex(s);
     let spanned_tokens = tokens.spanned(end_of_input(s));
 
     let expected_tags = expected_tags
         .into_iter()
-        .map(|s| Tag::try_from(s).unwrap())
+        .map(|s| spanned(Tag::try_from(s.value).unwrap(), s.span))
         .collect::<Vec<_>>();
-    let expected_tags = expected_tags.iter().collect::<Vec<_>>();
+    let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
 
     let expected_links = expected_links
         .into_iter()
-        .map(|s| Link::try_from(s).unwrap())
+        .map(|s| spanned(Link::try_from(s.value).unwrap(), s.span))
         .collect::<Vec<_>>();
-    let expected_links = expected_links.iter().collect::<Vec<_>>();
+    let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
 
     let result = tags_links().parse(spanned_tokens).into_result();
 

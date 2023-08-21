@@ -9,8 +9,6 @@ use chumsky::{
 };
 use either::Either;
 
-pub type Span = SimpleSpan<usize>;
-
 pub fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
@@ -56,9 +54,12 @@ where
 {
     use Declaration::*;
 
-    choice((directive().map(Directive), pragma().map(Pragma)))
-        .map_with_span(|d, span| (d, span))
-        .recover_with(skip_then_retry_until(any().ignored(), end()))
+    choice((
+        directive().map_with_span(spanned).map(Directive),
+        pragma().map(Pragma),
+    ))
+    .map_with_span(|d, span| (d, span))
+    .recover_with(skip_then_retry_until(any().ignored(), end()))
 }
 
 /// Matches a `Directive`.
@@ -110,7 +111,10 @@ where
     group((
         transaction_header_line(),
         metadata(),
-        posting().repeated().collect::<Vec<_>>(),
+        posting()
+            .map_with_span(spanned)
+            .repeated()
+            .collect::<Vec<_>>(),
     ))
     .map(
         |((date, flag, s1, s2, (tags, links)), metadata, postings)| match (s1, s2) {
@@ -128,11 +132,14 @@ fn transaction_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        NaiveDate,
-        Flag,
-        Option<&'src str>,
-        Option<&'src str>,
-        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+        Spanned<NaiveDate>,
+        Spanned<Flag>,
+        Option<Spanned<&'src str>>,
+        Option<Spanned<&'src str>>,
+        (
+            Vec<Spanned<&'src Tag<'src>>>,
+            Vec<Spanned<&'src Link<'src>>>,
+        ),
     ),
     extra::Err<ParserError<'src>>,
 >
@@ -143,8 +150,14 @@ where
     let date = select_ref!(Token::Date(date) => *date);
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
-    group((date, txn(), string.or_not(), string.or_not(), tags_links()))
-        .then_ignore(just(Token::Eol))
+    group((
+        date.map_with_span(spanned),
+        txn().map_with_span(spanned),
+        string.map_with_span(spanned).or_not(),
+        string.map_with_span(spanned).or_not(),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
 }
 
 /// Matches a open, including metadata, over several lines.
@@ -171,11 +184,14 @@ fn open_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        NaiveDate,
-        &'src Account<'src>,
-        Vec<&'src Currency<'src>>,
-        Option<&'src str>,
-        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+        Spanned<NaiveDate>,
+        Spanned<&'src Account<'src>>,
+        Vec<Spanned<&'src Currency<'src>>>,
+        Option<Spanned<&'src str>>,
+        (
+            Vec<Spanned<&'src Tag<'src>>>,
+            Vec<Spanned<&'src Link<'src>>>,
+        ),
     ),
     extra::Err<ParserError<'src>>,
 >
@@ -189,11 +205,14 @@ where
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
     group((
-        date,
+        date.map_with_span(spanned),
         just(Token::Open),
-        account,
-        currency.repeated().collect::<Vec<_>>(),
-        string.or_not(),
+        account.map_with_span(spanned),
+        currency
+            .map_with_span(spanned)
+            .repeated()
+            .collect::<Vec<_>>(),
+        string.map_with_span(spanned).or_not(),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -209,12 +228,8 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     group((commodity_header_line(), metadata())).map(
-        |((date, currency, (tags, links)), metadata)| Commodity {
-            date,
-            currency,
-            tags,
-            links,
-            metadata,
+        |((date, currency, (tags, links)), metadata)| {
+            Commodity::new(date, currency, tags, links, metadata)
         },
     )
 }
@@ -224,9 +239,12 @@ fn commodity_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        NaiveDate,
-        &'src Currency<'src>,
-        (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>),
+        Spanned<NaiveDate>,
+        Spanned<&'src Currency<'src>>,
+        (
+            Vec<Spanned<&'src Tag<'src>>>,
+            Vec<Spanned<&'src Link<'src>>>,
+        ),
     ),
     extra::Err<ParserError<'src>>,
 >
@@ -237,9 +255,14 @@ where
     let date = select_ref!(Token::Date(date) => *date);
     let currency = select_ref!(Token::Currency(cur) => cur);
 
-    group((date, just(Token::Commodity), currency, tags_links()))
-        .then_ignore(just(Token::Eol))
-        .map(|(date, _, currency, tags_link)| (date, currency, tags_link))
+    group((
+        date.map_with_span(spanned),
+        just(Token::Commodity),
+        currency.map_with_span(spanned),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .map(|(date, _, currency, tags_link)| (date, currency, tags_link))
 }
 
 /// Matches the `txn` keyword or a flag.
@@ -278,12 +301,12 @@ where
     just(Token::Indent)
         .ignore_then(
             group((
-                flag().or_not(),
-                account,
-                expr().or_not(),
-                currency.or_not(),
-                cost_spec().or_not(),
-                price_annotation().or_not(),
+                flag().map_with_span(spanned).or_not(),
+                account.map_with_span(spanned),
+                expr().map_with_span(spanned).or_not(),
+                currency.map_with_span(spanned).or_not(),
+                cost_spec().map_with_span(spanned).or_not(),
+                price_annotation().map_with_span(spanned).or_not(),
             ))
             .then_ignore(just(Token::Eol))
             .then(metadata())
@@ -339,9 +362,9 @@ where
 
 /// A single instance of `Metadata`
 enum Metadatum<'a> {
-    KeyValue((&'a Key<'a>, MetaValue<'a>)),
-    Tag(&'a Tag<'a>),
-    Link(&'a Link<'a>),
+    KeyValue((Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>)),
+    Tag(Spanned<&'a Tag<'a>>),
+    Link(Spanned<&'a Link<'a>>),
 }
 
 /// Matches a single Metadatum on a single line.
@@ -359,10 +382,11 @@ where
     just(Token::Indent)
         .ignore_then(
             choice((
-                key.then(just(Token::Colon).ignore_then(meta_value()))
+                key.map_with_span(spanned)
+                    .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
                     .map(KeyValue),
-                tag.map(Tag),
-                link.map(Link),
+                tag.map_with_span(spanned).map(Tag),
+                link.map_with_span(spanned).map(Link),
             ))
             .then_ignore(just(Token::Eol)),
         )
@@ -419,7 +443,11 @@ where
 {
     let currency = select_ref!(Token::Currency(cur) => cur);
 
-    group((expr(), currency)).map(Amount::new)
+    group((
+        expr().map_with_span(spanned),
+        currency.map_with_span(spanned),
+    ))
+    .map(Amount::new)
 }
 
 pub fn loose_amount<'src, I>(
@@ -430,7 +458,11 @@ where
 {
     let currency = select_ref!(Token::Currency(cur) => cur);
 
-    group((expr().or_not(), currency.or_not())).map(LooseAmount::new)
+    group((
+        expr().map_with_span(spanned).or_not(),
+        currency.map_with_span(spanned).or_not(),
+    ))
+    .map(LooseAmount::new)
 }
 
 pub fn compound_amount<'src, I>(
@@ -507,7 +539,13 @@ where
     use CostComp::*;
 
     just(Token::Lcurl)
-        .ignore_then(cost_comp().repeated().at_least(1).collect::<Vec<_>>())
+        .ignore_then(
+            cost_comp()
+                .map_with_span(spanned)
+                .repeated()
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
         .then_ignore(just(Token::Rcurl))
         .try_map(move |cost_comps, span| {
             cost_comps
@@ -515,17 +553,17 @@ where
                 .fold(
                     // accumulate the `CostComp`s in a `CostSpecBuilder`
                     CostSpecBuilder::default(),
-                    |builder, cost_comp| match cost_comp {
+                    |builder, cost_comp| match cost_comp.value {
                         ScopedAmount(compound_amount) => match compound_amount {
-                            BareCurrency(cur) => builder.currency(cur),
-                            BareAmount(amount) => builder.compound_expr(amount),
-                            CurrencyAmount(amount, cur) => {
-                                builder.compound_expr(amount).currency(cur)
-                            }
+                            BareCurrency(cur) => builder.currency(cur, cost_comp.span),
+                            BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
+                            CurrencyAmount(amount, cur) => builder
+                                .compound_expr(amount, cost_comp.span)
+                                .currency(cur, cost_comp.span),
                         },
-                        Date(date) => builder.date(date),
-                        Label(s) => builder.label(s),
-                        Merge => builder.merge(),
+                        Date(date) => builder.date(date, cost_comp.span),
+                        Label(s) => builder.label(s, cost_comp.span),
+                        Merge => builder.merge(cost_comp.span),
                     },
                 )
                 .build()
@@ -563,8 +601,15 @@ where
 }
 
 /// Matches zero or more tags or links.
-pub fn tags_links<'src, I>(
-) -> impl Parser<'src, I, (Vec<&'src Tag<'src>>, Vec<&'src Link<'src>>), extra::Err<ParserError<'src>>>
+pub fn tags_links<'src, I>() -> impl Parser<
+    'src,
+    I,
+    (
+        Vec<Spanned<&'src Tag<'src>>>,
+        Vec<Spanned<&'src Link<'src>>>,
+    ),
+    extra::Err<ParserError<'src>>,
+>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
@@ -572,11 +617,16 @@ where
     let tag = select_ref!(Token::Tag(tag) => tag);
     let link = select_ref!(Token::Link(link) => link);
 
-    choice((tag.map(Either::Left), link.map(Either::Right)))
-        .repeated()
-        .collect::<Vec<_>>()
-        .map(|tags_or_links| {
-            tags_or_links.into_iter().fold(
+    choice((
+        tag.map_with_span(spanned).map(Either::Left),
+        link.map_with_span(spanned).map(Either::Right),
+    ))
+    .repeated()
+    .collect::<Vec<_>>()
+    .map(|tags_or_links| {
+        tags_or_links
+            .into_iter()
+            .fold(
                 (Vec::new(), Vec::new()),
                 |(mut tags, mut links), item| match item {
                     Either::Left(tag) => (
@@ -592,7 +642,7 @@ where
                     }),
                 },
             )
-        })
+    })
 }
 
 /// Matches a bool
