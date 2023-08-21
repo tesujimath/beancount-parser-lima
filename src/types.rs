@@ -8,11 +8,13 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     iter::empty,
     mem::swap,
+    path::Path,
 };
 use strum_macros::{Display, EnumString};
 
 pub type Span = SimpleSpan<usize>;
 
+/// a Spanned value may be located within a source file if the file path is known.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Spanned<T> {
     pub value: T,
@@ -41,9 +43,16 @@ where
     }
 }
 
+/// Spanned and additionally with source path
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Sourced<'a, T> {
+    pub spanned_value: Spanned<T>,
+    pub source_path: &'a Path,
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Declaration<'a> {
-    Directive(Spanned<Directive<'a>>),
+    Directive(Directive<'a>),
     // TODO actually support Pragma
     Pragma(Pragma<'a>),
 }
@@ -57,7 +66,7 @@ pub enum Directive<'a> {
 }
 
 /// A trait for items which have a (naive) date
-trait Date {
+pub trait Date {
     fn date(&self) -> &NaiveDate;
 }
 

@@ -3,11 +3,12 @@
 #![recursion_limit = "256"]
 
 use ariadne::{Color, Label, Report, ReportKind};
+use chrono::NaiveDate;
 use chumsky::prelude::{Input, Parser};
 use lexer::{lex, Token};
 use parser::{end_of_input, file, includes, ParserError};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     fmt::{self, Display, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
@@ -280,6 +281,56 @@ where
         } else {
             Err(Ok(()))
         }
+    }
+}
+
+/// Builder for iterator for date-ordered traversal of `Directive`s.
+/// Importantly, directives with the same date must be preserved in source file order.
+#[derive(Default, Debug)]
+struct DirectiveIteratorBuilder<'t> {
+    // TODO Sourced not Spanned
+    date_buckets: BTreeMap<&'t NaiveDate, Vec<Sourced<'t, &'t Directive<'t>>>>,
+    // TODO tags and metadata from push/pop pragma processing
+}
+
+impl<'t> DirectiveIteratorBuilder<'t> {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn declaration<'a>(
+        &'a mut self,
+        declaration: &'t Declaration<'t>,
+        span: Span,
+        source_path: &'t Path,
+    ) where
+        't: 'a,
+    {
+        use Declaration::*;
+
+        match declaration {
+            Directive(directive) => {
+                let date = directive.date();
+                match self.date_buckets.get_mut(date) {
+                    None => {
+                        self.date_buckets.insert(date, Vec::new());
+                    }
+                    Some(directives) => directives.push(Sourced {
+                        spanned_value: spanned(directive, span),
+                        source_path,
+                    }),
+                }
+            }
+            Pragma(_pragma) => {
+                // TODO
+            }
+        }
+    }
+
+    fn build(&self) -> impl Iterator<Item = &Sourced<'t, &'t Directive<'t>>> {
+        self.date_buckets
+            .iter()
+            .flat_map(|(_date, directives)| directives.iter())
     }
 }
 

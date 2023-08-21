@@ -54,12 +54,9 @@ where
 {
     use Declaration::*;
 
-    choice((
-        directive().map_with_span(spanned).map(Directive),
-        pragma().map(Pragma),
-    ))
-    .map_with_span(|d, span| (d, span))
-    .recover_with(skip_then_retry_until(any().ignored(), end()))
+    choice((directive().map(Directive), pragma().map(Pragma)))
+        .map_with_span(|d, span| (d, span))
+        .recover_with(skip_then_retry_until(any().ignored(), end()))
 }
 
 /// Matches a `Directive`.
