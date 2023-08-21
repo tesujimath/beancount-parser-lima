@@ -236,9 +236,12 @@ where
     }
 
     /// Parse the sources, returning declarations or writing errors.
-    /// If parsing fails, errors are written to `w`, and the result is Err,
+    /// If parsing fails, errors are written to `error_w`, and the result is Err,
     /// which may or may not include an I/O error from failing to write the errors.
-    pub fn parse<W>(&'t self, w: W) -> Result<Vec<(Declaration<'t>, Location<'s>)>, io::Result<()>>
+    pub fn parse<W>(
+        &'t self,
+        error_w: W,
+    ) -> Result<Vec<(Declaration<'t>, Location<'s>)>, Option<io::Error>>
     where
         W: Write + Copy,
         's: 't,
@@ -272,14 +275,14 @@ where
         for (path, errors) in all_errors.into_iter() {
             let (_source, _tokens) = self.tokenized_sources.get(path).unwrap();
             self.sources
-                .write_parse_errors(w, path, errors)
-                .map_err(Err)?;
+                .write_parse_errors(error_w, path, errors)
+                .map_err(Some)?;
         }
 
         if !errors_occured {
             Ok(all_outputs.into_values().flatten().collect())
         } else {
-            Err(Ok(()))
+            Err(None)
         }
     }
 }
