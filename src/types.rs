@@ -25,6 +25,23 @@ pub enum Directive<'a> {
     // TODO other directives
 }
 
+/// A trait for items which have a (naive) date
+trait Date {
+    fn date(&self) -> &NaiveDate;
+}
+
+impl<'a> Date for Directive<'a> {
+    fn date(&self) -> &NaiveDate {
+        use Directive::*;
+
+        match self {
+            Transaction(x) => x.date(),
+            Open(x) => x.date(),
+            Commodity(x) => x.date(),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Pragma<'a> {
     // TODO
@@ -91,6 +108,12 @@ impl<'a> Display for Transaction<'a> {
     }
 }
 
+impl<'a> Date for Transaction<'a> {
+    fn date(&self) -> &NaiveDate {
+        &self.date
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
     pub date: NaiveDate,
@@ -151,6 +174,12 @@ impl<'a> Display for Open<'a> {
     }
 }
 
+impl<'a> Date for Open<'a> {
+    fn date(&self) -> &NaiveDate {
+        &self.date
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Commodity<'a> {
     pub date: NaiveDate,
@@ -197,6 +226,12 @@ impl<'a> Display for Commodity<'a> {
             .collect::<String>(),
             // TODO metadata
         )
+    }
+}
+
+impl<'a> Date for Commodity<'a> {
+    fn date(&self) -> &NaiveDate {
+        &self.date
     }
 }
 
