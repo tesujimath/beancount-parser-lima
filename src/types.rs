@@ -1,10 +1,10 @@
+use super::parser::ParserError;
 use chrono::NaiveDate;
 use chumsky::span::SimpleSpan;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     cmp::max,
-    error::Error,
     fmt::{self, Debug, Display, Formatter},
     iter::empty,
     mem::swap,
@@ -49,6 +49,54 @@ pub struct Sourced<'a, T> {
     pub spanned_value: Spanned<T>,
     pub source_path: &'a Path,
 }
+
+/// Our public error type
+#[derive(Debug)]
+pub struct SourcedError<'a> {
+    pub(crate) source_path: &'a Path,
+    pub(crate) span: Span,
+    pub(crate) message: String,
+    pub(crate) reason: Option<String>,
+    pub(crate) contexts: Vec<(String, Span)>,
+}
+
+impl<'a> SourcedError<'a> {
+    pub(crate) fn from_parser_error(source_path: &'a Path, error: ParserError) -> Self {
+        let error = error.map_token(|tok| tok.to_string());
+
+        SourcedError {
+            source_path,
+            span: *error.span(),
+            message: error.to_string(),
+            reason: Some(error.reason().to_string()),
+            contexts: error
+                .contexts()
+                .map(|(label, span)| (label.to_string(), *span))
+                .collect(),
+        }
+    }
+}
+
+impl<'a> Display for SourcedError<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ", self.message)?;
+        if let Some(reason) = &self.reason {
+            write!(f, "({}) ", reason)?;
+        }
+        write!(
+            f,
+            "at {} of {}",
+            self.span,
+            self.source_path.to_string_lossy()
+        )?;
+        for context in self.contexts.iter() {
+            write!(f, " while parsing {} at {}", context.0, context.1)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'a> std::error::Error for SourcedError<'a> {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Declaration<'a> {
@@ -364,7 +412,7 @@ impl Display for AccountNameError {
     }
 }
 
-impl Error for AccountNameError {}
+impl std::error::Error for AccountNameError {}
 
 impl<'a> TryFrom<&'a str> for AccountName<'a> {
     type Error = AccountNameError;
@@ -462,7 +510,7 @@ impl Display for CurrencyError {
     }
 }
 
-impl Error for CurrencyError {}
+impl std::error::Error for CurrencyError {}
 
 impl<'a> TryFrom<&'a str> for Currency<'a> {
     type Error = CurrencyError;
@@ -561,7 +609,7 @@ impl Display for FlagLetterError {
     }
 }
 
-impl Error for FlagLetterError {}
+impl std::error::Error for FlagLetterError {}
 
 impl TryFrom<char> for FlagLetter {
     type Error = FlagLetterError;
@@ -704,7 +752,7 @@ impl Display for TagOrLinkIdentifierError {
     }
 }
 
-impl Error for TagOrLinkIdentifierError {}
+impl std::error::Error for TagOrLinkIdentifierError {}
 
 impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
     type Error = TagOrLinkIdentifierError;
@@ -774,7 +822,7 @@ impl Display for KeyError {
     }
 }
 
-impl Error for KeyError {}
+impl std::error::Error for KeyError {}
 
 impl<'a> TryFrom<&'a str> for Key<'a> {
     type Error = KeyError;
@@ -1137,7 +1185,7 @@ impl Display for CostSpecError {
     }
 }
 
-impl Error for CostSpecError {}
+impl std::error::Error for CostSpecError {}
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct CostSpecErrors(Vec<CostSpecError>);
@@ -1156,6 +1204,6 @@ impl Display for CostSpecErrors {
     }
 }
 
-impl Error for CostSpecErrors {}
+impl std::error::Error for CostSpecErrors {}
 
 mod tests;

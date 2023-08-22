@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::env;
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     writeln!(error_w, "{:?}", &sources)?;
 
     let beancount_parser = BeancountParser::new(&sources);
-    match beancount_parser.parse(error_w) {
+    match beancount_parser.parse() {
         Ok(located_declarations) => {
             writeln!(
                 error_w,
@@ -34,12 +34,8 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        Err(e) => match e {
-            None => Err(anyhow!("parsing failed")),
-            Some(e) => {
-                writeln!(error_w, "parsing failed, failed to write errors {}", e)?;
-                Err(e.into())
-            }
-        },
+        Err(errors) => sources
+            .write_sourced_errors(error_w, errors)
+            .map_err(|e| e.into()),
     }
 }

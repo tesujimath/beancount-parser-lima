@@ -6,7 +6,7 @@ use ariadne::{Color, Label, Report, ReportKind};
 use chrono::NaiveDate;
 use chumsky::prelude::{Input, Parser};
 use lexer::{lex, Token};
-use parser::{end_of_input, file, includes, ParserError};
+use parser::{end_of_input, file, includes};
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     fmt::{self, Display, Formatter},
@@ -78,26 +78,25 @@ impl BeancountSources {
         }
     }
 
-    fn write_error_message<W, StringSpans>(
+    fn write_error_message<W>(
         &self,
         w: W,
         src_id: String,
         span: Span,
         msg: String,
-        reason: String,
-        contexts: StringSpans,
+        reason: Option<String>,
+        contexts: Vec<(String, Span)>,
     ) -> io::Result<()>
     where
         W: Write + Copy,
-        StringSpans: IntoIterator<Item = (&'static str, Span)>,
     {
         Report::build(ReportKind::Error, src_id.clone(), span.start)
             .with_message(msg)
-            .with_label(
+            .with_labels(reason.into_iter().map(|reason| {
                 Label::new((src_id.clone(), span.into_range()))
                     .with_message(reason)
-                    .with_color(Color::Red),
-            )
+                    .with_color(Color::Red)
+            }))
             .with_labels(contexts.into_iter().map(|(label, span)| {
                 Label::new((src_id.clone(), span.into_range()))
                     .with_message(format!("while parsing this {}", label))
@@ -107,39 +106,21 @@ impl BeancountSources {
             .write(ariadne::sources(self.sources()), w)
     }
 
-    fn write_parse_errors<W>(&self, w: W, path: &Path, errors: Vec<ParserError>) -> io::Result<()>
+    pub fn write_sourced_errors<W>(&self, w: W, errors: Vec<SourcedError>) -> io::Result<()>
     where
         W: Write + Copy,
     {
-        let src_id = source_id(path);
+        for error in errors.into_iter() {
+            let src_id = source_id(error.source_path);
 
-        for error in errors
-            .into_iter()
-            .map(|e| e.map_token(|tok| tok.to_string()))
-        {
             self.write_error_message(
                 w,
                 src_id.clone(),
-                *error.span(),
-                error.to_string(),
-                error.reason().to_string(),
-                error.contexts().map(|(label, span)| (*label, *span)),
+                error.span,
+                error.message,
+                error.reason,
+                error.contexts,
             )?;
-            //     Report::build(ReportKind::Error, src_id.clone(), error.span().start)
-            //         .with_message(error.to_string())
-            //         .with_label(
-            //             Label::new((src_id.clone(), error.span().into_range()))
-            //                 .with_message(error.reason().to_string())
-            //                 .with_color(Color::Red),
-            //         )
-            //         .with_labels(error.contexts().map(|(label, span)| {
-            //             Label::new((src_id.clone(), span.into_range()))
-            //                 .with_message(format!("while parsing this {}", label))
-            //                 .with_color(Color::Yellow)
-            //         }))
-            //         .finish()
-            //         .write(ariadne::sources(self.sources()), w)
-            //         .unwrap()
         }
         Ok(())
     }
@@ -235,15 +216,9 @@ where
         }
     }
 
-    /// Parse the sources, returning declarations or writing errors.
-    /// If parsing fails, errors are written to `error_w`, and the result is Err,
-    /// which may or may not include an I/O error from failing to write the errors.
-    pub fn parse<W>(
-        &'t self,
-        error_w: W,
-    ) -> Result<Vec<(Declaration<'t>, Location<'s>)>, Option<io::Error>>
+    /// Parse the sources, returning declarations or errors.
+    pub fn parse(&'t self) -> Result<Vec<(Declaration<'t>, Location<'s>)>, Vec<SourcedError<'t>>>
     where
-        W: Write + Copy,
         's: 't,
     {
         let mut all_outputs = HashMap::new();
@@ -271,18 +246,19 @@ where
             }
         }
 
-        let errors_occured = !all_errors.is_empty();
-        for (path, errors) in all_errors.into_iter() {
-            let (_source, _tokens) = self.tokenized_sources.get(path).unwrap();
-            self.sources
-                .write_parse_errors(error_w, path, errors)
-                .map_err(Some)?;
-        }
-
-        if !errors_occured {
+        if all_errors.is_empty() {
             Ok(all_outputs.into_values().flatten().collect())
         } else {
-            Err(None)
+            let sourced_errors = all_errors
+                .into_iter()
+                .flat_map(|(path, errors)| {
+                    errors
+                        .into_iter()
+                        .map(|e| SourcedError::from_parser_error(path, e))
+                })
+                .collect::<Vec<_>>();
+
+            Err(sourced_errors)
         }
     }
 }
