@@ -4,7 +4,6 @@ use chumsky::span::SimpleSpan;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
-    borrow::Cow,
     cmp::max,
     fmt::{self, Display, Formatter},
     iter::empty,
@@ -189,19 +188,21 @@ impl<'a> Transaction<'a> {
 
 impl<'a> Display for Transaction<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
+        write!(f, "{} {}", self.date, self.flag)?;
+
+        format(f, &self.payee, double_quoted, " ", Some(" "))?;
+        format(f, &self.narration, double_quoted, " ", Some(" "))?;
+        format(f, &self.tags, plain, " ", Some(" "))?;
+        format(f, &self.links, plain, " ", Some(" "))?;
+        f.write_str(self.metadata.to_string().as_str())?;
+        format(
             f,
-            "{} {} {}{}{}{}{}\n{}{}",
-            self.date,
-            self.flag,
-            format_option_with_padding(&self.payee, double_quote),
-            format_option_with_padding(&self.narration, double_quote),
-            join(&self.tags, " "),
-            pad_if(!self.tags.is_empty()),
-            join(&self.links, " "),
-            &self.metadata,
-            join(&self.postings, ""),
-        )
+            &self.postings,
+            plain,
+            NEWLINE_INDENT,
+            Some(NEWLINE_INDENT),
+        )?;
+        Ok(())
     }
 }
 
@@ -246,16 +247,14 @@ impl<'a> Open<'a> {
 
 impl<'a> Display for Open<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} open {} {} {} {}\n{}",
-            self.date,
-            self.account,
-            join(&self.currencies, ", "),
-            join(&self.tags, ", "),
-            join(&self.links, ", "),
-            &self.metadata,
-        )
+        write!(f, "{} open {}", self.date, self.account)?;
+        format(f, &self.currencies, plain, " ", Some(" "))?;
+        format(f, &self.booking, double_quoted, " ", Some(" "))?;
+        format(f, &self.tags, plain, " ", Some(" "))?;
+        format(f, &self.links, plain, " ", Some(" "))?;
+        f.write_str(self.metadata.to_string().as_str())?;
+
+        Ok(())
     }
 }
 
@@ -294,16 +293,12 @@ impl<'a> Commodity<'a> {
 
 impl<'a> Display for Commodity<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} commodity {} {}{}{}\n{}",
-            self.date,
-            self.currency,
-            join(&self.tags, " "),
-            pad_if(!self.tags.is_empty()),
-            join(&self.links, " "),
-            &self.metadata,
-        )
+        write!(f, "{} commodity {}", self.date, self.currency)?;
+        format(f, &self.tags, plain, " ", Some(" "))?;
+        format(f, &self.links, plain, " ", Some(" "))?;
+        f.write_str(self.metadata.to_string().as_str())?;
+
+        Ok(())
     }
 }
 
@@ -330,7 +325,9 @@ impl<'a> Account<'a> {
 
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.account_type, join(&self.names, ":"))
+        write!(f, "{}", self.account_type)?;
+        format(f, &self.names, plain, ":", Some(":"))?;
+        Ok(())
     }
 }
 
@@ -382,11 +379,10 @@ impl Display for AccountNameError {
                 "invalid character '{}' for account name initial - must be uppercase ASCII letter or digit",
                 bad_char
             ),
-            Subsequent(bad_chars) => write!(
-                f,
-                "invalid characters {} for account name - must be alphanumeric or '-'",
-                format_and_join(bad_chars, single_quote, ", ")
-            ),
+            Subsequent(bad_chars) => {
+                format(f, bad_chars, single_quoted, ", ", Some("invalid characters "))?;
+                f.write_str(" - must be alphanumeric or '-'")
+            }
         }
     }
 }
@@ -469,11 +465,10 @@ impl Display for CurrencyError {
                 "invalid initial character '{}' for currency - must be uppercase ASCII letter or '/'",
                 bad_char
             ),
-            Intermediate(bad_chars) => write!(
-                f,
-                "invalid intermediate characters {} for currency - must be upppercase ASCII alphanumeric or one of {}",
-                format_and_join(bad_chars, single_quote, ", "),
-                format_and_join(CURRENCY_INTERMEDIATE_EXTRA_CHARS, single_quote, ", ") ),
+            Intermediate(bad_chars) => {
+                format(f, bad_chars, single_quoted, ", ", Some("invalid intermediate characters "))?;
+                format(f, CURRENCY_INTERMEDIATE_EXTRA_CHARS, single_quoted, ", ", Some(" for currency - must be upppercase ASCII alphanumeric or one of "))
+            }
             Final(bad_char) => write!(
                 f,
                 "invalid final character '{}' for currency - must be uppercase ASCII alphanumeric",
@@ -610,18 +605,21 @@ pub struct Posting<'a> {
 
 impl<'a> Display for Posting<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        simple_format(f, &self.flag, None)?;
+
         write!(
             f,
-            "{}{}{} {}{}{}{}\n{}",
-            INDENT,
-            option_with_padding(&self.flag),
-            &self.account.value,
-            option_with_padding(&self.amount),
-            option_with_padding(&self.currency),
-            option_with_padding(&self.cost_spec),
-            option_with_padding(&self.price_annotation),
-            &self.metadata,
-        )
+            "{}{}",
+            if self.flag.is_some() { " " } else { "" },
+            &self.account.value
+        )?;
+
+        simple_format(f, &self.amount, Some(" "))?;
+        simple_format(f, &self.currency, Some(" "))?;
+        simple_format(f, &self.cost_spec, Some(" "))?;
+        simple_format(f, &self.price_annotation, Some(" "))?;
+
+        f.write_str(self.metadata.to_string().as_str())
     }
 }
 
@@ -634,17 +632,15 @@ pub struct Metadata<'a> {
 
 impl<'a> Display for Metadata<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
+        format(
             f,
-            "{}{}{}",
-            format_and_join(
-                &self.key_values,
-                |kv| format!("{}{}: \"{}\"\n", INDENT, kv.0, kv.1),
-                ""
-            ),
-            format_and_join(&self.tags, |tag| format!("{}{}\n", INDENT, tag), ""),
-            format_and_join(&self.links, |link| format!("{}{}\n", INDENT, link), ""),
-        )
+            &self.key_values,
+            |kv| format!("{}: \"{}\"", kv.0, kv.1),
+            NEWLINE_INDENT,
+            Some(NEWLINE_INDENT),
+        )?;
+        format(f, &self.tags, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
+        format(f, &self.links, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))
     }
 }
 
@@ -771,11 +767,13 @@ pub struct TagOrLinkIdentifierError(Vec<char>);
 
 impl Display for TagOrLinkIdentifierError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
+        format(f, &self.0, single_quoted, ", ", Some("invalid characters "))?;
+        format(
             f,
-            "invalid characters {} for tag or link identifier - must be alphanumeric or one of {}",
-            format_and_join(&self.0, single_quote, ", "),
-            format_and_join(TAG_OR_LINK_EXTRA_CHARS, single_quote, ", ")
+            TAG_OR_LINK_EXTRA_CHARS,
+            single_quoted,
+            ", ",
+            Some(" for tag or link identifier - must be alphanumeric or one of "),
         )
     }
 }
@@ -837,11 +835,16 @@ impl Display for KeyError {
                 "invalid character '{}' for key initial - must be lowercase ASCII letter",
                 bad_char
             ),
-            Subsequent(bad_chars) => write!(
-                f,
-                "invalid characters {} for key - must be alphanumeric or '-'",
-                format_and_join(bad_chars, single_quote, ", ")
-            ),
+            Subsequent(bad_chars) => {
+                format(
+                    f,
+                    bad_chars,
+                    single_quoted,
+                    ", ",
+                    Some("invalid characters "),
+                )?;
+                f.write_str(" for key - must be alphanumeric or '-'")
+            }
         }
     }
 }
@@ -1253,7 +1256,7 @@ pub struct CostSpecErrors(Vec<CostSpecError>);
 
 impl Display for CostSpecErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&join(&self.0, ", "))
+        format(f, &self.0, plain, ", ", None)
     }
 }
 
@@ -1261,49 +1264,57 @@ impl std::error::Error for CostSpecErrors {}
 
 // TODO move this formatting stuff somewhere else, like format submodule
 
-/// Join a collection.
-fn join<C, T, S>(collection: C, separator: S) -> String
+fn format<C, T, M>(
+    f: &mut Formatter<'_>,
+    container: C,
+    mapper: M,
+    separator: &'static str,
+    prefix: Option<&'static str>,
+) -> fmt::Result
 where
     C: IntoIterator<Item = T>,
-    T: ToString,
-    S: ToString,
+    M: Fn(T) -> String,
 {
-    format_and_join(collection, |item| item.to_string(), separator)
+    let mut container = container.into_iter();
+    if let Some(item) = container.by_ref().next() {
+        if let Some(prefix) = prefix {
+            f.write_str(prefix)?;
+        }
+
+        f.write_str(mapper(item).as_str())?;
+    }
+
+    for item in container {
+        f.write_str(separator)?;
+        f.write_str(mapper(item).as_str())?;
+    }
+
+    Ok(())
 }
 
-/// Join a collection with custom formatting
-fn format_and_join<C, T, F, S>(collection: C, formatter: F, separator: S) -> String
+/// Simple format with no mapper or separator
+fn simple_format<C, T>(
+    f: &mut Formatter<'_>,
+    container: C,
+    prefix: Option<&'static str>,
+) -> fmt::Result
 where
     C: IntoIterator<Item = T>,
-    F: Fn(T) -> String,
-    S: ToString,
-{
-    itertools::Itertools::intersperse(collection.into_iter().map(formatter), separator.to_string())
-        .collect::<String>()
-}
-
-fn option_with_padding<T>(optional: &Option<Spanned<T>>) -> Cow<'_, str>
-where
     T: Display,
 {
-    format_option_with_padding(optional, |x| x.to_string())
+    format(f, container, plain, "", prefix)
 }
 
-fn format_option_with_padding<'a, T, F>(
-    optional: &'a Option<Spanned<T>>,
-    formatter: F,
-) -> Cow<'a, str>
+/// Format plain.
+fn plain<S>(s: S) -> String
 where
-    F: Fn(&'a T) -> String,
+    S: Display,
 {
-    match optional {
-        Some(spanned) => Cow::Owned(format!("{} ", formatter(&spanned.value))),
-        None => Cow::Borrowed(""),
-    }
+    s.to_string()
 }
 
 /// Format in single quotes.
-fn single_quote<S>(s: S) -> String
+fn single_quoted<S>(s: S) -> String
 where
     S: Display,
 {
@@ -1311,7 +1322,7 @@ where
 }
 
 /// Format in double quotes.
-fn double_quote<S>(s: S) -> String
+fn double_quoted<S>(s: S) -> String
 where
     S: Display,
 {
@@ -1326,6 +1337,8 @@ fn pad_if(condition: bool) -> &'static str {
     }
 }
 
-const INDENT: &str = "    ";
+const NEWLINE: &str = "\n";
+const INDENT: &str = "  ";
+const NEWLINE_INDENT: &str = "\n  ";
 
 mod tests;

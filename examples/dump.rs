@@ -18,7 +18,7 @@ fn main() -> Result<()> {
             writeln!(error_w, "parsed {} directives", directives.len())?;
 
             for directive in &directives {
-                println!("{}", directive.spanned.value);
+                println!("{}\n", directive.spanned.value);
             }
             Ok(())
         }

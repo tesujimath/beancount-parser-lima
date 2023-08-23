@@ -164,14 +164,8 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     group((open_header_line(), metadata())).map(
-        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
-            date,
-            account,
-            currencies,
-            booking,
-            tags,
-            links,
-            metadata,
+        |((date, account, currencies, booking, (tags, links)), metadata)| {
+            Open::new(date, account, currencies, booking, tags, links, metadata)
         },
     )
 }
