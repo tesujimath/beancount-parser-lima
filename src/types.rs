@@ -1,6 +1,7 @@
 use super::parser::ParserError;
 use chrono::NaiveDate;
 use chumsky::span::SimpleSpan;
+use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
@@ -194,7 +195,7 @@ impl<'a> Display for Transaction<'a> {
         format(f, &self.narration, double_quoted, " ", Some(" "))?;
         format(f, &self.tags, plain, " ", Some(" "))?;
         format(f, &self.links, plain, " ", Some(" "))?;
-        f.write_str(self.metadata.to_string().as_str())?;
+        self.metadata.fmt(f)?;
         format(
             f,
             &self.postings,
@@ -252,9 +253,7 @@ impl<'a> Display for Open<'a> {
         format(f, &self.booking, double_quoted, " ", Some(" "))?;
         format(f, &self.tags, plain, " ", Some(" "))?;
         format(f, &self.links, plain, " ", Some(" "))?;
-        f.write_str(self.metadata.to_string().as_str())?;
-
-        Ok(())
+        self.metadata.fmt(f)
     }
 }
 
@@ -296,9 +295,7 @@ impl<'a> Display for Commodity<'a> {
         write!(f, "{} commodity {}", self.date, self.currency)?;
         format(f, &self.tags, plain, " ", Some(" "))?;
         format(f, &self.links, plain, " ", Some(" "))?;
-        f.write_str(self.metadata.to_string().as_str())?;
-
-        Ok(())
+        self.metadata.fmt(f)
     }
 }
 
@@ -619,7 +616,7 @@ impl<'a> Display for Posting<'a> {
         simple_format(f, &self.cost_spec, Some(" "))?;
         simple_format(f, &self.price_annotation, Some(" "))?;
 
-        f.write_str(self.metadata.to_string().as_str())
+        self.metadata.fmt(f)
     }
 }
 
@@ -1282,7 +1279,7 @@ impl std::error::Error for CostSpecErrors {}
 
 // TODO move this formatting stuff somewhere else, like format submodule
 
-fn format<C, T, M>(
+fn format<C, T, M, D>(
     f: &mut Formatter<'_>,
     container: C,
     mapper: M,
@@ -1291,7 +1288,8 @@ fn format<C, T, M>(
 ) -> fmt::Result
 where
     C: IntoIterator<Item = T>,
-    M: Fn(T) -> String,
+    M: Fn(T) -> D,
+    D: Display,
 {
     let mut container = container.into_iter();
     if let Some(item) = container.by_ref().next() {
@@ -1299,12 +1297,12 @@ where
             f.write_str(prefix)?;
         }
 
-        f.write_str(mapper(item).as_str())?;
+        mapper(item).fmt(f)?;
     }
 
     for item in container {
         f.write_str(separator)?;
-        f.write_str(mapper(item).as_str())?;
+        mapper(item).fmt(f)?;
     }
 
     Ok(())
@@ -1324,27 +1322,27 @@ where
 }
 
 /// Format plain.
-fn plain<S>(s: S) -> String
+fn plain<S>(s: S) -> impl Display
 where
     S: Display,
 {
-    s.to_string()
+    lazy_format!("{s}")
 }
 
 /// Format in single quotes.
-fn single_quoted<S>(s: S) -> String
+fn single_quoted<S>(s: S) -> impl Display
 where
     S: Display,
 {
-    format!("'{}'", s)
+    lazy_format!("'{s}'")
 }
 
 /// Format in double quotes.
-fn double_quoted<S>(s: S) -> String
+fn double_quoted<S>(s: S) -> impl Display
 where
     S: Display,
 {
-    format!("\"{}\"", s)
+    lazy_format!("\"{s}\"")
 }
 
 fn pad_if(condition: bool) -> &'static str {

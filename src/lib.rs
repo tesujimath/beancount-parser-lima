@@ -5,6 +5,7 @@
 use ariadne::{Color, Label, Report, ReportKind};
 use chrono::NaiveDate;
 use chumsky::prelude::{Input, Parser};
+use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parser::{end_of_input, file, includes};
 use std::{
@@ -99,7 +100,7 @@ impl BeancountSources {
             }))
             .with_labels(contexts.into_iter().map(|(label, span)| {
                 Label::new((src_id.clone(), span.into_range()))
-                    .with_message(format!("while parsing this {}", label))
+                    .with_message(lazy_format!("while parsing this {}", label))
                     .with_color(Color::Yellow)
             }))
             .finish()
@@ -134,10 +135,10 @@ impl BeancountSources {
         let src_id = source_id(loc.path);
 
         Report::build(ReportKind::Error, src_id.clone(), loc.span.start)
-            .with_message(message.to_string())
+            .with_message(message)
             .with_label(
                 Label::new((src_id, loc.span.into_range()))
-                    .with_message(label.to_string())
+                    .with_message(label)
                     .with_color(Color::Red),
             )
             .finish()

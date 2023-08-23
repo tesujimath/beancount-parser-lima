@@ -86,6 +86,7 @@ dependencies = [
  "chumsky",
  "either",
  "itertools",
+ "lazy_format",
  "logos",
  "nonempty",
  "rust_decimal",
@@ -342,6 +343,12 @@ checksum = "2f37a4a5928311ac501dee68b3c7613a1037d0edb30c8e5427bd832d55d1b790"
 dependencies = [
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "lazy_format"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c20af27ff47d964ba51ed586b8e84695261ff364922ad40bcf5a8080e99954d"
 
 [[package]]
 name = "libc"
