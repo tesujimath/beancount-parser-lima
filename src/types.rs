@@ -625,7 +625,7 @@ impl<'a> Display for Posting<'a> {
 
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
-    pub key_values: Vec<(Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>)>,
+    pub key_values: Vec<Spanned<MetaKeyValue<'a>>>,
     pub tags: Vec<Spanned<&'a Tag<'a>>>,
     pub links: Vec<Spanned<&'a Link<'a>>>,
 }
@@ -635,12 +635,30 @@ impl<'a> Display for Metadata<'a> {
         format(
             f,
             &self.key_values,
-            |kv| format!("{}: \"{}\"", kv.0, kv.1),
+            plain,
             NEWLINE_INDENT,
             Some(NEWLINE_INDENT),
         )?;
         format(f, &self.tags, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
         format(f, &self.links, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct MetaKeyValue<'a> {
+    pub key: Spanned<&'a Key<'a>>,
+    pub value: Spanned<MetaValue<'a>>,
+}
+
+impl<'a> MetaKeyValue<'a> {
+    pub fn new(key: Spanned<&'a Key<'a>>, value: Spanned<MetaValue<'a>>) -> Self {
+        MetaKeyValue { key, value }
+    }
+}
+
+impl<'a> Display for MetaKeyValue<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: \"{}\"", &self.key, &self.value)
     }
 }
 

@@ -353,7 +353,7 @@ where
 
 /// A single instance of `Metadata`
 enum Metadatum<'a> {
-    KeyValue((Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>)),
+    KeyValue(Spanned<MetaKeyValue<'a>>),
     Tag(Spanned<&'a Tag<'a>>),
     Link(Spanned<&'a Link<'a>>),
 }
@@ -375,7 +375,7 @@ where
             choice((
                 key.map_with_span(spanned)
                     .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
-                    .map(KeyValue),
+                    .map_with_span(|(k, v), span| KeyValue(spanned(MetaKeyValue::new(k, v), span))),
                 tag.map_with_span(spanned).map(Tag),
                 link.map_with_span(spanned).map(Link),
             ))
