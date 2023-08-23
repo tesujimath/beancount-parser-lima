@@ -47,7 +47,7 @@ where
 /// Spanned and additionally with source path
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Sourced<'a, T> {
-    pub spanned_value: Spanned<T>,
+    pub spanned: Spanned<T>,
     pub source_path: &'a Path,
 }
 
@@ -200,7 +200,7 @@ impl<'a> Display for Transaction<'a> {
             pad_if(!self.tags.is_empty()),
             join(&self.links, " "),
             &self.metadata,
-            format_and_join(&self.postings, |spanned| spanned.value.to_string(), ""),
+            join(&self.postings, ""),
         )
     }
 }
@@ -251,21 +251,9 @@ impl<'a> Display for Open<'a> {
             "{} open {} {} {} {}\n{}",
             self.date,
             self.account,
-            itertools::Itertools::intersperse(
-                self.currencies.iter().map(|cur| format!("{}", cur)),
-                ", ".to_string()
-            )
-            .collect::<String>(),
-            itertools::Itertools::intersperse(
-                self.tags.iter().map(|tag| format!("{}", tag)),
-                " ".to_string()
-            )
-            .collect::<String>(),
-            itertools::Itertools::intersperse(
-                self.links.iter().map(|link| format!("{}", link)),
-                " ".to_string()
-            )
-            .collect::<String>(),
+            join(&self.currencies, ", "),
+            join(&self.tags, ", "),
+            join(&self.links, ", "),
             &self.metadata,
         )
     }
@@ -651,7 +639,7 @@ impl<'a> Display for Metadata<'a> {
             "{}{}{}",
             format_and_join(
                 &self.key_values,
-                |kv| format!("{}{}: \"{}\"\n", INDENT, kv.0.value, kv.1.value),
+                |kv| format!("{}{}: \"{}\"\n", INDENT, kv.0, kv.1),
                 ""
             ),
             format_and_join(&self.tags, |tag| format!("{}{}\n", INDENT, tag), ""),
@@ -786,8 +774,8 @@ impl Display for TagOrLinkIdentifierError {
         write!(
             f,
             "invalid characters {} for tag or link identifier - must be alphanumeric or one of {}",
-            format_and_join(&self.0, |c| format!("'{}'", c), ", "),
-            format_and_join(TAG_OR_LINK_EXTRA_CHARS, |c| format!("'{}'", c), ", ")
+            format_and_join(&self.0, single_quote, ", "),
+            format_and_join(TAG_OR_LINK_EXTRA_CHARS, single_quote, ", ")
         )
     }
 }
@@ -1294,7 +1282,7 @@ where
         .collect::<String>()
 }
 
-fn option_with_padding<'a, T>(optional: &'a Option<Spanned<T>>) -> Cow<'a, str>
+fn option_with_padding<T>(optional: &Option<Spanned<T>>) -> Cow<'_, str>
 where
     T: Display,
 {

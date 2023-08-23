@@ -37,7 +37,7 @@ where
 
 /// Matches the whole file.
 pub fn file<'src, I>(
-) -> impl Parser<'src, I, Vec<(Declaration<'src>, SimpleSpan)>, extra::Err<ParserError<'src>>>
+) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
@@ -47,7 +47,7 @@ where
 
 /// Matches a `Declaration`, and returns with Span.
 pub fn declaration<'src, I>(
-) -> impl Parser<'src, I, (Declaration<'src>, SimpleSpan), extra::Err<ParserError<'src>>>
+) -> impl Parser<'src, I, Spanned<Declaration<'src>>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
@@ -55,7 +55,7 @@ where
     use Declaration::*;
 
     choice((directive().map(Directive), pragma().map(Pragma)))
-        .map_with_span(|d, span| (d, span))
+        .map_with_span(spanned)
         .recover_with(skip_then_retry_until(any().ignored(), end()))
 }
 

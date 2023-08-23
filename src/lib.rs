@@ -217,7 +217,31 @@ where
     }
 
     /// Parse the sources, returning declarations or errors.
-    pub fn parse(&'t self) -> Result<Vec<(Declaration<'t>, Location<'s>)>, Vec<SourcedError<'t>>>
+    pub fn parse(&'t self) -> Result<Vec<Sourced<Directive<'t>>>, Vec<SourcedError<'t>>>
+    where
+        's: 't,
+    {
+        self.parse_declarations().map(|mut declarations_by_path| {
+            let mut builder = DirectiveIteratorBuilder::new();
+            for (path, declarations) in declarations_by_path.drain() {
+                eprintln!(
+                    "{} declarations in {}",
+                    declarations.len(),
+                    path.to_string_lossy()
+                );
+                for declaration in declarations.into_iter() {
+                    builder.declaration(declaration.value, declaration.span, path)
+                }
+            }
+
+            builder.build().collect::<Vec<_>>()
+        })
+    }
+
+    /// Parse the sources, returning declarations or errors.
+    fn parse_declarations(
+        &'t self,
+    ) -> Result<HashMap<&'t Path, Vec<Spanned<Declaration<'t>>>>, Vec<SourcedError<'t>>>
     where
         's: 't,
     {
@@ -235,9 +259,8 @@ where
             if let Some(output) = output {
                 all_outputs.insert(
                     path,
-                    output
-                        .into_iter()
-                        .map(|(d, span)| (d, Location::new(path, span))),
+                    output, // .into_iter()
+                           // .map(|(d, span)| (d, Location::new(path, span))),
                 );
             }
 
@@ -247,7 +270,7 @@ where
         }
 
         if all_errors.is_empty() {
-            Ok(all_outputs.into_values().flatten().collect())
+            Ok(all_outputs)
         } else {
             let sourced_errors = all_errors
                 .into_iter()
@@ -267,8 +290,7 @@ where
 /// Importantly, directives with the same date must be preserved in source file order.
 #[derive(Default, Debug)]
 struct DirectiveIteratorBuilder<'t> {
-    // TODO Sourced not Spanned
-    date_buckets: BTreeMap<&'t NaiveDate, Vec<Sourced<'t, &'t Directive<'t>>>>,
+    date_buckets: BTreeMap<NaiveDate, Vec<Sourced<'t, Directive<'t>>>>,
     // TODO tags and metadata from push/pop pragma processing
 }
 
@@ -279,7 +301,7 @@ impl<'t> DirectiveIteratorBuilder<'t> {
 
     fn declaration<'a>(
         &'a mut self,
-        declaration: &'t Declaration<'t>,
+        declaration: Declaration<'t>,
         span: Span,
         source_path: &'t Path,
     ) where
@@ -289,15 +311,18 @@ impl<'t> DirectiveIteratorBuilder<'t> {
 
         match declaration {
             Directive(directive) => {
-                let date = directive.date();
-                match self.date_buckets.get_mut(date) {
+                let date = *directive.date();
+                let sourced = Sourced {
+                    spanned: spanned(directive, span),
+                    source_path,
+                };
+                match self.date_buckets.get_mut(&date) {
                     None => {
                         self.date_buckets.insert(date, Vec::new());
+                        let bucket = self.date_buckets.get_mut(&date).unwrap();
+                        bucket.push(sourced);
                     }
-                    Some(directives) => directives.push(Sourced {
-                        spanned_value: spanned(directive, span),
-                        source_path,
-                    }),
+                    Some(directives) => directives.push(sourced),
                 }
             }
             Pragma(_pragma) => {
@@ -306,10 +331,11 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         }
     }
 
-    fn build(&self) -> impl Iterator<Item = &Sourced<'t, &'t Directive<'t>>> {
-        self.date_buckets
-            .iter()
-            .flat_map(|(_date, directives)| directives.iter())
+    fn build(&mut self) -> impl Iterator<Item = Sourced<'t, Directive<'t>>> {
+        let date_buckets = std::mem::take(&mut self.date_buckets);
+        date_buckets
+            .into_iter()
+            .flat_map(|(_date, directives)| directives.into_iter())
     }
 }
 
