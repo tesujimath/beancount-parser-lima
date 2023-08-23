@@ -4,8 +4,9 @@ use chumsky::span::SimpleSpan;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
+    borrow::Cow,
     cmp::max,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Display, Formatter},
     iter::empty,
     mem::swap,
     path::Path,
@@ -113,6 +114,18 @@ pub enum Directive<'a> {
     // TODO other directives
 }
 
+impl<'a> Display for Directive<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Directive::*;
+
+        match &self {
+            Transaction(x) => x.fmt(f),
+            Open(x) => x.fmt(f),
+            Commodity(x) => x.fmt(f),
+        }
+    }
+}
+
 /// A trait for items which have a (naive) date
 pub trait Date {
     fn date(&self) -> &NaiveDate;
@@ -178,21 +191,16 @@ impl<'a> Display for Transaction<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {}",
+            "{} {} {}{}{}{}{}\n{}{}",
             self.date,
             self.flag,
-            self.payee.as_ref().map_or("-", |s| s.value),
-            self.narration.as_ref().map_or("-", |s| s.value),
-            itertools::Itertools::intersperse(
-                self.tags.iter().map(|tag| format!("{}", tag)),
-                " ".to_string()
-            )
-            .collect::<String>(),
-            itertools::Itertools::intersperse(
-                self.links.iter().map(|link| format!("{}", link)),
-                " ".to_string()
-            )
-            .collect::<String>(),
+            format_option_with_padding(&self.payee, double_quote),
+            format_option_with_padding(&self.narration, double_quote),
+            join(&self.tags, " "),
+            pad_if(!self.tags.is_empty()),
+            join(&self.links, " "),
+            &self.metadata,
+            format_and_join(&self.postings, |spanned| spanned.value.to_string(), ""),
         )
     }
 }
@@ -240,7 +248,7 @@ impl<'a> Display for Open<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {}",
+            "{} open {} {} {} {}\n{}",
             self.date,
             self.account,
             itertools::Itertools::intersperse(
@@ -258,7 +266,7 @@ impl<'a> Display for Open<'a> {
                 " ".to_string()
             )
             .collect::<String>(),
-            // TODO metadata
+            &self.metadata,
         )
     }
 }
@@ -300,20 +308,13 @@ impl<'a> Display for Commodity<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {}",
+            "{} commodity {} {}{}{}\n{}",
             self.date,
             self.currency,
-            itertools::Itertools::intersperse(
-                self.tags.iter().map(|tag| format!("{}", tag)),
-                " ".to_string()
-            )
-            .collect::<String>(),
-            itertools::Itertools::intersperse(
-                self.links.iter().map(|link| format!("{}", link)),
-                " ".to_string()
-            )
-            .collect::<String>(),
-            // TODO metadata
+            join(&self.tags, " "),
+            pad_if(!self.tags.is_empty()),
+            join(&self.links, " "),
+            &self.metadata,
         )
     }
 }
@@ -341,16 +342,7 @@ impl<'a> Account<'a> {
 
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}:{}",
-            self.account_type,
-            itertools::Itertools::intersperse(
-                self.names.iter().map(|s| format!("{}", s)),
-                ":".to_string()
-            )
-            .collect::<String>()
-        )
+        write!(f, "{}:{}", self.account_type, join(&self.names, ":"))
     }
 }
 
@@ -402,12 +394,11 @@ impl Display for AccountNameError {
                 "invalid character '{}' for account name initial - must be uppercase ASCII letter or digit",
                 bad_char
             ),
-            Subsequent(bad_chars) => write!(f,
-                                            "invalid characters {} for account name - must be alphanumeric or '-'",
-                                            itertools::Itertools::intersperse(
-                                                bad_chars.iter().map(|c| format!("'{}'", c)),
-                                                ", ".to_string())
-                                            .collect::<String>()),
+            Subsequent(bad_chars) => write!(
+                f,
+                "invalid characters {} for account name - must be alphanumeric or '-'",
+                format_and_join(bad_chars, single_quote, ", ")
+            ),
         }
     }
 }
@@ -490,16 +481,11 @@ impl Display for CurrencyError {
                 "invalid initial character '{}' for currency - must be uppercase ASCII letter or '/'",
                 bad_char
             ),
-            Intermediate(bad_chars) => write!(f,
-                                              "invalid intermediate characters {} for currency - must be upppercase ASCII alphanumeric or one of {}",
-                                              itertools::Itertools::intersperse(
-                                                  bad_chars.iter().map(|c| format!("'{}'", c)),
-                                                  ", ".to_string())
-                                              .collect::<String>(),
-                                              itertools::Itertools::intersperse(
-                                                  CURRENCY_INTERMEDIATE_EXTRA_CHARS.iter().map(|c| format!("'{}'", c)),
-                                                  ", ".to_string())
-                                              .collect::<String>()),
+            Intermediate(bad_chars) => write!(
+                f,
+                "invalid intermediate characters {} for currency - must be upppercase ASCII alphanumeric or one of {}",
+                format_and_join(bad_chars, single_quote, ", "),
+                format_and_join(CURRENCY_INTERMEDIATE_EXTRA_CHARS, single_quote, ", ") ),
             Final(bad_char) => write!(
                 f,
                 "invalid final character '{}' for currency - must be uppercase ASCII alphanumeric",
@@ -634,6 +620,23 @@ pub struct Posting<'a> {
     pub metadata: Metadata<'a>,
 }
 
+impl<'a> Display for Posting<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{}{} {}{}{}{}\n{}",
+            INDENT,
+            option_with_padding(&self.flag),
+            &self.account.value,
+            option_with_padding(&self.amount),
+            option_with_padding(&self.currency),
+            option_with_padding(&self.cost_spec),
+            option_with_padding(&self.price_annotation),
+            &self.metadata,
+        )
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub key_values: Vec<(Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>)>,
@@ -641,10 +644,37 @@ pub struct Metadata<'a> {
     pub links: Vec<Spanned<&'a Link<'a>>>,
 }
 
+impl<'a> Display for Metadata<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{}{}",
+            format_and_join(
+                &self.key_values,
+                |kv| format!("{}{}: \"{}\"\n", INDENT, kv.0.value, kv.1.value),
+                ""
+            ),
+            format_and_join(&self.tags, |tag| format!("{}{}\n", INDENT, tag), ""),
+            format_and_join(&self.links, |link| format!("{}{}\n", INDENT, link), ""),
+        )
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MetaValue<'a> {
     Simple(SimpleValue<'a>),
     Amount(Amount<'a>),
+}
+
+impl<'a> Display for MetaValue<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use MetaValue::*;
+
+        match self {
+            Simple(simple_value) => simple_value.fmt(f),
+            Amount(amount) => amount.fmt(f),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -658,6 +688,24 @@ pub enum SimpleValue<'a> {
     Bool(bool),
     None,
     Expr(Expr),
+}
+
+impl<'a> Display for SimpleValue<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use SimpleValue::*;
+
+        match self {
+            String(x) => x.fmt(f),
+            Currency(x) => x.fmt(f),
+            Account(x) => x.fmt(f),
+            Tag(x) => x.fmt(f),
+            Link(x) => x.fmt(f),
+            Date(x) => x.fmt(f),
+            Bool(x) => x.fmt(f),
+            None => Ok(()),
+            Expr(x) => x.fmt(f),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -738,16 +786,8 @@ impl Display for TagOrLinkIdentifierError {
         write!(
             f,
             "invalid characters {} for tag or link identifier - must be alphanumeric or one of {}",
-            itertools::Itertools::intersperse(
-                self.0.iter().map(|c| format!("'{}'", c)),
-                ", ".to_string()
-            )
-            .collect::<String>(),
-            itertools::Itertools::intersperse(
-                TAG_OR_LINK_EXTRA_CHARS.iter().map(|c| format!("'{}'", c)),
-                ", ".to_string()
-            )
-            .collect::<String>()
+            format_and_join(&self.0, |c| format!("'{}'", c), ", "),
+            format_and_join(TAG_OR_LINK_EXTRA_CHARS, |c| format!("'{}'", c), ", ")
         )
     }
 }
@@ -812,11 +852,7 @@ impl Display for KeyError {
             Subsequent(bad_chars) => write!(
                 f,
                 "invalid characters {} for key - must be alphanumeric or '-'",
-                itertools::Itertools::intersperse(
-                    bad_chars.iter().map(|c| format!("'{}'", c)),
-                    ", ".to_string()
-                )
-                .collect::<String>()
+                format_and_join(bad_chars, single_quote, ", ")
             ),
         }
     }
@@ -934,7 +970,7 @@ impl Display for Expr {
     }
 }
 
-impl Debug for Expr {
+impl fmt::Debug for Expr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::Expr::*;
         match *self {
@@ -959,6 +995,7 @@ pub enum ScopedExpr {
 impl Display for ScopedExpr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::ScopedExpr::*;
+
         match self {
             PerUnit(e) => write!(format, "{}", e),
             Total(e) => write!(format, "# {}", e),
@@ -970,6 +1007,12 @@ impl Display for ScopedExpr {
 pub struct Amount<'a> {
     number: Spanned<Expr>,
     currency: Spanned<&'a Currency<'a>>,
+}
+
+impl<'a> Display for Amount<'a> {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        write!(format, "{} {}", &self.number.value, &self.currency.value)
+    }
 }
 
 impl<'a> Amount<'a> {
@@ -1024,6 +1067,36 @@ pub struct CostSpec<'a> {
     date: Option<Spanned<NaiveDate>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
+}
+
+impl<'a> Display for CostSpec<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(per_unit) = &self.per_unit {
+            write!(f, "{} ", per_unit.value)?;
+        }
+
+        if let Some(total) = &self.total {
+            write!(f, "# {} ", total.value)?;
+        }
+
+        if let Some(currency) = &self.currency {
+            write!(f, "{} ", currency.value)?;
+        }
+
+        if let Some(date) = &self.date {
+            write!(f, "{} ", date.value)?;
+        }
+
+        if let Some(label) = &self.label {
+            write!(f, "\"{}\" ", label.value)?;
+        }
+
+        if self.merge {
+            f.write_str("* ")?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug)]
@@ -1192,18 +1265,79 @@ pub struct CostSpecErrors(Vec<CostSpecError>);
 
 impl Display for CostSpecErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            itertools::Itertools::intersperse(
-                self.0.iter().map(|e| format!("{}", e)),
-                ", ".to_string()
-            )
-            .collect::<String>(),
-        )
+        f.write_str(&join(&self.0, ", "))
     }
 }
 
 impl std::error::Error for CostSpecErrors {}
+
+// TODO move this formatting stuff somewhere else, like format submodule
+
+/// Join a collection.
+fn join<C, T, S>(collection: C, separator: S) -> String
+where
+    C: IntoIterator<Item = T>,
+    T: ToString,
+    S: ToString,
+{
+    format_and_join(collection, |item| item.to_string(), separator)
+}
+
+/// Join a collection with custom formatting
+fn format_and_join<C, T, F, S>(collection: C, formatter: F, separator: S) -> String
+where
+    C: IntoIterator<Item = T>,
+    F: Fn(T) -> String,
+    S: ToString,
+{
+    itertools::Itertools::intersperse(collection.into_iter().map(formatter), separator.to_string())
+        .collect::<String>()
+}
+
+fn option_with_padding<'a, T>(optional: &'a Option<Spanned<T>>) -> Cow<'a, str>
+where
+    T: Display,
+{
+    format_option_with_padding(optional, |x| x.to_string())
+}
+
+fn format_option_with_padding<'a, T, F>(
+    optional: &'a Option<Spanned<T>>,
+    formatter: F,
+) -> Cow<'a, str>
+where
+    F: Fn(&'a T) -> String,
+{
+    match optional {
+        Some(spanned) => Cow::Owned(format!("{} ", formatter(&spanned.value))),
+        None => Cow::Borrowed(""),
+    }
+}
+
+/// Format in single quotes.
+fn single_quote<S>(s: S) -> String
+where
+    S: Display,
+{
+    format!("'{}'", s)
+}
+
+/// Format in double quotes.
+fn double_quote<S>(s: S) -> String
+where
+    S: Display,
+{
+    format!("\"{}\"", s)
+}
+
+fn pad_if(condition: bool) -> &'static str {
+    if condition {
+        " "
+    } else {
+        ""
+    }
+}
+
+const INDENT: &str = "    ";
 
 mod tests;

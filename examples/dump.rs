@@ -22,7 +22,9 @@ fn main() -> Result<()> {
             )?;
 
             for (d, loc) in &located_declarations {
-                writeln!(error_w, "{:?}", d)?;
+                if let Declaration::Directive(directive) = d {
+                    writeln!(error_w, "{}", directive)?;
+                }
 
                 // use Directive::*;
                 // use Pragma::*;
