@@ -13,16 +13,27 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
-pub type Span = SimpleSpan<usize>;
+/// A Span which includes the source file, not needed except for top-level `Directive`s.
+pub type AnchoredSpan<'a> = SimpleSpan<usize, &'a Path>;
 
 /// a Spanned value may be located within a source file if the file path is known.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Spanned<T> {
-    pub value: T,
-    pub span: Span,
+    pub(crate) value: T,
+    pub(crate) span: SimpleSpan,
 }
 
-pub fn spanned<T>(value: T, span: Span) -> Spanned<T> {
+impl<T> Spanned<T> {
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn span(&self) -> &SimpleSpan {
+        &self.span
+    }
+}
+
+pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
     Spanned { value, span }
 }
 
@@ -55,10 +66,10 @@ pub struct Sourced<'a, T> {
 #[derive(Debug)]
 pub struct SourcedError<'a> {
     pub(crate) source_path: &'a Path,
-    pub(crate) span: Span,
+    pub(crate) span: SimpleSpan,
     pub(crate) message: String,
     pub(crate) reason: Option<String>,
-    pub(crate) contexts: Vec<(String, Span)>,
+    pub(crate) contexts: Vec<(String, SimpleSpan)>,
 }
 
 impl<'a> SourcedError<'a> {
@@ -1026,7 +1037,7 @@ pub struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: ScopedExpr, span: Span) -> Self {
+    pub fn compound_expr(self, value: ScopedExpr, span: SimpleSpan) -> Self {
         use ScopedExpr::*;
 
         match value {
@@ -1053,7 +1064,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
+    pub fn currency(mut self, value: &'a Currency<'a>, span: SimpleSpan) -> Self {
         if self.currency.is_none() {
             self.currency = Some(spanned(value, span));
         } else {
@@ -1062,7 +1073,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn date(mut self, value: NaiveDate, span: Span) -> Self {
+    pub fn date(mut self, value: NaiveDate, span: SimpleSpan) -> Self {
         if self.date.is_none() {
             self.date = Some(spanned(value, span));
         } else {
@@ -1071,7 +1082,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn label(mut self, value: &'a str, span: Span) -> Self {
+    pub fn label(mut self, value: &'a str, span: SimpleSpan) -> Self {
         if self.label.is_none() {
             self.label = Some(spanned(value, span));
         } else {
@@ -1080,7 +1091,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn merge(mut self, _span: Span) -> Self {
+    pub fn merge(mut self, _span: SimpleSpan) -> Self {
         if !self.merge {
             // TODO find a way to keep a span iff merge is true
             self.merge = true;

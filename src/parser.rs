@@ -9,11 +9,11 @@ use chumsky::{
 };
 use either::Either;
 
-pub fn end_of_input(s: &str) -> Span {
+pub fn end_of_input(s: &str) -> SimpleSpan {
     (s.len()..s.len()).into()
 }
 
-pub type ParserError<'a> = Rich<'a, Token<'a>, Span>;
+pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
 
 /// Matches all the includes in the file, ignoring everything else.
 pub fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>

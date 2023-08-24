@@ -4,7 +4,10 @@
 
 use ariadne::{Color, Label, Report, ReportKind};
 use chrono::NaiveDate;
-use chumsky::prelude::{Input, Parser};
+use chumsky::{
+    prelude::{Input, Parser},
+    span::SimpleSpan,
+};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parser::{end_of_input, file, includes};
@@ -83,10 +86,10 @@ impl BeancountSources {
         &self,
         w: W,
         src_id: String,
-        span: Span,
+        span: SimpleSpan,
         msg: String,
         reason: Option<String>,
-        contexts: Vec<(String, Span)>,
+        contexts: Vec<(String, SimpleSpan)>,
     ) -> io::Result<()>
     where
         W: Write + Copy,
@@ -191,7 +194,7 @@ where
     Ok(file_content)
 }
 
-type SpannedToken<'t> = (Token<'t>, Span);
+type SpannedToken<'t> = (Token<'t>, SimpleSpan);
 
 pub struct BeancountParser<'s, 't> {
     sources: &'s BeancountSources,
@@ -231,7 +234,7 @@ where
                     path.to_string_lossy()
                 );
                 for declaration in declarations.into_iter() {
-                    builder.declaration(declaration.value, declaration.span, path)
+                    builder.declaration(declaration, path)
                 }
             }
 
@@ -300,21 +303,17 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         Self::default()
     }
 
-    fn declaration<'a>(
-        &'a mut self,
-        declaration: Declaration<'t>,
-        span: Span,
-        source_path: &'t Path,
-    ) where
+    fn declaration<'a>(&'a mut self, declaration: Spanned<Declaration<'t>>, source_path: &'t Path)
+    where
         't: 'a,
     {
         use Declaration::*;
 
-        match declaration {
+        match declaration.value {
             Directive(directive) => {
                 let date = *directive.date();
                 let sourced = Sourced {
-                    spanned: spanned(directive, span),
+                    spanned: spanned(directive, declaration.span),
                     source_path,
                 };
                 match self.date_buckets.get_mut(&date) {
@@ -343,11 +342,11 @@ impl<'t> DirectiveIteratorBuilder<'t> {
 /// Source location of a parsed node.
 pub struct Location<'s> {
     path: &'s Path,
-    span: Span,
+    span: SimpleSpan,
 }
 
 impl<'s> Location<'s> {
-    fn new(path: &'s Path, span: Span) -> Self {
+    fn new(path: &'s Path, span: SimpleSpan) -> Self {
         Location { path, span }
     }
 }

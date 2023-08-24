@@ -1,5 +1,6 @@
 use super::{parser::end_of_input, *};
 use chrono::{NaiveDate, NaiveTime};
+use chumsky::span::SimpleSpan;
 use logos::Logos;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
@@ -257,35 +258,35 @@ pub fn dump(s: &str) {
 /// and forcing a final Eol in case missing.
 ///
 /// Lexing errors are returned as `Error` tokens.
-pub fn lex(s: &str) -> Vec<(Token, Span)> {
+pub fn lex(s: &str) -> Vec<(Token, SimpleSpan)> {
     lex_with_final_eol(s, Some(end_of_input(s)))
 }
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
 #[cfg(test)]
-pub fn bare_lex(s: &str) -> Vec<(Token, Span)> {
+pub fn bare_lex(s: &str) -> Vec<(Token, SimpleSpan)> {
     lex_with_final_eol(s, None)
 }
 
-fn lex_with_final_eol(s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
+fn lex_with_final_eol(s: &str, final_eol: Option<SimpleSpan>) -> Vec<(Token, SimpleSpan)> {
     Token::lexer(s)
         .spanned()
         .map(|(tok, span)| match tok {
-            Ok(tok) => (tok, Span::from(span)),
-            Err(e) => (Token::Error(e), Span::from(span)),
+            Ok(tok) => (tok, SimpleSpan::from(span)),
+            Err(e) => (Token::Error(e), SimpleSpan::from(span)),
         })
         .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
         .finalize()
 }
 
 struct EmptyLineFolder<'a> {
-    forced_final_eol_span: Option<Span>,
-    committed: Vec<(Token<'a>, Span)>,
-    pending_eol: Option<(Token<'a>, Span)>,
+    forced_final_eol_span: Option<SimpleSpan>,
+    committed: Vec<(Token<'a>, SimpleSpan)>,
+    pending_eol: Option<(Token<'a>, SimpleSpan)>,
 }
 
 impl<'a> EmptyLineFolder<'a> {
-    fn new(forced_final_eol_span: Option<Span>) -> Self {
+    fn new(forced_final_eol_span: Option<SimpleSpan>) -> Self {
         EmptyLineFolder {
             forced_final_eol_span,
             committed: Vec::new(),
@@ -293,7 +294,7 @@ impl<'a> EmptyLineFolder<'a> {
         }
     }
 
-    fn finalize(mut self) -> Vec<(Token<'a>, Span)> {
+    fn finalize(mut self) -> Vec<(Token<'a>, SimpleSpan)> {
         if let Some(pending) = self.pending_eol.take() {
             self.committed.push(pending)
         } else if let Some(eol_span) = self.forced_final_eol_span.take() {
@@ -303,10 +304,10 @@ impl<'a> EmptyLineFolder<'a> {
         self.committed
     }
 
-    fn fold(mut self, item: (Token<'a>, Span)) -> Self {
+    fn fold(mut self, item: (Token<'a>, SimpleSpan)) -> Self {
         if item.0.is_eol() {
             if let Some((_, span)) = self.pending_eol.take() {
-                self.pending_eol = Some((item.0, Span::new(span.start, item.1.end)))
+                self.pending_eol = Some((item.0, SimpleSpan::new(span.start, item.1.end)))
             } else {
                 self.pending_eol = Some(item)
             }
@@ -319,8 +320,8 @@ impl<'a> EmptyLineFolder<'a> {
                     if pending.0 == EolThenIndent {
                         // expand into separate tokens
                         let (start, end) = (pending.1.start, pending.1.end);
-                        self.committed.push((Eol, Span::new(start, end - 1)));
-                        self.committed.push((Indent, Span::new(end - 1, end)));
+                        self.committed.push((Eol, SimpleSpan::new(start, end - 1)));
+                        self.committed.push((Indent, SimpleSpan::new(end - 1, end)));
                     } else {
                         self.committed.push(pending);
                     }
