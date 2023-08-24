@@ -351,7 +351,7 @@ impl<'s> Location<'s> {
     }
 }
 
-pub use lexer::dump as logos_dump;
+pub use lexer::dump as dump_tokens;
 mod lexer;
 mod parser;
 mod types;
