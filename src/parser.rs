@@ -116,10 +116,26 @@ where
     .map(
         |((date, flag, s1, s2, (tags, links)), metadata, postings)| match (s1, s2) {
             // a single string is narration
-            (Some(s1), None) => {
-                Transaction::new(date, flag, None, Some(s1), tags, links, metadata, postings)
-            }
-            (s1, s2) => Transaction::new(date, flag, s1, s2, tags, links, metadata, postings),
+            (Some(s1), None) => Transaction {
+                date,
+                flag,
+                payee: None,
+                narration: Some(s1),
+                tags,
+                links,
+                metadata,
+                postings,
+            },
+            (s1, s2) => Transaction {
+                date,
+                flag,
+                payee: s1,
+                narration: s2,
+                tags,
+                links,
+                metadata,
+                postings,
+            },
         },
     )
 }
@@ -164,8 +180,14 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     group((open_header_line(), metadata())).map(
-        |((date, account, currencies, booking, (tags, links)), metadata)| {
-            Open::new(date, account, currencies, booking, tags, links, metadata)
+        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
+            date,
+            account,
+            currencies,
+            booking,
+            tags,
+            links,
+            metadata,
         },
     )
 }
@@ -219,8 +241,12 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     group((commodity_header_line(), metadata())).map(
-        |((date, currency, (tags, links)), metadata)| {
-            Commodity::new(date, currency, tags, links, metadata)
+        |((date, currency, (tags, links)), metadata)| Commodity {
+            date,
+            currency,
+            tags,
+            links,
+            metadata,
         },
     )
 }
@@ -375,7 +401,9 @@ where
             choice((
                 key.map_with_span(spanned)
                     .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
-                    .map_with_span(|(k, v), span| KeyValue(spanned(MetaKeyValue::new(k, v), span))),
+                    .map_with_span(|(key, value), span| {
+                        KeyValue(spanned(MetaKeyValue { key, value }, span))
+                    }),
                 tag.map_with_span(spanned).map(Tag),
                 link.map_with_span(spanned).map(Link),
             ))

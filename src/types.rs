@@ -152,39 +152,14 @@ pub enum Pragma<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Transaction<'a> {
-    date: Spanned<NaiveDate>,
-    flag: Spanned<Flag>,
-    payee: Option<Spanned<&'a str>>,
-    narration: Option<Spanned<&'a str>>,
-    tags: Vec<Spanned<&'a Tag<'a>>>,
-    links: Vec<Spanned<&'a Link<'a>>>,
-    metadata: Metadata<'a>,
-    postings: Vec<Spanned<Posting<'a>>>,
-}
-
-impl<'a> Transaction<'a> {
-    pub fn new(
-        date: Spanned<NaiveDate>,
-        flag: Spanned<Flag>,
-        payee: Option<Spanned<&'a str>>,
-        narration: Option<Spanned<&'a str>>,
-
-        tags: Vec<Spanned<&'a Tag<'a>>>,
-        links: Vec<Spanned<&'a Link<'a>>>,
-        metadata: Metadata<'a>,
-        postings: Vec<Spanned<Posting<'a>>>,
-    ) -> Self {
-        Transaction {
-            date,
-            flag,
-            payee,
-            narration,
-            tags,
-            links,
-            metadata,
-            postings,
-        }
-    }
+    pub(crate) date: Spanned<NaiveDate>,
+    pub(crate) flag: Spanned<Flag>,
+    pub(crate) payee: Option<Spanned<&'a str>>,
+    pub(crate) narration: Option<Spanned<&'a str>>,
+    pub(crate) tags: Vec<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: Vec<Spanned<&'a Link<'a>>>,
+    pub(crate) metadata: Metadata<'a>,
+    pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
 
 impl<'a> Display for Transaction<'a> {
@@ -215,35 +190,13 @@ impl<'a> Date for Transaction<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
-    pub date: Spanned<NaiveDate>,
-    pub account: Spanned<&'a Account<'a>>,
-    pub currencies: Vec<Spanned<&'a Currency<'a>>>,
-    pub booking: Option<Spanned<&'a str>>,
-    pub tags: Vec<Spanned<&'a Tag<'a>>>,
-    pub links: Vec<Spanned<&'a Link<'a>>>,
-    pub metadata: Metadata<'a>,
-}
-
-impl<'a> Open<'a> {
-    pub fn new(
-        date: Spanned<NaiveDate>,
-        account: Spanned<&'a Account<'a>>,
-        currencies: Vec<Spanned<&'a Currency<'a>>>,
-        booking: Option<Spanned<&'a str>>,
-        tags: Vec<Spanned<&'a Tag<'a>>>,
-        links: Vec<Spanned<&'a Link<'a>>>,
-        metadata: Metadata<'a>,
-    ) -> Self {
-        Open {
-            date,
-            account,
-            currencies,
-            booking,
-            tags,
-            links,
-            metadata,
-        }
-    }
+    pub(crate) date: Spanned<NaiveDate>,
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) currencies: Vec<Spanned<&'a Currency<'a>>>,
+    pub(crate) booking: Option<Spanned<&'a str>>,
+    pub(crate) tags: Vec<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: Vec<Spanned<&'a Link<'a>>>,
+    pub(crate) metadata: Metadata<'a>,
 }
 
 impl<'a> Display for Open<'a> {
@@ -272,24 +225,6 @@ pub struct Commodity<'a> {
     pub metadata: Metadata<'a>,
 }
 
-impl<'a> Commodity<'a> {
-    pub fn new(
-        date: Spanned<NaiveDate>,
-        currency: Spanned<&'a Currency<'a>>,
-        tags: Vec<Spanned<&'a Tag<'a>>>,
-        links: Vec<Spanned<&'a Link<'a>>>,
-        metadata: Metadata<'a>,
-    ) -> Self {
-        Commodity {
-            date,
-            currency,
-            tags,
-            links,
-            metadata,
-        }
-    }
-}
-
 impl<'a> Display for Commodity<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{} commodity {}", self.date, self.currency)?;
@@ -307,17 +242,8 @@ impl<'a> Date for Commodity<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account<'a> {
-    account_type: AccountType,
-    names: NonEmpty<AccountName<'a>>,
-}
-
-impl<'a> Account<'a> {
-    pub fn new(account_type: AccountType, names: NonEmpty<AccountName>) -> Account {
-        Account {
-            account_type,
-            names,
-        }
-    }
+    pub(crate) account_type: AccountType,
+    pub(crate) names: NonEmpty<AccountName<'a>>,
 }
 
 impl<'a> Display for Account<'a> {
@@ -647,12 +573,6 @@ pub struct MetaKeyValue<'a> {
     pub value: Spanned<MetaValue<'a>>,
 }
 
-impl<'a> MetaKeyValue<'a> {
-    pub fn new(key: Spanned<&'a Key<'a>>, value: Spanned<MetaValue<'a>>) -> Self {
-        MetaKeyValue { key, value }
-    }
-}
-
 impl<'a> Display for MetaKeyValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: \"{}\"", &self.key, &self.value)
@@ -708,13 +628,7 @@ impl<'a> Display for SimpleValue<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Tag<'a>(TagOrLinkIdentifier<'a>);
-
-impl<'a> Tag<'a> {
-    pub fn new(id: TagOrLinkIdentifier<'a>) -> Self {
-        Tag(id)
-    }
-}
+pub struct Tag<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
     fn from(id: TagOrLinkIdentifier<'a>) -> Self {
@@ -737,13 +651,7 @@ impl<'a> Display for Tag<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Link<'a>(TagOrLinkIdentifier<'a>);
-
-impl<'a> Link<'a> {
-    pub fn new(id: TagOrLinkIdentifier<'a>) -> Self {
-        Link(id)
-    }
-}
+pub struct Link<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Link<'a> {
     fn from(id: TagOrLinkIdentifier<'a>) -> Self {

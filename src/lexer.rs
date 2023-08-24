@@ -138,10 +138,10 @@ pub enum Token<'a> {
     #[regex(r"(?&number)", |lex| parse_number(lex.slice()))]
     Number(Decimal),
 
-    #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag::new))]
+    #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag))]
     Tag(super::Tag<'a>),
 
-    #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link::new))]
+    #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link))]
     Link(super::Link<'a>),
 
     // TODO only in trailing colon context
@@ -361,10 +361,10 @@ fn parse_account(s: &str) -> Result<Account, LexerError> {
         .by_ref()
         .map(AccountName::try_from)
         .collect::<Result<Vec<AccountName>, _>>()?;
-    Ok(Account::new(
+    Ok(Account {
         account_type,
-        NonEmpty::collect(account_names.into_iter()).unwrap(),
-    ))
+        names: NonEmpty::collect(account_names.into_iter()).unwrap(),
+    })
 }
 
 fn unescape_string_literal(s: &str) -> Result<Cow<str>, LexerError> {

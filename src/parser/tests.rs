@@ -40,16 +40,16 @@ fn test_transaction(
         .collect::<Vec<_>>();
     let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
 
-    let expected = Transaction::new(
-        expected_date,
-        expected_flag,
-        expected_payee,
-        expected_narration,
-        expected_tags,
-        expected_links,
-        Metadata::default(),
-        Vec::new(),
-    );
+    let expected = Transaction {
+        date: expected_date,
+        flag: expected_flag,
+        payee: expected_payee,
+        narration: expected_narration,
+        tags: expected_tags,
+        links: expected_links,
+        metadata: Metadata::default(),
+        postings: Vec::new(),
+    };
 
     assert_eq!(result, Ok(expected));
 }
