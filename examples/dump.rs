@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::env;
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
 
@@ -13,32 +12,53 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 use beancount_parser::{BeancountParser, BeancountSources};
 
 fn main() -> Result<()> {
+    let flags = xflags::parse_or_exit! {
+        /// Show allocations
+        optional --show-allocations
+        /// File to parse
+        required path: PathBuf
+    };
+
     // allocation counting
     let reg = Region::new(GLOBAL);
 
     let mut error_w = &io::stderr();
-    let file_path = env::args().nth(1).unwrap();
 
-    let sources = BeancountSources::new(PathBuf::from(file_path));
+    let sources = BeancountSources::new(flags.path);
     writeln!(error_w, "{:?}", &sources)?;
 
-    eprintln!("Allocations before parsing: {:#?}", reg.change());
+    if flags.show_allocations {
+        eprintln!("Allocations before parsing: {:#?}", reg.change());
+    }
 
     let beancount_parser = BeancountParser::new(&sources);
     match beancount_parser.parse() {
         Ok(directives) => {
             writeln!(error_w, "parsed {} directives", directives.len())?;
 
-            eprintln!(
-                "Allocations before printing directives: {:#?}",
-                reg.change()
-            );
+            let mut directives_as_strings = Vec::new();
 
-            for directive in &directives {
-                println!("{}\n", directive.spanned.value);
+            if flags.show_allocations {
+                eprintln!(
+                    "Allocations before printing directives: {:#?}",
+                    reg.change()
+                );
             }
 
-            eprintln!("Allocations after printing directives: {:#?}", reg.change());
+            for directive in &directives {
+                if flags.show_allocations {
+                    let directive_as_string = format!("{}", &directive.spanned.value);
+                    directives_as_strings.push(directive_as_string);
+                    let last_directive = directives_as_strings.last().unwrap();
+                    println!("{}\n", last_directive);
+                } else {
+                    println!("{}\n", &directive.spanned.value);
+                }
+            }
+
+            if flags.show_allocations {
+                eprintln!("Allocations after printing directives: {:#?}", reg.change());
+            }
 
             Ok(())
         }

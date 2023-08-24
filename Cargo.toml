@@ -19,6 +19,7 @@ rust_decimal = "1.29.1"
 stats_alloc = "0.1.10"
 strum = "0.25.0"
 strum_macros = "0.25.0"
+xflags = "0.3.1"
 
 [dev-dependencies]
 test-case = "3.1.0"
