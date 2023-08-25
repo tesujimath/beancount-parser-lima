@@ -1,4 +1,4 @@
-use super::{parser::end_of_input, *};
+use super::{end_of_input, types::*};
 use chrono::{NaiveDate, NaiveTime};
 use chumsky::span::SimpleSpan;
 use logos::Logos;
@@ -245,7 +245,7 @@ impl<'a> Display for Token<'a> {
 }
 
 // TODO remove this temporary diagnostic
-pub fn dump(s: &str) {
+pub fn dump_tokens(s: &str) {
     for (tok, span) in lex(s) {
         match tok {
             Token::Error(e) => println!("{:?} at {:?}", e, span),

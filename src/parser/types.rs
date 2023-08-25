@@ -1,5 +1,6 @@
-use super::parser::ParserError;
+use super::lexer::Token;
 use chrono::NaiveDate;
+use chumsky::error::Rich;
 use chumsky::span::SimpleSpan;
 use lazy_format::lazy_format;
 use nonempty::NonEmpty;
@@ -13,8 +14,7 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
-/// A Span which includes the source file, not needed except for top-level `Directive`s.
-pub type AnchoredSpan<'a> = SimpleSpan<usize, &'a Path>;
+pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
 
 /// a Spanned value may be located within a source file if the file path is known.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -56,6 +56,8 @@ where
 }
 
 /// Spanned and additionally with source path
+/// TODO: eventually this should perhaps be using &Path as the Span::Context,
+/// which requires bleeding edge chumsky at this time.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Sourced<'a, T> {
     pub spanned: Spanned<T>,

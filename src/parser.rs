@@ -1,678 +1,359 @@
-use std::ops::Deref;
-
-use super::*;
-use crate::lexer::Token;
+use ariadne::{Color, Label, Report, ReportKind};
 use chrono::NaiveDate;
 use chumsky::{
-    input::{BorrowInput, ValueInput},
-    prelude::*,
+    prelude::{Input, Parser},
+    span::SimpleSpan,
 };
-use either::Either;
+use lazy_format::lazy_format;
+use lexer::{lex, Token};
+use parsers::{file, includes};
+use std::{
+    collections::{BTreeMap, HashMap, VecDeque},
+    fmt::{self, Display, Formatter},
+    fs::File,
+    io::{self, stderr, Read, Write},
+    path::{Path, PathBuf},
+};
+use types::*;
 
 pub fn end_of_input(s: &str) -> SimpleSpan {
     (s.len()..s.len()).into()
 }
 
-pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
-
-/// Matches all the includes in the file, ignoring everything else.
-pub fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    (just(Token::Include).ignore_then(string).map(Some))
-        .or(any().map(|_| None))
-        .repeated()
-        .collect::<Vec<_>>()
-        .map(|includes| {
-            includes
-                .into_iter()
-                .filter_map(|s| s.as_ref().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
+/// The transitive closure of all the include'd source files.
+pub struct BeancountSources {
+    root_path: PathBuf,
+    content_paths: HashMap<PathBuf, String>,
+    error_paths: HashMap<PathBuf, anyhow::Error>,
 }
 
-/// Matches the whole file.
-pub fn file<'src, I>(
-) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    declaration().repeated().collect::<Vec<_>>()
-}
+impl BeancountSources {
+    pub fn new(root_path: PathBuf) -> Self {
+        let mut content_paths = HashMap::new();
+        let mut error_paths = HashMap::new();
+        let mut paths = VecDeque::from([root_path.clone()]);
 
-/// Matches a `Declaration`, and returns with Span.
-pub fn declaration<'src, I>(
-) -> impl Parser<'src, I, Spanned<Declaration<'src>>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use Declaration::*;
+        while !paths.is_empty() {
+            let path = paths.pop_front().unwrap();
 
-    choice((directive().map(Directive), pragma().map(Pragma)))
-        .map_with_span(spanned)
-        .recover_with(skip_then_retry_until(any().ignored(), end()))
-}
+            match read(&path) {
+                Ok(content) => {
+                    // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
+                    content_paths.insert(path.clone(), content);
+                    let content = content_paths.get(&path).unwrap();
 
-/// Matches a `Directive`.
-pub fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use Directive::*;
+                    let tokens = Some(lex(content));
+                    let spanned_tokens = tokens.as_ref().unwrap().spanned(end_of_input(content));
 
-    choice((
-        transaction()
-            .map(Transaction)
-            .labelled("transaction")
-            .as_context(),
-        choice((
-            open().map(Open),
-            commodity().map(Commodity),
-            // TODO other directives
-        ))
-        .labelled("directive")
-        .as_context(),
-    ))
-}
+                    // ignore any errors in parsing, we'll pick them up in the next pass
+                    // TODO can we do this with &str for includes?
+                    if let Some(includes) = includes().parse(spanned_tokens).into_output() {
+                        for include in includes {
+                            let included_path = path
+                                .parent()
+                                .map_or(PathBuf::from(&include), |parent| parent.join(include));
+                            if !content_paths.contains_key(&included_path)
+                                && !error_paths.contains_key(&included_path)
+                            {
+                                paths.push_back(included_path);
+                            } else {
+                                // TODO include cycle error
+                                writeln!(
+                                    &mut stderr(),
+                                    "warning: ignoring include cycle in {} for {}",
+                                    &path.display(),
+                                    &included_path.display()
+                                )
+                                .unwrap();
+                            }
+                        }
+                    };
+                }
+                Err(e) => {
+                    error_paths.insert(path, e);
+                }
+            }
+        }
 
-/// Matches a `Pragma`.
-pub fn pragma<'src, I>() -> impl Parser<'src, I, Pragma<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use Pragma::*;
-
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    choice((just(Token::Include).ignore_then(string).map(Include),))
-        .then_ignore(just(Token::Eol))
-        .labelled("pragma")
-        .as_context()
-}
-
-/// Matches a transaction, including metadata and postings, over several lines.
-pub fn transaction<'src, I>(
-) -> impl Parser<'src, I, Transaction<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    group((
-        transaction_header_line(),
-        metadata(),
-        posting()
-            .map_with_span(spanned)
-            .repeated()
-            .collect::<Vec<_>>(),
-    ))
-    .map(
-        |((date, flag, s1, s2, (tags, links)), metadata, postings)| match (s1, s2) {
-            // a single string is narration
-            (Some(s1), None) => Transaction {
-                date,
-                flag,
-                payee: None,
-                narration: Some(s1),
-                tags,
-                links,
-                metadata,
-                postings,
-            },
-            (s1, s2) => Transaction {
-                date,
-                flag,
-                payee: s1,
-                narration: s2,
-                tags,
-                links,
-                metadata,
-                postings,
-            },
-        },
-    )
-}
-
-/// Matches the first line of a transaction.
-fn transaction_header_line<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Spanned<NaiveDate>,
-        Spanned<Flag>,
-        Option<Spanned<&'src str>>,
-        Option<Spanned<&'src str>>,
-        (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
-        ),
-    ),
-    extra::Err<ParserError<'src>>,
->
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    group((
-        date.map_with_span(spanned),
-        txn().map_with_span(spanned),
-        string.map_with_span(spanned).or_not(),
-        string.map_with_span(spanned).or_not(),
-        tags_links(),
-    ))
-    .then_ignore(just(Token::Eol))
-}
-
-/// Matches a open, including metadata, over several lines.
-pub fn open<'src, I>() -> impl Parser<'src, I, Open<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    group((open_header_line(), metadata())).map(
-        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
-            date,
-            account,
-            currencies,
-            booking,
-            tags,
-            links,
-            metadata,
-        },
-    )
-}
-
-/// Matches the first line of a open.
-fn open_header_line<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Spanned<NaiveDate>,
-        Spanned<&'src Account<'src>>,
-        Vec<Spanned<&'src Currency<'src>>>,
-        Option<Spanned<&'src str>>,
-        (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
-        ),
-    ),
-    extra::Err<ParserError<'src>>,
->
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let date = select_ref!(Token::Date(date) => *date);
-    let account = select_ref!(Token::Account(acc) => acc);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    group((
-        date.map_with_span(spanned),
-        just(Token::Open),
-        account.map_with_span(spanned),
-        currency
-            .map_with_span(spanned)
-            .repeated()
-            .collect::<Vec<_>>(),
-        string.map_with_span(spanned).or_not(),
-        tags_links(),
-    ))
-    .then_ignore(just(Token::Eol))
-    .map(|(date, _, account, currency, booking, tags_links)| {
-        (date, account, currency, booking, tags_links)
-    })
-}
-
-/// Matches a commodity, including metadata, over several lines.
-pub fn commodity<'src, I>() -> impl Parser<'src, I, Commodity<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    group((commodity_header_line(), metadata())).map(
-        |((date, currency, (tags, links)), metadata)| Commodity {
-            date,
-            currency,
-            tags,
-            links,
-            metadata,
-        },
-    )
-}
-
-/// Matches the first line of a commodity.
-fn commodity_header_line<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Spanned<NaiveDate>,
-        Spanned<&'src Currency<'src>>,
-        (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
-        ),
-    ),
-    extra::Err<ParserError<'src>>,
->
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let date = select_ref!(Token::Date(date) => *date);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
-    group((
-        date.map_with_span(spanned),
-        just(Token::Commodity),
-        currency.map_with_span(spanned),
-        tags_links(),
-    ))
-    .then_ignore(just(Token::Eol))
-    .map(|(date, _, currency, tags_link)| (date, currency, tags_link))
-}
-
-/// Matches the `txn` keyword or a flag.
-pub fn txn<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    choice((just(Token::Txn).to(Flag::default()), flag()))
-}
-
-/// Matches any flag, dedicated or overloaded
-pub fn flag<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let dedicated_flag = select_ref!(Token::DedicatedFlag(flag) => *flag);
-
-    choice((
-        dedicated_flag,
-        just(Token::Asterisk).to(Flag::Asterisk),
-        just(Token::Hash).to(Flag::Hash),
-    ))
-}
-
-/// Matches a `Posting` complete with `Metadata` over several lines.
-fn posting<'src, I>() -> impl Parser<'src, I, Posting<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let account = select_ref!(Token::Account(acc) => acc);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
-    just(Token::Indent)
-        .ignore_then(
-            group((
-                flag().map_with_span(spanned).or_not(),
-                account.map_with_span(spanned),
-                expr().map_with_span(spanned).or_not(),
-                currency.map_with_span(spanned).or_not(),
-                cost_spec().map_with_span(spanned).or_not(),
-                price_annotation().map_with_span(spanned).or_not(),
-            ))
-            .then_ignore(just(Token::Eol))
-            .then(metadata())
-            .map(
-                |((flag, account, amount, currency, cost_spec, price_annotation), metadata)| {
-                    Posting {
-                        flag,
-                        account,
-                        amount,
-                        currency,
-                        cost_spec,
-                        price_annotation,
-                        metadata,
-                    }
-                },
-            ),
-        )
-        .labelled("posting")
-        .as_context()
-}
-
-/// Matches `Metadata`, over several lines.
-fn metadata<'src, I>() -> impl Parser<'src, I, Metadata<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use Metadatum::*;
-
-    metadatum_line()
-        .repeated()
-        .collect::<Vec<_>>()
-        .map(|metadata| {
-            // collate by type of metadatum
-            metadata
-                .into_iter()
-                .fold(Metadata::default(), |mut m, item| match item {
-                    KeyValue(kv) => {
-                        m.key_values.push(kv);
-                        m
-                    }
-                    Tag(tag) => {
-                        m.tags.push(tag);
-                        m
-                    }
-                    Link(link) => {
-                        m.links.push(link);
-                        m
-                    }
-                })
-        })
-}
-
-/// A single instance of `Metadata`
-enum Metadatum<'a> {
-    KeyValue(Spanned<MetaKeyValue<'a>>),
-    Tag(Spanned<&'a Tag<'a>>),
-    Link(Spanned<&'a Link<'a>>),
-}
-
-/// Matches a single Metadatum on a single line.
-fn metadatum_line<'src, I>() -> impl Parser<'src, I, Metadatum<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use Metadatum::*;
-
-    let key = select_ref!(Token::Key(key) => key);
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-
-    just(Token::Indent)
-        .ignore_then(
-            choice((
-                key.map_with_span(spanned)
-                    .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
-                    .map_with_span(|(key, value), span| {
-                        KeyValue(spanned(MetaKeyValue { key, value }, span))
-                    }),
-                tag.map_with_span(spanned).map(Tag),
-                link.map_with_span(spanned).map(Link),
-            ))
-            .then_ignore(just(Token::Eol)),
-        )
-        .labelled("metadata")
-        .as_context()
-}
-
-/// Matches a `MetaValue`.
-pub fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use MetaValue::*;
-
-    choice((simple_value().map(Simple), amount().map(Amount)))
-}
-
-/// Matches a `SimpleValue`.
-/// TODO: the original parser allowed for the SimpleValue to be empty, which we don't support here,
-/// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
-pub fn simple_value<'src, I>(
-) -> impl Parser<'src, I, SimpleValue<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use SimpleValue::*;
-
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-    let currency = select_ref!(Token::Currency(cur) => cur);
-    let account = select_ref!(Token::Account(acc) => acc);
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-    let date = select_ref!(Token::Date(date) => *date);
-
-    choice((
-        string.map(String),
-        currency.map(Currency),
-        account.map(Account),
-        tag.map(Tag),
-        link.map(Link),
-        date.map(Date),
-        bool().map(Bool),
-        just(Token::Null).to(None),
-        expr().map(Expr),
-    ))
-}
-
-pub fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
-    group((
-        expr().map_with_span(spanned),
-        currency.map_with_span(spanned),
-    ))
-    .map(Amount::new)
-}
-
-pub fn loose_amount<'src, I>(
-) -> impl Parser<'src, I, LooseAmount<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
-    group((
-        expr().map_with_span(spanned).or_not(),
-        currency.map_with_span(spanned).or_not(),
-    ))
-    .map(LooseAmount::new)
-}
-
-pub fn compound_amount<'src, I>(
-) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use ScopedAmount::*;
-
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
-    choice((
-        (compound_expr().then(currency)).map(|(amount, cur)| CurrencyAmount(amount, cur)),
-        compound_expr().map(BareAmount),
-        currency.map(BareCurrency),
-    ))
-}
-
-pub fn compound_expr<'src, I>() -> impl Parser<'src, I, ScopedExpr, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use ScopedExpr::*;
-
-    choice((
-        expr().then_ignore(just(Token::Hash)).map(PerUnit),
-        expr().map(PerUnit),
-        just(Token::Hash).ignore_then(expr()).map(Total),
-    ))
-}
-
-pub fn price_annotation<'src, I>(
-) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use ScopedAmount::*;
-
-    let currency = select_ref!(Token::Currency(cur) => cur);
-    fn scope(amount: Expr, is_total: bool) -> ScopedExpr {
-        use ScopedExpr::*;
-
-        if is_total {
-            Total(amount)
-        } else {
-            PerUnit(amount)
+        Self {
+            root_path,
+            content_paths,
+            error_paths,
         }
     }
 
-    group((
-        choice((just(Token::At).to(false), just(Token::AtAt).to(true))),
-        expr().or_not(),
-        currency.or_not(),
-    ))
-    .try_map(|(is_total, amount, cur), span| match (amount, cur) {
-        (Some(amount), Some(cur)) => Ok(CurrencyAmount(scope(amount, is_total), cur)),
-        (Some(amount), None) => Ok(BareAmount(scope(amount, is_total))),
-        (None, Some(cur)) => Ok(BareCurrency(cur)),
-        (None, None) => Err(Rich::custom(span, "empty price annotation")),
-    })
-}
+    fn write_error_message<W>(
+        &self,
+        w: W,
+        src_id: String,
+        span: SimpleSpan,
+        msg: String,
+        reason: Option<String>,
+        contexts: Vec<(String, SimpleSpan)>,
+    ) -> io::Result<()>
+    where
+        W: Write + Copy,
+    {
+        Report::build(ReportKind::Error, src_id.clone(), span.start)
+            .with_message(msg)
+            .with_labels(reason.into_iter().map(|reason| {
+                Label::new((src_id.clone(), span.into_range()))
+                    .with_message(reason)
+                    .with_color(Color::Red)
+            }))
+            .with_labels(contexts.into_iter().map(|(label, span)| {
+                Label::new((src_id.clone(), span.into_range()))
+                    .with_message(lazy_format!("while parsing this {}", label))
+                    .with_color(Color::Yellow)
+            }))
+            .finish()
+            .write(ariadne::sources(self.sources()), w)
+    }
 
-/// Matches a `CostSpec`.
-/// For now we only match the new syntax of single braces.
-fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use self::ScopedAmount::*;
-    use CostComp::*;
+    pub fn write_sourced_errors<W>(&self, w: W, errors: Vec<SourcedError>) -> io::Result<()>
+    where
+        W: Write + Copy,
+    {
+        for error in errors.into_iter() {
+            let src_id = source_id(error.source_path);
 
-    just(Token::Lcurl)
-        .ignore_then(
-            cost_comp()
-                .map_with_span(spanned)
-                .repeated()
-                .at_least(1)
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::Rcurl))
-        .try_map(move |cost_comps, span| {
-            cost_comps
-                .into_iter()
-                .fold(
-                    // accumulate the `CostComp`s in a `CostSpecBuilder`
-                    CostSpecBuilder::default(),
-                    |builder, cost_comp| match cost_comp.value {
-                        ScopedAmount(compound_amount) => match compound_amount {
-                            BareCurrency(cur) => builder.currency(cur, cost_comp.span),
-                            BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
-                            CurrencyAmount(amount, cur) => builder
-                                .compound_expr(amount, cost_comp.span)
-                                .currency(cur, cost_comp.span),
-                        },
-                        Date(date) => builder.date(date, cost_comp.span),
-                        Label(s) => builder.label(s, cost_comp.span),
-                        Merge => builder.merge(cost_comp.span),
-                    },
-                )
-                .build()
-                .map_err(|e| Rich::custom(span, e.to_string()))
-        })
-}
+            self.write_error_message(
+                w,
+                src_id.clone(),
+                error.span,
+                error.message,
+                error.reason,
+                error.contexts,
+            )?;
+        }
+        Ok(())
+    }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-/// One component of a cost specification.
-/// Setting a field type multiple times is rejected by methods in `CostSpec`.
-enum CostComp<'a> {
-    ScopedAmount(ScopedAmount<'a>),
-    Date(NaiveDate),
-    Label(&'a str),
-    Merge,
-}
+    pub fn write_error<W, M, L>(&self, w: W, loc: &Location, message: M, label: L) -> io::Result<()>
+    where
+        W: Write + Copy,
+        M: Display,
+        L: Display,
+    {
+        let src_id = source_id(loc.path);
 
-/// Matches one component of a `CostSpec`.
-fn cost_comp<'src, I>() -> impl Parser<'src, I, CostComp<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    use CostComp::*;
-
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-    let date = select_ref!(Token::Date(date) => *date);
-
-    choice((
-        compound_amount().map(ScopedAmount),
-        date.map(Date),
-        string.map(Label),
-        just(Token::Asterisk).to(Merge),
-    ))
-}
-
-/// Matches zero or more tags or links.
-pub fn tags_links<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Vec<Spanned<&'src Tag<'src>>>,
-        Vec<Spanned<&'src Link<'src>>>,
-    ),
-    extra::Err<ParserError<'src>>,
->
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
-{
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-
-    choice((
-        tag.map_with_span(spanned).map(Either::Left),
-        link.map_with_span(spanned).map(Either::Right),
-    ))
-    .repeated()
-    .collect::<Vec<_>>()
-    .map(|tags_or_links| {
-        tags_or_links
-            .into_iter()
-            .fold(
-                (Vec::new(), Vec::new()),
-                |(mut tags, mut links), item| match item {
-                    Either::Left(tag) => (
-                        {
-                            tags.push(tag);
-                            tags
-                        },
-                        links,
-                    ),
-                    Either::Right(link) => (tags, {
-                        links.push(link);
-                        links
-                    }),
-                },
+        Report::build(ReportKind::Error, src_id.clone(), loc.span.start)
+            .with_message(message)
+            .with_label(
+                Label::new((src_id, loc.span.into_range()))
+                    .with_message(label)
+                    .with_color(Color::Red),
             )
-    })
+            .finish()
+            .write(ariadne::sources(self.sources()), w)
+            .unwrap();
+
+        Ok(())
+    }
+
+    fn sources(&self) -> Vec<(String, &str)> {
+        self.content_paths
+            .iter()
+            .map(|(path, content)| (source_id(path), content.as_str()))
+            .collect()
+    }
 }
 
-/// Matches a bool
-pub fn bool<'src, I>() -> impl Parser<'src, I, bool, extra::Err<ParserError<'src>>>
+fn source_id<P>(path: P) -> String
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
-        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    P: AsRef<Path>,
 {
-    choice((just(Token::True).to(true), just(Token::False).to(false)))
+    path.as_ref().to_string_lossy().into_owned()
 }
 
-use expr::expr;
-mod expr;
-mod tests;
+impl std::fmt::Debug for BeancountSources {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        writeln!(f, "BeancountSources(",)?;
+
+        for (path, content) in &self.content_paths {
+            writeln!(f, "    {} ok len {},", path.display(), content.len())?;
+        }
+
+        for (path, error) in &self.error_paths {
+            writeln!(f, "    {} {},", path.display(), error)?;
+        }
+
+        writeln!(f, ")",)
+    }
+}
+
+fn read<P>(file_path: P) -> anyhow::Result<String>
+where
+    P: AsRef<Path>,
+{
+    let mut f = File::open(&file_path)?;
+    let mut file_content = String::new();
+
+    // read the whole file
+    f.read_to_string(&mut file_content)?;
+    Ok(file_content)
+}
+
+type SpannedToken<'t> = (Token<'t>, SimpleSpan);
+
+pub struct BeancountParser<'s, 't> {
+    sources: &'s BeancountSources,
+    tokenized_sources: HashMap<&'t Path, (&'t str, Vec<SpannedToken<'t>>)>,
+}
+
+impl<'s, 't> BeancountParser<'s, 't>
+where
+    's: 't,
+{
+    pub fn new(sources: &'s BeancountSources) -> Self {
+        let mut tokenized_sources = HashMap::new();
+
+        for (pathbuf, content) in &sources.content_paths {
+            let path = pathbuf.as_path();
+
+            tokenized_sources.insert(path, (content.as_str(), lex(content)));
+        }
+
+        BeancountParser {
+            sources,
+            tokenized_sources,
+        }
+    }
+
+    /// Parse the sources, returning declarations or errors.
+    pub fn parse(&'t self) -> Result<Vec<Sourced<Directive<'t>>>, Vec<SourcedError<'t>>>
+    where
+        's: 't,
+    {
+        self.parse_declarations().map(|mut declarations_by_path| {
+            let mut builder = DirectiveIteratorBuilder::new();
+            for (path, declarations) in declarations_by_path.drain() {
+                eprintln!(
+                    "{} declarations in {}",
+                    declarations.len(),
+                    path.to_string_lossy()
+                );
+                for declaration in declarations.into_iter() {
+                    builder.declaration(declaration, path)
+                }
+            }
+
+            builder.build().collect::<Vec<_>>()
+        })
+    }
+
+    /// Parse the sources, returning declarations or errors.
+    fn parse_declarations(
+        &'t self,
+    ) -> Result<HashMap<&'t Path, Vec<Spanned<Declaration<'t>>>>, Vec<SourcedError<'t>>>
+    where
+        's: 't,
+    {
+        let mut all_outputs = HashMap::new();
+        let mut all_errors = HashMap::new();
+
+        for (pathbuf, content) in &self.sources.content_paths {
+            let path = pathbuf.as_path();
+
+            let (_source, tokens) = self.tokenized_sources.get(path).unwrap();
+            let spanned_tokens = tokens.spanned(end_of_input(content));
+
+            let (output, errors) = file().parse(spanned_tokens).into_output_errors();
+
+            if let Some(output) = output {
+                all_outputs.insert(
+                    path,
+                    output, // .into_iter()
+                           // .map(|(d, span)| (d, Location::new(path, span))),
+                );
+            }
+
+            if !errors.is_empty() {
+                all_errors.insert(path, errors);
+            }
+        }
+
+        if all_errors.is_empty() {
+            Ok(all_outputs)
+        } else {
+            let sourced_errors = all_errors
+                .into_iter()
+                .flat_map(|(path, errors)| {
+                    errors
+                        .into_iter()
+                        .map(|e| SourcedError::from_parser_error(path, e))
+                })
+                .collect::<Vec<_>>();
+
+            Err(sourced_errors)
+        }
+    }
+}
+
+/// Builder for iterator for date-ordered traversal of `Directive`s.
+/// Importantly, directives with the same date must be preserved in source file order.
+#[derive(Default, Debug)]
+struct DirectiveIteratorBuilder<'t> {
+    date_buckets: BTreeMap<NaiveDate, Vec<Sourced<'t, Directive<'t>>>>,
+    // TODO tags and metadata from push/pop pragma processing
+}
+
+impl<'t> DirectiveIteratorBuilder<'t> {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn declaration<'a>(&'a mut self, declaration: Spanned<Declaration<'t>>, source_path: &'t Path)
+    where
+        't: 'a,
+    {
+        use Declaration::*;
+
+        match declaration.value {
+            Directive(directive) => {
+                let date = *directive.date();
+                let sourced = Sourced {
+                    spanned: spanned(directive, declaration.span),
+                    source_path,
+                };
+                match self.date_buckets.get_mut(&date) {
+                    None => {
+                        self.date_buckets.insert(date, Vec::new());
+                        let bucket = self.date_buckets.get_mut(&date).unwrap();
+                        bucket.push(sourced);
+                    }
+                    Some(directives) => directives.push(sourced),
+                }
+            }
+            Pragma(_pragma) => {
+                // TODO
+            }
+        }
+    }
+
+    fn build(&mut self) -> impl Iterator<Item = Sourced<'t, Directive<'t>>> {
+        let date_buckets = std::mem::take(&mut self.date_buckets);
+        date_buckets
+            .into_iter()
+            .flat_map(|(_date, directives)| directives.into_iter())
+    }
+}
+
+/// Source location of a parsed node.
+pub struct Location<'s> {
+    path: &'s Path,
+    span: SimpleSpan,
+}
+
+impl<'s> Location<'s> {
+    fn new(path: &'s Path, span: SimpleSpan) -> Self {
+        Location { path, span }
+    }
+}
+
+#[cfg(test)]
+pub use lexer::bare_lex;
+pub use lexer::dump_tokens;
+mod lexer;
+mod parsers;
+mod types;
