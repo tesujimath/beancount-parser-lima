@@ -4,8 +4,8 @@ use super::*;
 use rust_decimal_macros::dec;
 use test_case::test_case;
 
-#[test_case(r##"2023-07-03 * "New World Gardens North East Va ;"
-"##, spanned((2023, 7, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
+#[test_case(r#"2023-07-03 * "New World Gardens North East Va ;"
+"#, spanned((2023, 7, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
 fn test_transaction(
     s: &str,
     expected_date: Spanned<(i32, u32, u32)>,
