@@ -1,5 +1,4 @@
 use super::lexer::Token;
-use chrono::NaiveDate;
 use chumsky::error::Rich;
 use chumsky::span::SimpleSpan;
 use lazy_format::lazy_format;
@@ -13,6 +12,7 @@ use std::{
     path::Path,
 };
 use strum_macros::{Display, EnumString};
+use time::Date;
 
 pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
 
@@ -139,13 +139,13 @@ impl<'a> Display for Directive<'a> {
     }
 }
 
-/// A trait for items which have a (naive) date
-pub trait Date {
-    fn date(&self) -> &NaiveDate;
+/// A trait for items which have a date
+pub trait Dated {
+    fn date(&self) -> &Date;
 }
 
-impl<'a> Date for Directive<'a> {
-    fn date(&self) -> &NaiveDate {
+impl<'a> Dated for Directive<'a> {
+    fn date(&self) -> &Date {
         use Directive::*;
 
         match self {
@@ -165,7 +165,7 @@ pub enum Pragma<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Transaction<'a> {
-    pub(crate) date: Spanned<NaiveDate>,
+    pub(crate) date: Spanned<Date>,
     pub(crate) flag: Spanned<Flag>,
     pub(crate) payee: Option<Spanned<&'a str>>,
     pub(crate) narration: Option<Spanned<&'a str>>,
@@ -195,15 +195,15 @@ impl<'a> Display for Transaction<'a> {
     }
 }
 
-impl<'a> Date for Transaction<'a> {
-    fn date(&self) -> &NaiveDate {
+impl<'a> Dated for Transaction<'a> {
+    fn date(&self) -> &Date {
         &self.date.value
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
-    pub(crate) date: Spanned<NaiveDate>,
+    pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
     pub(crate) currencies: Vec<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<&'a str>>,
@@ -223,15 +223,15 @@ impl<'a> Display for Open<'a> {
     }
 }
 
-impl<'a> Date for Open<'a> {
-    fn date(&self) -> &NaiveDate {
+impl<'a> Dated for Open<'a> {
+    fn date(&self) -> &Date {
         &self.date.value
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Commodity<'a> {
-    pub date: Spanned<NaiveDate>,
+    pub date: Spanned<Date>,
     pub currency: Spanned<&'a Currency<'a>>,
     pub tags: Vec<Spanned<&'a Tag<'a>>>,
     pub links: Vec<Spanned<&'a Link<'a>>>,
@@ -247,8 +247,8 @@ impl<'a> Display for Commodity<'a> {
     }
 }
 
-impl<'a> Date for Commodity<'a> {
-    fn date(&self) -> &NaiveDate {
+impl<'a> Dated for Commodity<'a> {
+    fn date(&self) -> &Date {
         &self.date.value
     }
 }
@@ -616,7 +616,7 @@ pub enum SimpleValue<'a> {
     Account(&'a Account<'a>),
     Tag(&'a Tag<'a>),
     Link(&'a Link<'a>),
-    Date(NaiveDate),
+    Date(Date),
     Bool(bool),
     None,
     Expr(Expr),
@@ -991,7 +991,7 @@ pub struct CostSpec<'a> {
     per_unit: Option<Spanned<Expr>>,
     total: Option<Spanned<Expr>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
-    date: Option<Spanned<NaiveDate>>,
+    date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
 }
@@ -1032,7 +1032,7 @@ pub struct CostSpecBuilder<'a> {
     per_unit: Option<Spanned<Expr>>,
     total: Option<Spanned<Expr>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
-    date: Option<Spanned<NaiveDate>>,
+    date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
     errors: Vec<CostSpecError>,
@@ -1075,7 +1075,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn date(mut self, value: NaiveDate, span: SimpleSpan) -> Self {
+    pub fn date(mut self, value: Date, span: SimpleSpan) -> Self {
         if self.date.is_none() {
             self.date = Some(spanned(value, span));
         } else {

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use super::lexer::Token;
 use super::types::*;
-use chrono::NaiveDate;
+use time::Date;
 use chumsky::{
     input::{BorrowInput, ValueInput},
     prelude::*,
@@ -139,7 +139,7 @@ fn transaction_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        Spanned<NaiveDate>,
+        Spanned<Date>,
         Spanned<Flag>,
         Option<Spanned<&'src str>>,
         Option<Spanned<&'src str>>,
@@ -191,7 +191,7 @@ fn open_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        Spanned<NaiveDate>,
+        Spanned<Date>,
         Spanned<&'src Account<'src>>,
         Vec<Spanned<&'src Currency<'src>>>,
         Option<Spanned<&'src str>>,
@@ -250,7 +250,7 @@ fn commodity_header_line<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        Spanned<NaiveDate>,
+        Spanned<Date>,
         Spanned<&'src Currency<'src>>,
         (
             Vec<Spanned<&'src Tag<'src>>>,
@@ -589,7 +589,7 @@ where
 /// Setting a field type multiple times is rejected by methods in `CostSpec`.
 enum CostComp<'a> {
     ScopedAmount(ScopedAmount<'a>),
-    Date(NaiveDate),
+    Date(Date),
     Label(&'a str),
     Merge,
 }

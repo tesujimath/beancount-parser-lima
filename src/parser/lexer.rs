@@ -1,5 +1,4 @@
 use super::{end_of_input, types::*};
-use chrono::{NaiveDate, NaiveTime};
 use chumsky::span::SimpleSpan;
 use logos::Logos;
 use nonempty::NonEmpty;
@@ -10,6 +9,7 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
+use time::{Date, Month, Time};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(error = LexerError, skip r"[ \t]+")]
@@ -118,10 +118,10 @@ pub enum Token<'a> {
     Include,
 
     #[regex(r"(?&date)", |lex| parse_date(lex.slice()))]
-    Date(NaiveDate),
+    Date(Date),
 
     #[regex(r"(?&time)", |lex| parse_time(lex.slice()))]
-    Time(NaiveTime),
+    Time(Time),
 
     #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_account(lex.slice()))]
     Account(super::Account<'a>),
@@ -334,25 +334,26 @@ impl<'a> EmptyLineFolder<'a> {
     }
 }
 
-fn parse_date(s: &str) -> Result<NaiveDate, LexerError> {
+fn parse_date(s: &str) -> Result<Date, LexerError> {
     let mut date = s.split(&['-', '/']);
     let year = date.by_ref().next().unwrap().parse::<i32>().unwrap();
-    let month = date.by_ref().next().unwrap().parse::<u32>().unwrap();
-    let day = date.by_ref().next().unwrap().parse::<u32>().unwrap();
-    NaiveDate::from_ymd_opt(year, month, day).ok_or(LexerError::new("date out of range"))
+    let month = date.by_ref().next().unwrap().parse::<u8>().unwrap();
+    let month = Month::try_from(month).or(Err(LexerError::new("month out of range")))?;
+    let day = date.by_ref().next().unwrap().parse::<u8>().unwrap();
+    Date::from_calendar_date(year, month, day).or(Err(LexerError::new("date out of range")))
 }
 
-fn parse_time(s: &str) -> Result<NaiveTime, LexerError> {
+fn parse_time(s: &str) -> Result<Time, LexerError> {
     let mut time = s.split(':');
-    let hour = time.by_ref().next().unwrap().parse::<u32>().unwrap();
-    let min = time.by_ref().next().unwrap().parse::<u32>().unwrap();
+    let hour = time.by_ref().next().unwrap().parse::<u8>().unwrap();
+    let min = time.by_ref().next().unwrap().parse::<u8>().unwrap();
     let sec = time
         .by_ref()
         .next()
-        .map(|s| s.parse::<u32>().unwrap())
+        .map(|s| s.parse::<u8>().unwrap())
         .unwrap_or(0);
 
-    NaiveTime::from_hms_opt(hour, min, sec).ok_or(LexerError::new("time out of range"))
+    Time::from_hms(hour, min, sec).or(Err(LexerError::new("time out of range")))
 }
 
 fn parse_account(s: &str) -> Result<Account, LexerError> {
@@ -364,7 +365,7 @@ fn parse_account(s: &str) -> Result<Account, LexerError> {
         .collect::<Result<Vec<AccountName>, _>>()?;
     Ok(Account {
         account_type,
-        names: NonEmpty::collect(account_names.into_iter()).unwrap(),
+        names: NonEmpty::collect(account_names).unwrap(),
     })
 }
 

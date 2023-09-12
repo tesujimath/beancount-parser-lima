@@ -1,5 +1,5 @@
 use ariadne::{Color, Label, Report, ReportKind};
-use chrono::NaiveDate;
+use time::Date;
 use chumsky::{
     prelude::{Input, Parser},
     span::SimpleSpan,
@@ -295,7 +295,7 @@ where
 /// Importantly, directives with the same date must be preserved in source file order.
 #[derive(Default, Debug)]
 struct DirectiveIteratorBuilder<'t> {
-    date_buckets: BTreeMap<NaiveDate, Vec<Sourced<'t, Directive<'t>>>>,
+    date_buckets: BTreeMap<Date, Vec<Sourced<'t, Directive<'t>>>>,
     // TODO tags and metadata from push/pop pragma processing
 }
 

@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 ariadne = "0.3.0"
-chrono = "0.4.25"
 chumsky = { version = "1.0.0-alpha.4", features = ["label", "regex"] }
 either = "1.8.1"
 itertools = "0.10.5"
@@ -19,6 +18,7 @@ rust_decimal = "1.29.1"
 stats_alloc = "0.1.10"
 strum = "0.25.0"
 strum_macros = "0.25.0"
+time = "0.3.28"
 xflags = "0.3.1"
 
 [dev-dependencies]

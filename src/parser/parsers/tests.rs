@@ -3,12 +3,13 @@ use super::super::{bare_lex, end_of_input};
 use super::*;
 use rust_decimal_macros::dec;
 use test_case::test_case;
+use time::Month;
 
 #[test_case(r#"2023-07-03 * "New World Gardens North East Va ;"
-"#, spanned((2023, 7, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
+"#, spanned((2023, Month::July, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
 fn test_transaction(
     s: &str,
-    expected_date: Spanned<(i32, u32, u32)>,
+    expected_date: Spanned<(i32, Month, u8)>,
     expected_flag: Spanned<Flag>,
     expected_payee: Option<Spanned<&str>>,
     expected_narration: Option<Spanned<&str>>,
@@ -20,7 +21,7 @@ fn test_transaction(
 
     let result = transaction().parse(spanned_tokens).into_result();
     let expected_date = spanned(
-        NaiveDate::from_ymd_opt(
+        Date::from_calendar_date(
             expected_date.value.0,
             expected_date.value.1,
             expected_date.value.2,
