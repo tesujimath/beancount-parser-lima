@@ -4,11 +4,12 @@ use chumsky::{
     prelude::{Input, Parser},
     span::SimpleSpan,
 };
+use hashbrown::{hash_map, HashMap};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parsers::{file, includes};
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     fmt::{self, Display, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
@@ -38,37 +39,48 @@ impl BeancountSources {
 
             match read(&path) {
                 Ok(content) => {
-                    // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
-                    // TODO switch to hashbrown crate, which has very similar API without requiring nightly compiler
-                    content_paths.insert(path.clone(), content);
-                    let content = content_paths.get(&path).unwrap();
+                    use hash_map::Entry::*;
+                    match content_paths.entry(path) {
+                        Occupied(entry) => panic!(
+                            "attempt to insert duplicate path {}",
+                            entry.key().to_string_lossy()
+                        ),
+                        Vacant(entry) => {
+                            let parent = entry.key().parent().map(Path::to_path_buf);
+                            // insert content and keep an immutable reference
+                            let content = &*entry.insert(content);
 
-                    let tokens = Some(lex(content));
-                    let spanned_tokens = tokens.as_ref().unwrap().spanned(end_of_input(content));
+                            let tokens = Some(lex(content));
+                            let spanned_tokens =
+                                tokens.as_ref().unwrap().spanned(end_of_input(content));
 
-                    // ignore any errors in parsing, we'll pick them up in the next pass
-                    // TODO can we do this with &str for includes?
-                    if let Some(includes) = includes().parse(spanned_tokens).into_output() {
-                        for include in includes {
-                            let included_path = path
-                                .parent()
-                                .map_or(PathBuf::from(&include), |parent| parent.join(include));
-                            if !content_paths.contains_key(&included_path)
-                                && !error_paths.contains_key(&included_path)
-                            {
-                                paths.push_back(included_path);
-                            } else {
-                                // TODO include cycle error
-                                writeln!(
-                                    &mut stderr(),
-                                    "warning: ignoring include cycle in {} for {}",
-                                    &path.display(),
-                                    &included_path.display()
-                                )
-                                .unwrap();
-                            }
+                            // ignore any errors in parsing, we'll pick them up in the next pass
+                            // TODO can we do this with &str for includes?
+                            if let Some(includes) = includes().parse(spanned_tokens).into_output() {
+                                for include in includes {
+                                    let included_path = parent
+                                        .as_ref()
+                                        .map_or(PathBuf::from(&include), |ref parent| {
+                                            parent.join(include)
+                                        });
+                                    if !content_paths.contains_key(&included_path)
+                                        && !error_paths.contains_key(&included_path)
+                                    {
+                                        paths.push_back(included_path);
+                                    } else {
+                                        // TODO include cycle error
+                                        writeln!(
+                                            &mut stderr(),
+                                            "warning: ignoring include cycle in {} for {}",
+                                            &path.display(),
+                                            &included_path.display()
+                                        )
+                                        .unwrap();
+                                    }
+                                }
+                            };
                         }
-                    };
+                    }
                 }
                 Err(e) => {
                     error_paths.insert(path, e);

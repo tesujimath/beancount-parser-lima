@@ -11,6 +11,7 @@ ariadne = "0.3.0"
 chrono = "0.4.25"
 chumsky = { version = "1.0.0-alpha.4", features = ["label", "regex"] }
 either = "1.8.1"
+hashbrown = "0.14.0"
 itertools = "0.10.5"
 lazy_format = "2.0.0"
 logos = "0.13.0"
