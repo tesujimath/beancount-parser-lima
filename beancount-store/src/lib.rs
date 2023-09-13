@@ -9,11 +9,11 @@ pub struct BeancountStore {
 }
 
 impl BeancountStore {
-    pub fn intern<S>(&mut self, s: S) -> Symbol
+    pub fn intern<S, T>(&mut self, s: S) -> Symbol<T>
     where
         S: AsRef<str>,
     {
-        self.string_interner.get_or_intern(s)
+        Symbol::new(self.string_interner.get_or_intern(s))
     }
 }
 
