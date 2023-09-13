@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 use std::{
     cmp::max,
     fmt::{self, Display, Formatter},
+    hash::{Hash, Hasher},
     iter::empty,
     mem::swap,
     path::Path,
@@ -17,11 +18,16 @@ use time::Date;
 
 pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
 
-/// a Spanned value may be located within a source file if the file path is known.
-#[derive(PartialEq, Eq, Clone, Debug)]
+/// A Spanned value may be located within a source file if the file path is known.
+/// The span is invisible with respect to equality and hashing.
+#[derive(Clone, Debug)]
 pub struct Spanned<T> {
     pub(crate) value: T,
     pub(crate) span: SimpleSpan,
+}
+
+pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
+    Spanned { value, span }
 }
 
 impl<T> Spanned<T> {
@@ -32,18 +38,32 @@ impl<T> Spanned<T> {
     pub fn span(&self) -> &SimpleSpan {
         &self.span
     }
-}
 
-pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
-    Spanned { value, span }
-}
-
-impl<T> Spanned<T> {
     pub fn as_ref(&self) -> Spanned<&T> {
         Spanned {
             value: &self.value,
             span: self.span,
         }
+    }
+}
+
+impl<T> PartialEq for Spanned<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl<T> Eq for Spanned<T> where T: Eq {}
+
+impl<T> Hash for Spanned<T>
+where
+    T: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state)
     }
 }
 

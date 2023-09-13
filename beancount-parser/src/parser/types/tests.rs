@@ -1,7 +1,35 @@
 #![cfg(test)]
+use std::collections::hash_map::DefaultHasher;
+
 use super::*;
 use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
+
+#[test_case(
+    spanned(1, SimpleSpan::new(0, 2)),
+    spanned(1, SimpleSpan::new(3, 4)),
+    true
+)]
+#[test_case(
+    spanned(1, SimpleSpan::new(0, 2)),
+    spanned(2, SimpleSpan::new(0, 2)),
+    false
+)]
+fn test_span_eq_hash(x1: Spanned<i32>, x2: Spanned<i32>, eq: bool) {
+    assert_eq!(x1.eq(&x2), eq);
+
+    let mut h1 = DefaultHasher::new();
+    x1.hash(&mut h1);
+
+    let mut h2 = DefaultHasher::new();
+    x2.hash(&mut h2);
+
+    if eq {
+        assert_eq!(h1.finish(), h2.finish());
+    } else {
+        assert_ne!(h1.finish(), h2.finish());
+    }
+}
 
 #[test_case("MyAccountName", Ok("MyAccountName"))]
 #[test_case("", Err(AccountNameErrorKind::Empty))]
