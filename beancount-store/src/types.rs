@@ -50,10 +50,13 @@ pub struct Currency();
 pub struct Payee();
 pub struct Tag();
 pub struct Link();
+pub struct Key();
 pub struct AccountName();
 pub struct Label();
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+// TODO consider hashing for Augmented, maybe don't want the augmentation to count?
+// consider how we will look things up.  Bah!
 pub struct Augmented<T, A> {
     item: T,
     augmentation: A,
@@ -78,15 +81,41 @@ pub struct Posting<A> {
     pub amount: Option<Augmented<Decimal, A>>,
     pub currency: Option<Augmented<Symbol<Currency>, A>>,
     pub cost_spec: Option<Augmented<CostSpec<A>, A>>,
-    // TODO pub price_annotation: Option<Augmented<ScopedAmount, A<A>>>,
+    pub price_annotation: Option<Augmented<ScopedAmount, A>>,
     pub metadata: Metadata<A>,
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct Metadata<A> {
-    // TODO pub key_values: Vec<Spanned<MetaKeyValue<'a>>>,
+    // TODO should this be a hashmap?
+    pub key_values: Vec<Augmented<MetaKeyValue<A>, A>>,
     pub tags: HashSet<Augmented<Symbol<Tag>, A>>,
     pub links: HashSet<Augmented<Symbol<Link>, A>>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct MetaKeyValue<A> {
+    pub key: Augmented<Symbol<Key>, A>,
+    pub value: Augmented<MetaValue<A>, A>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum MetaValue<A> {
+    Simple(SimpleValue),
+    Amount(Amount<A>),
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum SimpleValue {
+    String(String),
+    Currency(Symbol<Currency>),
+    Account(Account),
+    Tag(Symbol<Tag>),
+    Link(Symbol<Link>),
+    Date(Date),
+    Bool(bool),
+    None,
+    Value(Decimal),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
