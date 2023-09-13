@@ -67,6 +67,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ariadne",
+ "beancount-types",
  "chumsky",
  "either",
  "itertools",
@@ -81,6 +82,30 @@ dependencies = [
  "test-case",
  "time",
  "xflags",
+]
+
+[[package]]
+name = "beancount-store"
+version = "0.1.0"
+dependencies = [
+ "beancount-parser",
+ "beancount-types",
+ "log",
+ "nonempty",
+ "rust_decimal",
+ "string-interner",
+ "test-case",
+ "time",
+ "xflags",
+]
+
+[[package]]
+name = "beancount-types"
+version = "0.1.0"
+dependencies = [
+ "strum",
+ "strum_macros",
+ "test-case",
 ]
 
 [[package]]
@@ -240,6 +265,15 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+dependencies = [
+ "ahash 0.7.6",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
@@ -288,6 +322,12 @@ name = "libc"
 version = "0.2.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b00cc1c228a6782d0f076e7b232802e0c5689d41bb5df366f2a6b6621cfdfe1"
+
+[[package]]
+name = "log"
+version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "logos"
@@ -625,6 +665,17 @@ name = "stats_alloc"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c0e04424e733e69714ca1bbb9204c1a57f09f5493439520f9f68c132ad25eec"
+
+[[package]]
+name = "string-interner"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e2531d8525b29b514d25e275a43581320d587b86db302b9a7e464bac579648"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.11.2",
+ "serde",
+]
 
 [[package]]
 name = "strum"

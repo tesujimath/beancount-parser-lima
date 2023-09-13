@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 ariadne = "0.3.0"
+beancount-types = { path = "../beancount-types"}
 chumsky = { version = "1.0.0-alpha.4", features = ["label", "regex"] }
 either = "1.8.1"
 itertools = "0.10.5"

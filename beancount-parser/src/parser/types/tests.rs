@@ -45,18 +45,6 @@ fn test_currency_try_from(s: &str, expected: Result<&str, CurrencyErrorKind>) {
     }
 }
 
-#[test_case('A', Ok(FlagLetter('A')))]
-#[test_case('b', Err(FlagLetterError('b')))]
-#[test_case('?', Err(FlagLetterError('?')))]
-fn test_flag_letter_try_from(c: char, expected: Result<FlagLetter, FlagLetterError>) {
-    let result = FlagLetter::try_from(c);
-    // visually check the error display by making a bad test case
-    if let Err(ref e) = result {
-        println!("{}", e);
-    }
-    assert_eq!(result, expected);
-}
-
 #[test_case("a-b-c-d", Ok("a-b-c-d"))]
 #[test_case("a=b?c,d-e", Err(TagOrLinkIdentifierError(vec!['=', '?', ','])))]
 fn test_tag_or_link_identifier_try_from(

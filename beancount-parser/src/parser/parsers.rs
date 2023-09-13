@@ -2,12 +2,13 @@ use std::ops::Deref;
 
 use super::lexer::Token;
 use super::types::*;
-use time::Date;
+use beancount_types::Flag;
 use chumsky::{
     input::{BorrowInput, ValueInput},
     prelude::*,
 };
 use either::Either;
+use time::Date;
 
 /// Matches all the includes in the file, ignoring everything else.
 pub fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>
