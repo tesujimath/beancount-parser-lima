@@ -1,0 +1,11 @@
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Technology
+
+
+2023-05-29 * "JB HiFI" "" #technology #abc #technology ^birthday ^mother ^birthday
+  m1: "s1"
+  m2: 101
+  m1: NZD
+  Assets:Bank:Current                           -39.65 NZD
+  Expenses:Technology
