@@ -72,6 +72,7 @@ where
             .as_context(),
         choice((
             open().map(Open),
+            close().map(Close),
             commodity().map(Commodity),
             // TODO other directives
         ))
@@ -246,6 +247,54 @@ where
     .map(|(date, _, account, currency, booking, tags_links)| {
         (date, account, currency, booking, tags_links)
     })
+}
+
+/// Matches a close, including metadata, over several lines.
+pub fn close<'src, I>() -> impl Parser<'src, I, Close<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    group((close_header_line(), metadata())).map(|((date, account, (tags, links)), metadata)| {
+        Close {
+            date,
+            account,
+            tags,
+            links,
+            metadata,
+        }
+    })
+}
+
+/// Matches the first line of a close.
+fn close_header_line<'src, I>() -> impl Parser<
+    'src,
+    I,
+    (
+        Spanned<Date>,
+        Spanned<&'src Account<'src>>,
+        (
+            HashSet<Spanned<&'src Tag<'src>>>,
+            HashSet<Spanned<&'src Link<'src>>>,
+        ),
+    ),
+    extra::Err<ParserError<'src>>,
+>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+
+    group((
+        date.map_with_span(spanned),
+        just(Token::Close),
+        account.map_with_span(spanned),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .map(|(date, _, account, tags_links)| (date, account, tags_links))
 }
 
 /// Matches a commodity, including metadata, over several lines.

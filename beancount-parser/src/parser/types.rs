@@ -145,6 +145,7 @@ pub enum Declaration<'a> {
 pub enum Directive<'a> {
     Transaction(Transaction<'a>),
     Open(Open<'a>),
+    Close(Close<'a>),
     Commodity(Commodity<'a>),
     // TODO other directives
 }
@@ -156,6 +157,7 @@ impl<'a> Display for Directive<'a> {
         match &self {
             Transaction(x) => x.fmt(f),
             Open(x) => x.fmt(f),
+            Close(x) => x.fmt(f),
             Commodity(x) => x.fmt(f),
         }
     }
@@ -173,6 +175,7 @@ impl<'a> Dated for Directive<'a> {
         match self {
             Transaction(x) => x.date(),
             Open(x) => x.date(),
+            Close(x) => x.date(),
             Commodity(x) => x.date(),
         }
     }
@@ -246,6 +249,30 @@ impl<'a> Display for Open<'a> {
 }
 
 impl<'a> Dated for Open<'a> {
+    fn date(&self) -> &Date {
+        &self.date.value
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Close<'a> {
+    pub(crate) date: Spanned<Date>,
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
+    pub(crate) metadata: Metadata<'a>,
+}
+
+impl<'a> Display for Close<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} close {}", self.date, self.account)?;
+        format(f, &self.tags, plain, " ", Some(" "))?;
+        format(f, &self.links, plain, " ", Some(" "))?;
+        self.metadata.fmt(f)
+    }
+}
+
+impl<'a> Dated for Close<'a> {
     fn date(&self) -> &Date {
         &self.date.value
     }

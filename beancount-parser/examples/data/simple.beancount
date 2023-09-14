@@ -6,6 +6,12 @@
 2016-03-01 open Assets:Bank:Current NZD
 ;   check commodity == "NZD"
 
+2024-03-01 close Assets:Bank:Current
+
+; TODO this should be an error, can only open an account once:
+2025-03-01 open Assets:Bank:Current
+
+
 2016-03-01 open Expenses:Groceries NZD
 ;   check commodity == "NZD"
 
