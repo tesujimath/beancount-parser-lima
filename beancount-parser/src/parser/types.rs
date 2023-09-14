@@ -507,8 +507,8 @@ impl<'a> Display for Posting<'a> {
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub key_values: Vec<Spanned<MetaKeyValue<'a>>>,
-    pub tags: Vec<Spanned<&'a Tag<'a>>>,
-    pub links: Vec<Spanned<&'a Link<'a>>>,
+    pub tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub links: HashSet<Spanned<&'a Link<'a>>>,
 }
 
 impl<'a> Display for Metadata<'a> {

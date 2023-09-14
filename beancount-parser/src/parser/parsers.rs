@@ -351,7 +351,7 @@ where
     metadatum_line()
         .repeated()
         .collect::<Vec<_>>()
-        .map(|metadata| {
+        .validate(|metadata, _span, emitter| {
             // collate by type of metadatum
             metadata
                 .into_iter()
@@ -361,11 +361,27 @@ where
                         m
                     }
                     Tag(tag) => {
-                        m.tags.push(tag);
+                        if m.tags.contains(&tag) {
+                            emitter.emit(Rich::custom(
+                                tag.span,
+                                format!("duplicate tag {}", tag.value),
+                            ))
+                        } else {
+                            m.tags.insert(tag);
+                        }
+
                         m
                     }
                     Link(link) => {
-                        m.links.push(link);
+                        if m.links.contains(&link) {
+                            emitter.emit(Rich::custom(
+                                link.span,
+                                format!("duplicate link {}", link.value),
+                            ))
+                        } else {
+                            m.links.insert(link);
+                        }
+
                         m
                     }
                 })

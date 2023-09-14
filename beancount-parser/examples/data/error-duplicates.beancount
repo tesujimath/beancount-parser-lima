@@ -7,5 +7,9 @@
   m1: "s1"
   m2: 101
   m1: NZD
+  #tag1
+  #tag1
+  #tag2
+  ^link1
   Assets:Bank:Current                           -39.65 NZD
   Expenses:Technology

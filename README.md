@@ -1,5 +1,11 @@
 _Work in progress_
 
+## Uncertainties / TODOs
+
+Yeah, Beancount is complicated, and I may have made some mistakes here.  Current list of uncertainties, which is certainly not comprehensive.
+
+- metadata tags/links for transaction get folded in with those in the transaction header line
+
 ## License
 
 Licensed under either of
