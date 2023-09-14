@@ -7,6 +7,7 @@ use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     cmp::max,
+    collections::HashSet,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     iter::empty,
@@ -190,8 +191,8 @@ pub struct Transaction<'a> {
     pub(crate) flag: Spanned<Flag>,
     pub(crate) payee: Option<Spanned<&'a str>>,
     pub(crate) narration: Option<Spanned<&'a str>>,
-    pub(crate) tags: Vec<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: Vec<Spanned<&'a Link<'a>>>,
+    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
     pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
@@ -228,8 +229,8 @@ pub struct Open<'a> {
     pub(crate) account: Spanned<&'a Account<'a>>,
     pub(crate) currencies: Vec<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<&'a str>>,
-    pub(crate) tags: Vec<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: Vec<Spanned<&'a Link<'a>>>,
+    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
 }
 
@@ -254,8 +255,8 @@ impl<'a> Dated for Open<'a> {
 pub struct Commodity<'a> {
     pub date: Spanned<Date>,
     pub currency: Spanned<&'a Currency<'a>>,
-    pub tags: Vec<Spanned<&'a Tag<'a>>>,
-    pub links: Vec<Spanned<&'a Link<'a>>>,
+    pub tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub links: HashSet<Spanned<&'a Link<'a>>>,
     pub metadata: Metadata<'a>,
 }
 
@@ -584,7 +585,7 @@ impl<'a> Display for SimpleValue<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Tag<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
@@ -607,7 +608,7 @@ impl<'a> Display for Tag<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Link<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Link<'a> {
@@ -630,7 +631,7 @@ impl<'a> Display for Link<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct TagOrLinkIdentifier<'a>(&'a str);
 
 /// The valid characters for tags and links besides alphanumeric.

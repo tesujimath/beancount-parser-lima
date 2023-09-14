@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::HashSet, ops::Deref};
 
 use super::lexer::Token;
 use super::types::*;
@@ -145,8 +145,8 @@ fn transaction_header_line<'src, I>() -> impl Parser<
         Option<Spanned<&'src str>>,
         Option<Spanned<&'src str>>,
         (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
+            HashSet<Spanned<&'src Tag<'src>>>,
+            HashSet<Spanned<&'src Link<'src>>>,
         ),
     ),
     extra::Err<ParserError<'src>>,
@@ -197,8 +197,8 @@ fn open_header_line<'src, I>() -> impl Parser<
         Vec<Spanned<&'src Currency<'src>>>,
         Option<Spanned<&'src str>>,
         (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
+            HashSet<Spanned<&'src Tag<'src>>>,
+            HashSet<Spanned<&'src Link<'src>>>,
         ),
     ),
     extra::Err<ParserError<'src>>,
@@ -254,8 +254,8 @@ fn commodity_header_line<'src, I>() -> impl Parser<
         Spanned<Date>,
         Spanned<&'src Currency<'src>>,
         (
-            Vec<Spanned<&'src Tag<'src>>>,
-            Vec<Spanned<&'src Link<'src>>>,
+            HashSet<Spanned<&'src Tag<'src>>>,
+            HashSet<Spanned<&'src Link<'src>>>,
         ),
     ),
     extra::Err<ParserError<'src>>,
@@ -615,12 +615,13 @@ where
 }
 
 /// Matches zero or more tags or links.
+/// Duplicates are errors.
 pub fn tags_links<'src, I>() -> impl Parser<
     'src,
     I,
     (
-        Vec<Spanned<&'src Tag<'src>>>,
-        Vec<Spanned<&'src Link<'src>>>,
+        HashSet<Spanned<&'src Tag<'src>>>,
+        HashSet<Spanned<&'src Link<'src>>>,
     ),
     extra::Err<ParserError<'src>>,
 >
@@ -637,25 +638,36 @@ where
     ))
     .repeated()
     .collect::<Vec<_>>()
-    .map(|tags_or_links| {
-        tags_or_links
-            .into_iter()
-            .fold(
-                (Vec::new(), Vec::new()),
-                |(mut tags, mut links), item| match item {
-                    Either::Left(tag) => (
-                        {
-                            tags.push(tag);
-                            tags
-                        },
-                        links,
-                    ),
-                    Either::Right(link) => (tags, {
-                        links.push(link);
-                        links
-                    }),
-                },
-            )
+    .validate(|tags_or_links, _span, emitter| {
+        tags_or_links.into_iter().fold(
+            (HashSet::new(), HashSet::new()),
+            |(mut tags, mut links), item| match item {
+                Either::Left(tag) => {
+                    if tags.contains(&tag) {
+                        emitter.emit(Rich::custom(
+                            tag.span,
+                            format!("duplicate tag {}", tag.value),
+                        ))
+                    } else {
+                        tags.insert(tag);
+                    }
+
+                    (tags, links)
+                }
+                Either::Right(link) => {
+                    if links.contains(&link) {
+                        emitter.emit(Rich::custom(
+                            link.span,
+                            format!("duplicate link {}", link.value),
+                        ))
+                    } else {
+                        links.insert(link);
+                    }
+
+                    (tags, links)
+                }
+            },
+        )
     })
 }
 
