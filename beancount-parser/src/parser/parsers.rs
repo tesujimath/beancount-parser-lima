@@ -197,7 +197,7 @@ fn open_header_line<'src, I>() -> impl Parser<
     (
         Spanned<Date>,
         Spanned<&'src Account<'src>>,
-        Vec<Spanned<&'src Currency<'src>>>,
+        HashSet<Spanned<&'src Currency<'src>>>,
         Option<Spanned<&'src str>>,
         (
             HashSet<Spanned<&'src Tag<'src>>>,
@@ -222,7 +222,23 @@ where
         currency
             .map_with_span(spanned)
             .repeated()
-            .collect::<Vec<_>>(),
+            .collect::<Vec<_>>()
+            .validate(|currencies, _span, emitter| {
+                currencies
+                    .into_iter()
+                    .fold(HashSet::new(), |mut currencies, currency| {
+                        if currencies.contains(&currency) {
+                            emitter.emit(Rich::custom(
+                                currency.span,
+                                format!("duplicate currency {}", currency.value),
+                            ))
+                        } else {
+                            currencies.insert(currency);
+                        }
+
+                        currencies
+                    })
+            }),
         string.map_with_span(spanned).or_not(),
         tags_links(),
     ))

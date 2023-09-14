@@ -227,7 +227,7 @@ impl<'a> Dated for Transaction<'a> {
 pub struct Open<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
-    pub(crate) currencies: Vec<Spanned<&'a Currency<'a>>>,
+    pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<&'a str>>,
     pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
     pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
@@ -364,7 +364,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Currency<'a>(&'a str);
 
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
