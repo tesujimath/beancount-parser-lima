@@ -1,33 +1,31 @@
 #![cfg(test)]
-use std::collections::hash_map::DefaultHasher;
-
 use super::*;
+use proptest::prelude::*;
+use std::collections::hash_map::DefaultHasher;
 use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
-#[test_case(
-    spanned(1, SimpleSpan::new(0, 2)),
-    spanned(1, SimpleSpan::new(3, 4)),
-    true
-)]
-#[test_case(
-    spanned(1, SimpleSpan::new(0, 2)),
-    spanned(2, SimpleSpan::new(0, 2)),
-    false
-)]
-fn test_span_eq_hash(x1: Spanned<i32>, x2: Spanned<i32>, eq: bool) {
-    assert_eq!(x1.eq(&x2), eq);
+prop_compose! {
+    fn arb_span(maxlen: usize)(b in any::<usize>(), len in 0..maxlen) -> SimpleSpan {
+        SimpleSpan::new(b, b + len)
+    }
+}
 
-    let mut h1 = DefaultHasher::new();
-    x1.hash(&mut h1);
+proptest! {
+    #[test]
+    fn test_span_eq_hash(i1 in any::<i32>(), i2 in any::<i32>(), s1 in arb_span(100), s2 in arb_span(100)) {
 
-    let mut h2 = DefaultHasher::new();
-    x2.hash(&mut h2);
+        fn hash<H>(x: H) -> u64 where H: Hash {
+            let mut h = DefaultHasher::new();
+            x.hash(&mut h);
+            h.finish()
+        }
 
-    if eq {
-        assert_eq!(h1.finish(), h2.finish());
-    } else {
-        assert_ne!(h1.finish(), h2.finish());
+        assert_eq!(spanned(i1, s1), spanned(i1, s2));
+        assert_eq!(spanned(i1, s1) == spanned(i2, s2), i1 == i2);
+
+        assert_eq!(hash(spanned(i1, s1)), hash(spanned(i1, s2)));
+        assert_eq!(hash(spanned(i1, s1)) == hash(spanned(i2, s2)), i1 == i2);
     }
 }
 
