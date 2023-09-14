@@ -1,4 +1,7 @@
-use std::{collections::HashSet, ops::Deref};
+use std::{
+    collections::{hash_map, HashSet},
+    ops::Deref,
+};
 
 use super::lexer::Token;
 use super::types::*;
@@ -357,7 +360,21 @@ where
                 .into_iter()
                 .fold(Metadata::default(), |mut m, item| match item {
                     KeyValue(kv) => {
-                        m.key_values.push(kv);
+                        use hash_map::Entry::*;
+
+                        let MetaKeyValue { key, value } = kv.value;
+
+                        let key_span = key.span;
+                        match m.key_values.entry(key) {
+                            Occupied(entry) => emitter.emit(Rich::custom(
+                                key_span,
+                                format!("duplicate key {}", entry.key().value),
+                            )),
+                            Vacant(entry) => {
+                                entry.insert(value);
+                            }
+                        }
+
                         m
                     }
                     Tag(tag) => {

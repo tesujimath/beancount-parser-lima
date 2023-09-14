@@ -7,7 +7,7 @@ use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     cmp::max,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     iter::empty,
@@ -134,14 +134,14 @@ impl<'a> Display for SourcedError<'a> {
 
 impl<'a> std::error::Error for SourcedError<'a> {}
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Declaration<'a> {
     Directive(Directive<'a>),
     // TODO actually support Pragma
     Pragma(Pragma<'a>),
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Directive<'a> {
     Transaction(Transaction<'a>),
     Open(Open<'a>),
@@ -185,7 +185,7 @@ pub enum Pragma<'a> {
     Include(&'a str),
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Transaction<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) flag: Spanned<Flag>,
@@ -223,7 +223,7 @@ impl<'a> Dated for Transaction<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Open<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
@@ -251,7 +251,7 @@ impl<'a> Dated for Open<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Commodity<'a> {
     pub date: Spanned<Date>,
     pub currency: Spanned<&'a Currency<'a>>,
@@ -473,7 +473,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Posting<'a> {
     pub flag: Option<Spanned<Flag>>,
     pub account: Spanned<&'a Account<'a>>,
@@ -504,9 +504,9 @@ impl<'a> Display for Posting<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Metadata<'a> {
-    pub key_values: Vec<Spanned<MetaKeyValue<'a>>>,
+    pub key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
     pub tags: HashSet<Spanned<&'a Tag<'a>>>,
     pub links: HashSet<Spanned<&'a Link<'a>>>,
 }
@@ -516,7 +516,7 @@ impl<'a> Display for Metadata<'a> {
         format(
             f,
             &self.key_values,
-            plain,
+            key_value,
             NEWLINE_INDENT,
             Some(NEWLINE_INDENT),
         )?;
@@ -572,7 +572,7 @@ impl<'a> Display for SimpleValue<'a> {
         use SimpleValue::*;
 
         match self {
-            String(x) => x.fmt(f),
+            String(x) => write!(f, r#""{}""#, x),
             Currency(x) => x.fmt(f),
             Account(x) => x.fmt(f),
             Tag(x) => x.fmt(f),
@@ -677,7 +677,7 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Key<'a>(&'a str);
 
 impl<'a> Key<'a> {
@@ -1209,6 +1209,15 @@ where
     S: Display,
 {
     lazy_format!("\"{s}\"")
+}
+
+/// Format plain.
+fn key_value<K, V>(kv: (K, V)) -> impl Display
+where
+    K: Display,
+    V: Display,
+{
+    lazy_format!("{}: {}", kv.0, kv.1)
 }
 
 fn pad_if(condition: bool) -> &'static str {

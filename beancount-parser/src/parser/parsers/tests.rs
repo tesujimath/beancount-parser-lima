@@ -42,18 +42,14 @@ fn test_transaction(
         .collect::<Vec<_>>();
     let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
 
-    let expected = Transaction {
-        date: expected_date,
-        flag: expected_flag,
-        payee: expected_payee,
-        narration: expected_narration,
-        tags: expected_tags,
-        links: expected_links,
-        metadata: Metadata::default(),
-        postings: Vec::new(),
-    };
-
-    assert_eq!(result, Ok(expected));
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(&result.date, &expected_date);
+    assert_eq!(&result.flag, &expected_flag);
+    assert_eq!(&result.payee, &expected_payee);
+    assert_eq!(&result.narration, &expected_narration);
+    assert_eq!(&result.tags, &expected_tags);
+    assert_eq!(&result.links, &expected_links);
 }
 
 #[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]
