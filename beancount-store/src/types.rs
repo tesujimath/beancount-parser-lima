@@ -1,6 +1,7 @@
 use std::{
-    collections::HashSet,
-    fmt::{self, Debug, Formatter},
+    collections::{HashMap, HashSet},
+    fmt::{self, Debug, Display, Formatter},
+    hash::{Hash, Hasher},
     marker::PhantomData,
 };
 
@@ -54,12 +55,40 @@ pub struct Key();
 pub struct AccountName();
 pub struct Label();
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-// TODO consider hashing for Augmented, maybe don't want the augmentation to count?
-// consider how we will look things up.  Bah!
+#[derive(Clone, Debug)]
+/// An augmented value, where the augmentation has no effect on Eq or Hash.
 pub struct Augmented<T, A> {
-    item: T,
+    value: T,
     augmentation: A,
+}
+
+impl<T, A> PartialEq for Augmented<T, A>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl<T, A> Eq for Augmented<T, A> where T: Eq {}
+
+impl<T, A> Hash for Augmented<T, A>
+where
+    T: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state)
+    }
+}
+
+impl<T, A> Display for Augmented<T, A>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value,)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -87,8 +116,7 @@ pub struct Posting<A> {
 
 #[derive(Clone, Default, Debug)]
 pub struct Metadata<A> {
-    // TODO should this be a hashmap?
-    pub key_values: Vec<Augmented<MetaKeyValue<A>, A>>,
+    pub key_values: HashMap<Augmented<Symbol<Key>, A>, Augmented<MetaValue<A>, A>>,
     pub tags: HashSet<Augmented<Symbol<Tag>, A>>,
     pub links: HashSet<Augmented<Symbol<Link>, A>>,
 }
