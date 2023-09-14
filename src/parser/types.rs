@@ -1,5 +1,4 @@
-use super::lexer::Token;
-use beancount_types::{AccountType, Flag};
+use super::{super::types::*, lexer::Token};
 use chumsky::error::Rich;
 use chumsky::span::SimpleSpan;
 use lazy_format::lazy_format;

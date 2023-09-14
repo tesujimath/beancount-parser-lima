@@ -1,13 +1,12 @@
+use super::super::types::*;
+use nonempty::NonEmpty;
+use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
-
-use beancount_types::{AccountType, Flag};
-use nonempty::NonEmpty;
-use rust_decimal::Decimal;
 use time::Date;
 
 /// The same Symbol type for all internalized strings,

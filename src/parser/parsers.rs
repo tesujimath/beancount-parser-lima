@@ -4,8 +4,7 @@ use std::{
 };
 
 use super::lexer::Token;
-use super::types::*;
-use beancount_types::Flag;
+use super::{super::types::*, types::*};
 use chumsky::{
     input::{BorrowInput, ValueInput},
     prelude::*,
