@@ -5,17 +5,21 @@ use string_interner::StringInterner;
 
 #[derive(Default, Debug)]
 pub struct BeancountStore {
-    string_interner: StringInterner,
+    symbol_table: SymbolTable,
 }
 
-impl BeancountStore {
+#[derive(Default, Debug)]
+pub struct SymbolTable(StringInterner);
+
+impl SymbolTable {
     pub fn intern<S, T>(&mut self, s: S) -> Symbol<T>
     where
         S: AsRef<str>,
     {
-        Symbol::new(self.string_interner.get_or_intern(s))
+        Symbol::new(self.0.get_or_intern(s))
     }
 }
 
-mod types;
+pub mod builder;
+pub mod types;
 pub use types::*;

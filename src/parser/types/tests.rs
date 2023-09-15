@@ -1,7 +1,10 @@
 #![cfg(test)]
 use super::*;
 use proptest::prelude::*;
-use std::collections::hash_map::DefaultHasher;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 

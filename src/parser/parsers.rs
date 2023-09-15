@@ -4,7 +4,8 @@ use std::{
 };
 
 use super::lexer::Token;
-use super::{super::types::*, types::*};
+use super::types::*;
+use crate::types::*;
 use chumsky::{
     input::{BorrowInput, ValueInput},
     prelude::*,

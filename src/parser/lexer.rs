@@ -1,4 +1,5 @@
-use super::{super::types::*, end_of_input, types::*};
+use super::{end_of_input, types::*};
+use crate::types::*;
 use chumsky::span::SimpleSpan;
 use logos::Logos;
 use nonempty::NonEmpty;

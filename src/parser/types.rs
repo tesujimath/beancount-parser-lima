@@ -1,4 +1,5 @@
-use super::{super::types::*, lexer::Token};
+use super::lexer::Token;
+use crate::types::*;
 use chumsky::error::Rich;
 use chumsky::span::SimpleSpan;
 use lazy_format::lazy_format;
@@ -8,7 +9,6 @@ use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
-    hash::{Hash, Hasher},
     iter::empty,
     mem::swap,
     path::Path,
@@ -17,64 +17,6 @@ use strum_macros::Display;
 use time::Date;
 
 pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
-
-/// A Spanned value may be located within a source file if the file path is known.
-/// The span is invisible with respect to equality and hashing.
-#[derive(Clone, Debug)]
-pub struct Spanned<T> {
-    pub(crate) value: T,
-    pub(crate) span: SimpleSpan,
-}
-
-pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
-    Spanned { value, span }
-}
-
-impl<T> Spanned<T> {
-    pub fn value(&self) -> &T {
-        &self.value
-    }
-
-    pub fn span(&self) -> &SimpleSpan {
-        &self.span
-    }
-
-    pub fn as_ref(&self) -> Spanned<&T> {
-        Spanned {
-            value: &self.value,
-            span: self.span,
-        }
-    }
-}
-
-impl<T> PartialEq for Spanned<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
-    }
-}
-
-impl<T> Eq for Spanned<T> where T: Eq {}
-
-impl<T> Hash for Spanned<T>
-where
-    T: Hash,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state)
-    }
-}
-
-impl<T> Display for Spanned<T>
-where
-    T: Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value,)
-    }
-}
 
 /// Spanned and additionally with source path
 /// TODO: eventually this should perhaps be using &Path as the Span::Context,
@@ -412,6 +354,12 @@ impl<'a> Currency<'a> {
     }
 }
 
+impl<'a> AsRef<str> for Currency<'a> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
 impl<'a> Display for Currency<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -628,6 +576,12 @@ impl<'a> TryFrom<&'a str> for Tag<'a> {
     }
 }
 
+impl<'a> AsRef<str> for Tag<'a> {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 impl<'a> Display for Tag<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "#{}", self.0 .0)
@@ -654,6 +608,12 @@ impl<'a> TryFrom<&'a str> for Link<'a> {
 impl<'a> Display for Link<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "^{}", self.0 .0)
+    }
+}
+
+impl<'a> AsRef<str> for Link<'a> {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 
@@ -700,6 +660,12 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
         } else {
             Err(TagOrLinkIdentifierError(bad_chars))
         }
+    }
+}
+
+impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
+    fn as_ref(&self) -> &str {
+        self.0
     }
 }
 

@@ -1,9 +1,9 @@
-use super::super::types::*;
+use crate::types::*;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
@@ -31,6 +31,15 @@ impl<T> PartialEq for Symbol<T> {
 
 impl<T> Eq for Symbol<T> {}
 
+impl<T> Hash for Symbol<T> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.0.hash(state)
+    }
+}
+
 impl<T> Copy for Symbol<T> {}
 
 impl<T> Clone for Symbol<T> {
@@ -55,81 +64,39 @@ pub struct AccountName();
 pub struct Label();
 
 #[derive(Clone, Debug)]
-/// An augmented value, where the augmentation has no effect on Eq or Hash.
-pub struct Augmented<T, A> {
-    value: T,
-    augmentation: A,
-}
-
-impl<T, A> PartialEq for Augmented<T, A>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
-    }
-}
-
-impl<T, A> Eq for Augmented<T, A> where T: Eq {}
-
-impl<T, A> Hash for Augmented<T, A>
-where
-    T: Hash,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state)
-    }
-}
-
-impl<T, A> Display for Augmented<T, A>
-where
-    T: Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value,)
-    }
+pub struct Transaction {
+    pub(crate) date: Spanned<Date>,
+    pub(crate) flag: Spanned<Flag>,
+    pub(crate) payee: Option<Spanned<Symbol<Payee>>>,
+    pub(crate) narration: Option<Spanned<String>>,
+    pub(crate) tags: HashSet<Spanned<Symbol<Tag>>>,
+    pub(crate) links: HashSet<Spanned<Symbol<Link>>>,
+    // tags and links from metadata are folded into above, leaving only key/values
+    pub(crate) metadata: HashMap<Spanned<Symbol<Key>>, Spanned<MetaValue>>,
+    pub(crate) postings: Vec<Spanned<Posting>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Transaction<A> {
-    pub(crate) date: Augmented<Date, A>,
-    pub(crate) flag: Augmented<Flag, A>,
-    pub(crate) payee: Option<Augmented<Symbol<Payee>, A>>,
-    pub(crate) narration: Option<Augmented<String, A>>,
-    pub(crate) tags: HashSet<Augmented<Symbol<Tag>, A>>,
-    pub(crate) links: HashSet<Augmented<Symbol<Link>, A>>,
-    pub(crate) metadata: Metadata<A>,
-    pub(crate) postings: Vec<Augmented<Posting<A>, A>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Posting<A> {
-    pub flag: Option<Augmented<Flag, A>>,
-    pub account: Augmented<Account, A>,
-    pub amount: Option<Augmented<Decimal, A>>,
-    pub currency: Option<Augmented<Symbol<Currency>, A>>,
-    pub cost_spec: Option<Augmented<CostSpec<A>, A>>,
-    pub price_annotation: Option<Augmented<ScopedAmount, A>>,
-    pub metadata: Metadata<A>,
-}
-
-#[derive(Clone, Default, Debug)]
-pub struct Metadata<A> {
-    pub key_values: HashMap<Augmented<Symbol<Key>, A>, Augmented<MetaValue<A>, A>>,
-    pub tags: HashSet<Augmented<Symbol<Tag>, A>>,
-    pub links: HashSet<Augmented<Symbol<Link>, A>>,
+pub struct Posting {
+    pub flag: Option<Spanned<Flag>>,
+    pub account: Spanned<Account>,
+    pub amount: Option<Spanned<Decimal>>,
+    pub currency: Option<Spanned<Symbol<Currency>>>,
+    pub cost_spec: Option<Spanned<CostSpec>>,
+    pub price_annotation: Option<Spanned<ScopedAmount>>,
+    pub metadata: HashMap<Spanned<Symbol<Key>>, Spanned<MetaValue>>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct MetaKeyValue<A> {
-    pub key: Augmented<Symbol<Key>, A>,
-    pub value: Augmented<MetaValue<A>, A>,
+pub struct MetaKeyValue {
+    pub key: Spanned<Symbol<Key>>,
+    pub value: Spanned<MetaValue>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum MetaValue<A> {
+pub enum MetaValue {
     Simple(SimpleValue),
-    Amount(Amount<A>),
+    Amount(Amount),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -145,7 +112,7 @@ pub enum SimpleValue {
     Value(Decimal),
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Account {
     pub(crate) account_type: AccountType,
     pub(crate) names: NonEmpty<Symbol<AccountName>>,
@@ -159,16 +126,16 @@ pub enum ScopedValue {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Amount<A> {
-    number: Augmented<Decimal, A>,
-    currency: Augmented<Symbol<Currency>, A>,
+pub struct Amount {
+    number: Spanned<Decimal>,
+    currency: Spanned<Symbol<Currency>>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// An amount where each element may not actually be specified.
-pub struct LooseAmount<A> {
-    number: Option<Augmented<Decimal, A>>,
-    currency: Option<Augmented<Symbol<Currency>, A>>,
+pub struct LooseAmount {
+    number: Option<Spanned<Decimal>>,
+    currency: Option<Spanned<Symbol<Currency>>>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -180,11 +147,11 @@ pub enum ScopedAmount {
 }
 
 #[derive(Clone, Debug)]
-pub struct CostSpec<A> {
-    per_unit: Option<Augmented<Decimal, A>>,
-    total: Option<Augmented<Decimal, A>>,
-    currency: Option<Augmented<Symbol<Currency>, A>>,
-    date: Option<Augmented<Date, A>>,
-    label: Option<Augmented<Symbol<Label>, A>>,
+pub struct CostSpec {
+    per_unit: Option<Spanned<Decimal>>,
+    total: Option<Spanned<Decimal>>,
+    currency: Option<Spanned<Symbol<Currency>>>,
+    date: Option<Spanned<Date>>,
+    label: Option<Spanned<Symbol<Label>>>,
     merge: bool,
 }

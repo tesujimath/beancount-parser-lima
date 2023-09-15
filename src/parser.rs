@@ -1,5 +1,5 @@
+use crate::types::*;
 use ariadne::{Color, Label, Report, ReportKind};
-use time::Date;
 use chumsky::{
     prelude::{Input, Parser},
     span::SimpleSpan,
@@ -14,6 +14,7 @@ use std::{
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
 };
+use time::Date;
 use types::*;
 
 pub fn end_of_input(s: &str) -> SimpleSpan {
@@ -357,4 +358,4 @@ pub use lexer::bare_lex;
 pub use lexer::dump_tokens;
 mod lexer;
 mod parsers;
-mod types;
+pub mod types;

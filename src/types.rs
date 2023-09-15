@@ -1,8 +1,11 @@
-use std::fmt::{self, Display, Formatter};
-
+use chumsky::span::SimpleSpan;
+use std::{
+    fmt::{self, Display, Formatter},
+    hash::{Hash, Hasher},
+};
 use strum_macros::{Display, EnumString};
 
-#[derive(PartialEq, Eq, Display, Clone, EnumString, Debug)]
+#[derive(PartialEq, Eq, Hash, Display, Clone, EnumString, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -75,6 +78,64 @@ impl TryFrom<char> for FlagLetter {
         } else {
             Err(FlagLetterError(c))
         }
+    }
+}
+
+/// A Spanned value may be located within a source file if the file path is known.
+/// The span is invisible with respect to equality and hashing.
+#[derive(Clone, Debug)]
+pub struct Spanned<T> {
+    pub(crate) value: T,
+    pub(crate) span: SimpleSpan,
+}
+
+pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
+    Spanned { value, span }
+}
+
+impl<T> Spanned<T> {
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn span(&self) -> &SimpleSpan {
+        &self.span
+    }
+
+    pub fn as_ref(&self) -> Spanned<&T> {
+        Spanned {
+            value: &self.value,
+            span: self.span,
+        }
+    }
+}
+
+impl<T> PartialEq for Spanned<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl<T> Eq for Spanned<T> where T: Eq {}
+
+impl<T> Hash for Spanned<T>
+where
+    T: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state)
+    }
+}
+
+impl<T> Display for Spanned<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value,)
     }
 }
 
