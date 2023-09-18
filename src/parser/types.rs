@@ -270,6 +270,12 @@ impl<'a> AccountName<'a> {
     }
 }
 
+impl<'a> AsRef<str> for AccountName<'a> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
 impl<'a> Display for AccountName<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -538,7 +544,7 @@ pub enum SimpleValue<'a> {
     Date(Date),
     Bool(bool),
     None,
-    Expr(Expr),
+    Expr(ExprValue),
 }
 
 impl<'a> Display for SimpleValue<'a> {
@@ -750,7 +756,7 @@ impl<'a> TryFrom<&'a str> for Key<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 /// An `Expr` which has been evaluated.
 pub struct ExprValue {
     pub value: Decimal,
@@ -869,7 +875,7 @@ impl Display for ScopedExpr {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Amount<'a> {
-    number: Spanned<Expr>,
+    number: Spanned<ExprValue>,
     currency: Spanned<&'a Currency<'a>>,
 }
 
@@ -880,11 +886,19 @@ impl<'a> Display for Amount<'a> {
 }
 
 impl<'a> Amount<'a> {
-    pub fn new(amount: (Spanned<Expr>, Spanned<&'a Currency<'a>>)) -> Self {
+    pub fn new(amount: (Spanned<ExprValue>, Spanned<&'a Currency<'a>>)) -> Self {
         Amount {
             number: amount.0,
             currency: amount.1,
         }
+    }
+
+    pub fn number(&self) -> &Spanned<ExprValue> {
+        &self.number
+    }
+
+    pub fn currency(&self) -> &Spanned<&Currency> {
+        &self.currency
     }
 }
 

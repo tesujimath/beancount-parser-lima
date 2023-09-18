@@ -544,7 +544,7 @@ where
         date.map(Date),
         bool().map(Bool),
         just(Token::Null).to(None),
-        expr().map(Expr),
+        expr_value().map(Expr),
     ))
 }
 
@@ -556,7 +556,7 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        expr().map_with_span(spanned),
+        expr_value().map_with_span(spanned),
         currency.map_with_span(spanned),
     ))
     .map(Amount::new)
@@ -776,6 +776,15 @@ where
         + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     choice((just(Token::True).to(true), just(Token::False).to(false)))
+}
+
+/// Match and evaluate an expression
+pub fn expr_value<'src, I>() -> impl Parser<'src, I, ExprValue, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    expr().map(ExprValue::from)
 }
 
 /// Match an expression

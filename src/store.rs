@@ -1,18 +1,16 @@
 // TODO remove suppression for dead code warning
 #![allow(dead_code)]
 
-use string_interner::StringInterner;
-
 #[derive(Default, Debug)]
 pub struct BeancountStore {
-    symbol_table: SymbolTable,
+    string_interner: StringInterner,
 }
 
 #[derive(Default, Debug)]
-pub struct SymbolTable(StringInterner);
+pub struct StringInterner(string_interner::StringInterner);
 
-impl SymbolTable {
-    pub fn intern<S, T>(&mut self, s: S) -> Symbol<T>
+impl SymbolTable for StringInterner {
+    fn get_or_intern<S, T>(&mut self, s: S) -> Symbol<T>
     where
         S: AsRef<str>,
     {

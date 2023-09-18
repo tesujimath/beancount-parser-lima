@@ -40,7 +40,6 @@ impl BeancountSources {
             match read(&path) {
                 Ok(content) => {
                     // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
-                    // TODO switch to hashbrown crate, which has very similar API without requiring nightly compiler
                     content_paths.insert(path.clone(), content);
                     let content = content_paths.get(&path).unwrap();
 

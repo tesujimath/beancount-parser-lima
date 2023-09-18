@@ -5,7 +5,7 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
-#[derive(PartialEq, Eq, Hash, Display, Clone, EnumString, Debug)]
+#[derive(PartialEq, Eq, Hash, Display, Clone, Copy, EnumString, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -105,6 +105,16 @@ impl<T> Spanned<T> {
     pub fn as_ref(&self) -> Spanned<&T> {
         Spanned {
             value: &self.value,
+            span: self.span,
+        }
+    }
+
+    pub fn map<U, F>(&self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(&T) -> U,
+    {
+        Spanned {
+            value: f(&self.value),
             span: self.span,
         }
     }

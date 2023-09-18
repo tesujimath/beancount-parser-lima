@@ -1,8 +1,5 @@
-use super::{types::*, SymbolTable};
-use crate::{
-    parsed_to_store::build_metavalue,
-    types::{spanned, Spanned},
-};
+use super::{types::*, StringInterner};
+use crate::types::Spanned;
 use std::{
     collections::{hash_map, HashMap, HashSet},
     fmt::{self, Debug, Display, Formatter},
@@ -75,15 +72,15 @@ impl AccountBuilder {
         }
     }
 
-    pub fn currencies<C, S>(mut self, symbol_table: &mut SymbolTable, currencies: C) -> Self
+    pub fn currencies<C, S>(mut self, symbol_table: &mut impl SymbolTable, currencies: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for currency in currencies {
-            let sym = symbol_table.intern(currency.value);
             // TODO check duplicates
-            self.currencies.insert(spanned(sym, currency.span));
+            self.currencies
+                .insert(currency.map(|cur| symbol_table.get_or_intern(cur)));
         }
 
         self
@@ -95,35 +92,35 @@ impl AccountBuilder {
     {
         if let Some(booking) = booking {
             // TODO check duplicates
-            self.booking = Some(spanned(booking.value.to_string(), booking.span));
+            self.booking = Some(booking.map(|s| s.to_string()));
         }
 
         self
     }
 
-    pub fn tags<C, S>(mut self, symbol_table: &mut SymbolTable, tags: C) -> Self
+    pub fn tags<C, S>(mut self, symbol_table: &mut impl SymbolTable, tags: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for tag in tags {
-            let sym = symbol_table.intern(tag.value);
             // TODO check duplicates
-            self.tags.insert(spanned(sym, tag.span));
+            self.tags
+                .insert(tag.map(|tag| symbol_table.get_or_intern(tag)));
         }
 
         self
     }
 
-    pub fn links<C, S>(mut self, symbol_table: &mut SymbolTable, links: C) -> Self
+    pub fn links<C, S>(mut self, symbol_table: &mut impl SymbolTable, links: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for link in links {
-            let sym = symbol_table.intern(link.value);
             // TODO check duplicates
-            self.links.insert(spanned(sym, link.span));
+            self.links
+                .insert(link.map(|link| symbol_table.get_or_intern(link)));
         }
 
         self
@@ -142,47 +139,48 @@ pub struct MetadataBuilder {
 }
 
 impl MetadataBuilder {
-    pub fn tags<C, S>(mut self, symbol_table: &mut SymbolTable, tags: C) -> Self
+    pub fn tags<C, S>(mut self, symbol_table: &mut StringInterner, tags: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for tag in tags {
-            let sym = symbol_table.intern(tag.value);
             // TODO check duplicates
-            self.tags.insert(spanned(sym, tag.span));
+            self.tags
+                .insert(tag.map(|tag| symbol_table.get_or_intern(tag)));
         }
 
         self
     }
 
-    pub fn links<C, S>(mut self, symbol_table: &mut SymbolTable, links: C) -> Self
+    pub fn links<C, S>(mut self, symbol_table: &mut StringInterner, links: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for link in links {
-            let sym = symbol_table.intern(link.value);
             // TODO check duplicates
-            self.links.insert(spanned(sym, link.span));
+            self.links
+                .insert(link.map(|link| symbol_table.get_or_intern(link)));
         }
 
         self
     }
 
-    pub fn key_values<'a, C, K>(mut self, symbol_table: &mut SymbolTable, keys_values: C) -> Self
+    pub fn key_values<'a, C, K>(
+        mut self,
+        symbol_table: &mut impl SymbolTable,
+        keys_values: C,
+    ) -> Self
     where
-        // TODO hide the metavalue type a bit better
         C: IntoIterator<Item = (Spanned<K>, Spanned<crate::parser::types::MetaValue<'a>>)>,
         K: AsRef<str>,
     {
         for (k, v) in keys_values {
-            let sym = symbol_table.intern(k.value);
             // TODO check duplicates
-            // TODO insert actual value
             self.key_values.insert(
-                spanned(sym, k.span),
-                spanned(build_metavalue(v.value, symbol_table), v.span),
+                k.map(|k| symbol_table.get_or_intern(k)),
+                v.map(|v| MetaValue::symbol_from(v, symbol_table)),
             );
         }
 
@@ -201,9 +199,3 @@ impl Display for BuilderErrors {
 }
 
 impl std::error::Error for BuilderErrors {}
-
-pub trait StoreBuilder {
-    type Output;
-
-    fn build(self, symbol_table: &mut SymbolTable) -> Self::Output;
-}
