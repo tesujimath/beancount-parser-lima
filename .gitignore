@@ -1,3 +1,4 @@
+/Cargo.lock
 /.direnv/
 /target/
 /flamegraph.svg
