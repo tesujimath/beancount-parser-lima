@@ -1,5 +1,5 @@
 use super::{types::*, StringInterner};
-use crate::types::Spanned;
+use crate::types::*;
 use std::{
     collections::{hash_map, HashMap, HashSet},
     fmt::{self, Debug, Display, Formatter},
@@ -50,7 +50,7 @@ pub struct AccountBuilder {
     opened: Option<Spanned<Date>>,
     closed: Option<Spanned<Date>>,
     currencies: HashSet<Spanned<Symbol<Currency>>>,
-    booking: Option<Spanned<String>>,
+    booking: Option<Spanned<Booking>>,
     tags: HashSet<Spanned<Symbol<Tag>>>,
     links: HashSet<Spanned<Symbol<Link>>>,
     metadata: MetadataBuilder,
@@ -86,13 +86,10 @@ impl AccountBuilder {
         self
     }
 
-    pub fn booking<S>(mut self, booking: Option<Spanned<S>>) -> Self
-    where
-        S: ToString,
-    {
+    pub fn booking(mut self, booking: Option<Spanned<Booking>>) -> Self {
         if let Some(booking) = booking {
             // TODO check duplicates
-            self.booking = Some(booking.map(|s| s.to_string()));
+            self.booking = Some(booking);
         }
 
         self

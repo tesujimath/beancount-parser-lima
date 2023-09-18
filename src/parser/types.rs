@@ -172,7 +172,7 @@ pub struct Open<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
     pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
-    pub(crate) booking: Option<Spanned<&'a str>>,
+    pub(crate) booking: Option<Spanned<Booking>>,
     pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
     pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
@@ -1049,7 +1049,8 @@ impl<'a> CostSpecBuilder<'a> {
             // TODO find a way to keep a span iff merge is true
             self.merge = true;
         } else {
-            self.errors.push(CostSpecError(CostSpecErrorKind::Merge))
+            self.errors
+                .push(CostSpecError(CostSpecErrorKind::MergeCost))
         }
         self
     }
@@ -1099,20 +1100,14 @@ impl<'a> CostSpecBuilder<'a> {
 pub struct CostSpecError(CostSpecErrorKind);
 
 #[derive(PartialEq, Eq, Display, Debug)]
+#[strum(serialize_all = "kebab-case")]
 enum CostSpecErrorKind {
-    #[strum(to_string = "per-unit")]
     PerUnit,
-    #[strum(to_string = "total")]
     Total,
-    #[strum(to_string = "currency")]
     Currency,
-    #[strum(to_string = "date")]
     Date,
-    #[strum(to_string = "label")]
     Label,
-    #[strum(to_string = "merge-cost")]
-    Merge,
-    #[strum(to_string = "empty")]
+    MergeCost,
     Empty,
 }
 

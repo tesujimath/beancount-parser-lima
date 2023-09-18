@@ -199,7 +199,7 @@ fn open_header_line<'src, I>() -> impl Parser<
         Spanned<Date>,
         Spanned<&'src Account<'src>>,
         HashSet<Spanned<&'src Currency<'src>>>,
-        Option<Spanned<&'src str>>,
+        Option<Spanned<Booking>>,
         (
             HashSet<Spanned<&'src Tag<'src>>>,
             HashSet<Spanned<&'src Link<'src>>>,
@@ -214,7 +214,6 @@ where
     let date = select_ref!(Token::Date(date) => *date);
     let account = select_ref!(Token::Account(acc) => acc);
     let currency = select_ref!(Token::Currency(cur) => cur);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
     group((
         date.map_with_span(spanned),
@@ -240,13 +239,24 @@ where
                         currencies
                     })
             }),
-        string.map_with_span(spanned).or_not(),
+        booking().map_with_span(spanned).or_not(),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
     .map(|(date, _, account, currency, booking, tags_links)| {
         (date, account, currency, booking, tags_links)
     })
+}
+
+/// Matches a `Booking`.
+fn booking<'src, I>() -> impl Parser<'src, I, Booking, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = SimpleSpan>
+        + ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+{
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    string.try_map(|s, span| Booking::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
 }
 
 /// Matches a close, including metadata, over several lines.

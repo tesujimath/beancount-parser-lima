@@ -5,7 +5,7 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
-#[derive(PartialEq, Eq, Hash, Display, Clone, Copy, EnumString, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, Display, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -79,6 +79,20 @@ impl TryFrom<char> for FlagLetter {
             Err(FlagLetterError(c))
         }
     }
+}
+
+/// The booking method for an account
+#[derive(EnumString, PartialEq, Eq, Default, Clone, Copy, Display, Debug)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum Booking {
+    #[default]
+    Strict,
+    StrictWithSize,
+    None,
+    Average,
+    Fifo,
+    Lifo,
+    Hifo,
 }
 
 /// A Spanned value may be located within a source file if the file path is known.
