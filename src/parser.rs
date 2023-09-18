@@ -9,7 +9,7 @@ use lexer::{lex, Token};
 use parsers::{file, includes};
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
-    fmt::{self, Display, Formatter},
+    fmt::{self, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
@@ -17,7 +17,7 @@ use std::{
 use time::Date;
 use types::*;
 
-pub fn end_of_input(s: &str) -> SimpleSpan {
+fn end_of_input(s: &str) -> SimpleSpan {
     (s.len()..s.len()).into()
 }
 
@@ -127,28 +127,6 @@ impl BeancountSources {
                 error.contexts,
             )?;
         }
-        Ok(())
-    }
-
-    pub fn write_error<W, M, L>(&self, w: W, loc: &Location, message: M, label: L) -> io::Result<()>
-    where
-        W: Write + Copy,
-        M: Display,
-        L: Display,
-    {
-        let src_id = source_id(loc.path);
-
-        Report::build(ReportKind::Error, src_id.clone(), loc.span.start)
-            .with_message(message)
-            .with_label(
-                Label::new((src_id, loc.span.into_range()))
-                    .with_message(label)
-                    .with_color(Color::Red),
-            )
-            .finish()
-            .write(ariadne::sources(self.sources()), w)
-            .unwrap();
-
         Ok(())
     }
 
@@ -337,18 +315,6 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         date_buckets
             .into_iter()
             .flat_map(|(_date, directives)| directives.into_iter())
-    }
-}
-
-/// Source location of a parsed node.
-pub struct Location<'s> {
-    path: &'s Path,
-    span: SimpleSpan,
-}
-
-impl<'s> Location<'s> {
-    fn new(path: &'s Path, span: SimpleSpan) -> Self {
-        Location { path, span }
     }
 }
 
