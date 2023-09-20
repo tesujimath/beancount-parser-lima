@@ -1,4 +1,3 @@
-use chumsky::span::SimpleSpan;
 use std::{
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
@@ -95,15 +94,18 @@ pub enum Booking {
     Hifo,
 }
 
+/// Our span type
+pub type Span = chumsky::span::SimpleSpan;
+
 /// A Spanned value may be located within a source file if the file path is known.
 /// The span is invisible with respect to equality and hashing.
 #[derive(Clone, Debug)]
 pub struct Spanned<T> {
     pub(crate) value: T,
-    pub(crate) span: SimpleSpan,
+    pub(crate) span: Span,
 }
 
-pub fn spanned<T>(value: T, span: SimpleSpan) -> Spanned<T> {
+pub fn spanned<T>(value: T, span: Span) -> Spanned<T> {
     Spanned { value, span }
 }
 
@@ -112,7 +114,7 @@ impl<T> Spanned<T> {
         &self.value
     }
 
-    pub fn span(&self) -> &SimpleSpan {
+    pub fn span(&self) -> &Span {
         &self.span
     }
 

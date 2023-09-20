@@ -6,7 +6,7 @@ use test_case::test_case;
 use time::Month;
 
 #[test_case(r#"2023-07-03 * "New World Gardens North East Va ;"
-"#, spanned((2023, Month::July, 3), SimpleSpan::new(0, 10)), spanned(Flag::Asterisk, SimpleSpan::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", SimpleSpan::new(13, 48))), vec![], vec![])]
+"#, spanned((2023, Month::July, 3), Span::new(0, 10)), spanned(Flag::Asterisk, Span::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", Span::new(13, 48))), vec![], vec![])]
 fn test_transaction(
     s: &str,
     expected_date: Spanned<(i32, Month, u8)>,
@@ -78,7 +78,7 @@ fn test_compound_expr(s: &str, expected: ScopedExpr) {
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec![spanned("a", SimpleSpan::new(0, 2)), spanned("c-is-my-tag", SimpleSpan::new(6, 18))], vec![spanned("b", SimpleSpan::new(3, 5)), spanned("d.is_my/link", SimpleSpan::new(19, 32))])]
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec![spanned("a", Span::new(0, 2)), spanned("c-is-my-tag", Span::new(6, 18))], vec![spanned("b", Span::new(3, 5)), spanned("d.is_my/link", Span::new(19, 32))])]
 fn test_tags_links(s: &str, expected_tags: Vec<Spanned<&str>>, expected_links: Vec<Spanned<&str>>) {
     let tokens = bare_lex(s);
     let spanned_tokens = tokens.spanned(end_of_input(s));

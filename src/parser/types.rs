@@ -1,7 +1,6 @@
 use super::lexer::Token;
 use crate::types::*;
-use chumsky::error::Rich;
-use chumsky::span::SimpleSpan;
+use chumsky::prelude::Rich;
 use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
@@ -16,7 +15,7 @@ use std::{
 use strum_macros::Display;
 use time::Date;
 
-pub type ParserError<'a> = Rich<'a, Token<'a>, SimpleSpan>;
+pub type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
 /// Spanned and additionally with source path
 /// TODO: eventually this should perhaps be using &Path as the Span::Context,
@@ -31,10 +30,10 @@ pub struct Sourced<'a, T> {
 #[derive(Debug)]
 pub struct SourcedError<'a> {
     pub(crate) source_path: &'a Path,
-    pub(crate) span: SimpleSpan,
+    pub(crate) span: Span,
     pub(crate) message: String,
     pub(crate) reason: Option<String>,
-    pub(crate) contexts: Vec<(String, SimpleSpan)>,
+    pub(crate) contexts: Vec<(String, Span)>,
 }
 
 impl<'a> SourcedError<'a> {
@@ -990,7 +989,7 @@ pub struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: ScopedExpr, span: SimpleSpan) -> Self {
+    pub fn compound_expr(self, value: ScopedExpr, span: Span) -> Self {
         use ScopedExpr::*;
 
         match value {
@@ -1017,7 +1016,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn currency(mut self, value: &'a Currency<'a>, span: SimpleSpan) -> Self {
+    pub fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
         if self.currency.is_none() {
             self.currency = Some(spanned(value, span));
         } else {
@@ -1026,7 +1025,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn date(mut self, value: Date, span: SimpleSpan) -> Self {
+    pub fn date(mut self, value: Date, span: Span) -> Self {
         if self.date.is_none() {
             self.date = Some(spanned(value, span));
         } else {
@@ -1035,7 +1034,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn label(mut self, value: &'a str, span: SimpleSpan) -> Self {
+    pub fn label(mut self, value: &'a str, span: Span) -> Self {
         if self.label.is_none() {
             self.label = Some(spanned(value, span));
         } else {
@@ -1044,7 +1043,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn merge(mut self, _span: SimpleSpan) -> Self {
+    pub fn merge(mut self, _span: Span) -> Self {
         if !self.merge {
             // TODO find a way to keep a span iff merge is true
             self.merge = true;

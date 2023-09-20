@@ -9,8 +9,8 @@ use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 prop_compose! {
-    fn arb_span(maxlen: usize)(b in any::<usize>(), len in 0..maxlen) -> SimpleSpan {
-        SimpleSpan::new(b, b + len)
+    fn arb_span(maxlen: usize)(b in any::<usize>(), len in 0..maxlen) -> Span {
+        Span::new(b, b + len)
     }
 }
 

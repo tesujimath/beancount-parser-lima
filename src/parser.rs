@@ -1,9 +1,6 @@
 use crate::types::*;
 use ariadne::{Color, Label, Report, ReportKind};
-use chumsky::{
-    prelude::{Input, Parser},
-    span::SimpleSpan,
-};
+use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parsers::{file, includes};
@@ -17,7 +14,7 @@ use std::{
 use time::Date;
 use types::*;
 
-fn end_of_input(s: &str) -> SimpleSpan {
+fn end_of_input(s: &str) -> Span {
     (s.len()..s.len()).into()
 }
 
@@ -87,10 +84,10 @@ impl BeancountSources {
         &self,
         w: W,
         src_id: String,
-        span: SimpleSpan,
+        span: Span,
         msg: String,
         reason: Option<String>,
-        contexts: Vec<(String, SimpleSpan)>,
+        contexts: Vec<(String, Span)>,
     ) -> io::Result<()>
     where
         W: Write + Copy,
@@ -173,7 +170,7 @@ where
     Ok(file_content)
 }
 
-type SpannedToken<'t> = (Token<'t>, SimpleSpan);
+type SpannedToken<'t> = (Token<'t>, Span);
 
 pub struct BeancountParser<'s, 't> {
     sources: &'s BeancountSources,
