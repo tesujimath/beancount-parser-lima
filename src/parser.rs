@@ -14,14 +14,17 @@ use std::{
 use time::Date;
 use types::*;
 
-fn end_of_input(s: &str) -> Span {
-    (s.len()..s.len()).into()
+fn end_of_input(source_id: SourceId, s: &str) -> Span {
+    chumsky::span::Span::new(source_id, s.len()..s.len())
 }
+
+/// a `SourceId` identifies a source file.
+pub type SourceId = u32;
 
 /// The transitive closure of all the include'd source files.
 pub struct BeancountSources {
     root_path: PathBuf,
-    content_paths: HashMap<PathBuf, String>,
+    content_paths: HashMap<PathBuf, (SourceId, String)>,
     error_paths: HashMap<PathBuf, anyhow::Error>,
 }
 
@@ -30,6 +33,7 @@ impl BeancountSources {
         let mut content_paths = HashMap::new();
         let mut error_paths = HashMap::new();
         let mut paths = VecDeque::from([root_path.clone()]);
+        let mut next_source_id = 0;
 
         while !paths.is_empty() {
             let path = paths.pop_front().unwrap();
@@ -37,11 +41,18 @@ impl BeancountSources {
             match read(&path) {
                 Ok(content) => {
                     // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
-                    content_paths.insert(path.clone(), content);
-                    let content = content_paths.get(&path).unwrap();
+                    let source_id = next_source_id;
+                    next_source_id += 1;
 
-                    let tokens = Some(lex(content));
-                    let spanned_tokens = tokens.as_ref().unwrap().spanned(end_of_input(content));
+                    content_paths.insert(path.clone(), (source_id, content));
+                    let (source_id, content) = content_paths.get(&path).unwrap();
+
+                    let tokens = Some(lex(*source_id, content));
+                    let spanned_tokens = tokens
+                        .as_ref()
+                        .unwrap()
+                        .spanned(end_of_input(*source_id, content))
+                        .with_context(*source_id);
 
                     // ignore any errors in parsing, we'll pick them up in the next pass
                     // TODO can we do this with &str for includes?
@@ -92,15 +103,17 @@ impl BeancountSources {
     where
         W: Write + Copy,
     {
+        use chumsky::span::Span;
+
         Report::build(ReportKind::Error, src_id.clone(), span.start)
             .with_message(msg)
             .with_labels(reason.into_iter().map(|reason| {
-                Label::new((src_id.clone(), span.into_range()))
+                Label::new((src_id.clone(), span.start()..span.end()))
                     .with_message(reason)
                     .with_color(Color::Red)
             }))
             .with_labels(contexts.into_iter().map(|(label, span)| {
-                Label::new((src_id.clone(), span.into_range()))
+                Label::new((src_id.clone(), span.start()..span.end()))
                     .with_message(lazy_format!("while parsing this {}", label))
                     .with_color(Color::Yellow)
             }))
@@ -113,7 +126,7 @@ impl BeancountSources {
         W: Write + Copy,
     {
         for error in errors.into_iter() {
-            let src_id = source_id(error.source_path);
+            let src_id = path_to_string(error.source_path);
 
             self.write_error_message(
                 w,
@@ -130,12 +143,12 @@ impl BeancountSources {
     fn sources(&self) -> Vec<(String, &str)> {
         self.content_paths
             .iter()
-            .map(|(path, content)| (source_id(path), content.as_str()))
+            .map(|(path, (_source_id, content))| (path_to_string(path), content.as_str()))
             .collect()
     }
 }
 
-fn source_id<P>(path: P) -> String
+fn path_to_string<P>(path: P) -> String
 where
     P: AsRef<Path>,
 {
@@ -146,7 +159,7 @@ impl std::fmt::Debug for BeancountSources {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "BeancountSources(",)?;
 
-        for (path, content) in &self.content_paths {
+        for (path, (_source_id, content)) in &self.content_paths {
             writeln!(f, "    {} ok len {},", path.display(), content.len())?;
         }
 
@@ -184,10 +197,10 @@ where
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = HashMap::new();
 
-        for (pathbuf, content) in &sources.content_paths {
+        for (pathbuf, (source_id, content)) in &sources.content_paths {
             let path = pathbuf.as_path();
 
-            tokenized_sources.insert(path, (content.as_str(), lex(content)));
+            tokenized_sources.insert(path, (content.as_str(), lex(*source_id, content)));
         }
 
         BeancountParser {
@@ -228,11 +241,13 @@ where
         let mut all_outputs = HashMap::new();
         let mut all_errors = HashMap::new();
 
-        for (pathbuf, content) in &self.sources.content_paths {
+        for (pathbuf, (source_id, content)) in &self.sources.content_paths {
             let path = pathbuf.as_path();
 
             let (_source, tokens) = self.tokenized_sources.get(path).unwrap();
-            let spanned_tokens = tokens.spanned(end_of_input(content));
+            let spanned_tokens = tokens
+                .spanned(end_of_input(*source_id, content))
+                .with_context(*source_id);
 
             let (output, errors) = file().parse(spanned_tokens).into_output_errors();
 

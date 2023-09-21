@@ -9,14 +9,14 @@ use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 prop_compose! {
-    fn arb_span(maxlen: usize)(b in any::<usize>(), len in 0..maxlen) -> Span {
-        Span::new(b, b + len)
+    fn arb_span(sources: u32, maxlen: usize)(source_id in 0..sources, b in any::<usize>(), len in 0..maxlen) -> Span {
+        chumsky::span::Span::new(source_id, b..b + len)
     }
 }
 
 proptest! {
     #[test]
-    fn test_span_eq_hash(i1 in any::<i32>(), i2 in any::<i32>(), s1 in arb_span(100), s2 in arb_span(100)) {
+    fn test_span_eq_hash(i1 in any::<i32>(), i2 in any::<i32>(), s1 in arb_span(3, 100), s2 in arb_span(3, 100)) {
 
         fn hash<H>(x: H) -> u64 where H: Hash {
             let mut h = DefaultHasher::new();

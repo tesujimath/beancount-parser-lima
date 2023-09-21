@@ -4,6 +4,8 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 
+use crate::parser::SourceId;
+
 #[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, Display, Debug)]
 pub enum AccountType {
     Assets,
@@ -95,7 +97,7 @@ pub enum Booking {
 }
 
 /// Our span type
-pub type Span = chumsky::span::SimpleSpan;
+pub type Span = chumsky::span::SimpleSpan<usize, SourceId>;
 
 /// A Spanned value may be located within a source file if the file path is known.
 /// The span is invisible with respect to equality and hashing.

@@ -1,4 +1,4 @@
-use super::{end_of_input, types::*};
+use super::{end_of_input, types::*, SourceId};
 use crate::types::*;
 use logos::Logos;
 use nonempty::NonEmpty;
@@ -246,7 +246,7 @@ impl<'a> Display for Token<'a> {
 
 // TODO remove this temporary diagnostic
 pub fn dump_tokens(s: &str) {
-    for (tok, span) in lex(s) {
+    for (tok, span) in lex(0, s) {
         match tok {
             Token::Error(e) => println!("{:?} at {:?}", e, span),
             tok => println!("{:?}", tok),
@@ -258,22 +258,22 @@ pub fn dump_tokens(s: &str) {
 /// and forcing a final Eol in case missing.
 ///
 /// Lexing errors are returned as `Error` tokens.
-pub fn lex(s: &str) -> Vec<(Token, Span)> {
-    lex_with_final_eol(s, Some(end_of_input(s)))
+pub fn lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+    lex_with_final_eol(source_id, s, Some(end_of_input(source_id, s)))
 }
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
 #[cfg(test)]
-pub fn bare_lex(s: &str) -> Vec<(Token, Span)> {
-    lex_with_final_eol(s, None)
+pub fn bare_lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+    lex_with_final_eol(source_id, s, None)
 }
 
-fn lex_with_final_eol(s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
+fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
         .map(|(tok, span)| match tok {
-            Ok(tok) => (tok, Span::from(span)),
-            Err(e) => (Token::Error(e), Span::from(span)),
+            Ok(tok) => (tok, chumsky::span::Span::new(source_id, span)),
+            Err(e) => (Token::Error(e), chumsky::span::Span::new(source_id, span)),
         })
         .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
         .finalize()
@@ -305,9 +305,11 @@ impl<'a> EmptyLineFolder<'a> {
     }
 
     fn fold(mut self, item: (Token<'a>, Span)) -> Self {
+        use chumsky::span::Span;
+
         if item.0.is_eol() {
             if let Some((_, span)) = self.pending_eol.take() {
-                self.pending_eol = Some((item.0, Span::new(span.start, item.1.end)))
+                self.pending_eol = Some((item.0, span.union(item.1)))
             } else {
                 self.pending_eol = Some(item)
             }
@@ -319,9 +321,12 @@ impl<'a> EmptyLineFolder<'a> {
                 if !self.committed.is_empty() {
                     if pending.0 == EolThenIndent {
                         // expand into separate tokens
-                        let (start, end) = (pending.1.start, pending.1.end);
-                        self.committed.push((Eol, Span::new(start, end - 1)));
-                        self.committed.push((Indent, Span::new(end - 1, end)));
+                        let (context, start, end) =
+                            (pending.1.context(), pending.1.start, pending.1.end);
+                        self.committed
+                            .push((Eol, Span::new(context, start..end - 1)));
+                        self.committed
+                            .push((Indent, Span::new(context, end - 1..end)));
                     } else {
                         self.committed.push(pending);
                     }

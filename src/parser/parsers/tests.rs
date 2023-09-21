@@ -1,4 +1,8 @@
 #![cfg(test)]
+use std::ops::Range;
+
+use crate::parser::SourceId;
+
 use super::super::{bare_lex, end_of_input};
 use super::*;
 use rust_decimal_macros::dec;
@@ -6,39 +10,44 @@ use test_case::test_case;
 use time::Month;
 
 #[test_case(r#"2023-07-03 * "New World Gardens North East Va ;"
-"#, spanned((2023, Month::July, 3), Span::new(0, 10)), spanned(Flag::Asterisk, Span::new(11, 12)), None, Some(spanned("New World Gardens North East Va ;", Span::new(13, 48))), vec![], vec![])]
+"#, ((2023, Month::July, 3), 0..10), (Flag::Asterisk, 11..12), None, Some(("New World Gardens North East Va ;", 13..48)), vec![], vec![])]
 fn test_transaction(
     s: &str,
-    expected_date: Spanned<(i32, Month, u8)>,
-    expected_flag: Spanned<Flag>,
-    expected_payee: Option<Spanned<&str>>,
-    expected_narration: Option<Spanned<&str>>,
-    expected_tags: Vec<Spanned<&str>>,
-    expected_links: Vec<Spanned<&str>>,
+    expected_date: ((i32, Month, u8), Range<usize>),
+    expected_flag: (Flag, Range<usize>),
+    expected_payee: Option<(&str, Range<usize>)>,
+    expected_narration: Option<(&str, Range<usize>)>,
+    expected_tags: Vec<(&str, Range<usize>)>,
+    expected_links: Vec<(&str, Range<usize>)>,
 ) {
-    let tokens = bare_lex(s);
-    let spanned_tokens = tokens.spanned(end_of_input(s));
+    let source_id = SourceId::default();
+    let tokens = bare_lex(source_id, s);
+    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
     let result = transaction().parse(spanned_tokens).into_result();
+
     let expected_date = spanned(
-        Date::from_calendar_date(
-            expected_date.value.0,
-            expected_date.value.1,
-            expected_date.value.2,
-        )
-        .unwrap(),
-        expected_date.span,
+        Date::from_calendar_date(expected_date.0 .0, expected_date.0 .1, expected_date.0 .2)
+            .unwrap(),
+        sourced_span(expected_date.1),
     );
+
+    let expected_flag = spanned(expected_flag.0, sourced_span(expected_flag.1));
+
+    let expected_payee = expected_payee.map(|(s, range)| spanned(s, sourced_span(range)));
+
+    let expected_narration = expected_narration.map(|(s, range)| spanned(s, sourced_span(range)));
 
     let expected_tags = expected_tags
         .into_iter()
-        .map(|s| spanned(Tag::try_from(s.value).unwrap(), s.span))
+        .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
         .collect::<Vec<_>>();
     let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
 
     let expected_links = expected_links
         .into_iter()
-        .map(|s| spanned(Link::try_from(s.value).unwrap(), s.span))
+        .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
         .collect::<Vec<_>>();
     let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
 
@@ -58,8 +67,9 @@ fn test_transaction(
 #[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExpr::PerUnit(Expr::Value(dec!(456.78))), &Currency::try_from("NZD").unwrap()))]
 #[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExpr::Total(Expr::Value(dec!(1456.98))), &Currency::try_from("USD").unwrap()))]
 fn test_compound_amount(s: &str, expected: ScopedAmount) {
-    let tokens = bare_lex(s);
-    let spanned_tokens = tokens.spanned(end_of_input(s));
+    let source_id = SourceId::default();
+    let tokens = bare_lex(source_id, s);
+    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
 
     let result = compound_amount().parse(spanned_tokens).into_result();
 
@@ -70,28 +80,35 @@ fn test_compound_amount(s: &str, expected: ScopedAmount) {
 #[test_case("789.45 #", ScopedExpr::PerUnit(Expr::Value(dec!(789.45))))]
 #[test_case("# 123.45", ScopedExpr::Total(Expr::Value(dec!(123.45))))]
 fn test_compound_expr(s: &str, expected: ScopedExpr) {
-    let tokens = bare_lex(s);
-    let spanned_tokens = tokens.spanned(end_of_input(s));
+    let source_id = SourceId::default();
+    let tokens = bare_lex(source_id, s);
+    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
 
     let result = compound_expr().parse(spanned_tokens).into_result();
 
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec![spanned("a", Span::new(0, 2)), spanned("c-is-my-tag", Span::new(6, 18))], vec![spanned("b", Span::new(3, 5)), spanned("d.is_my/link", Span::new(19, 32))])]
-fn test_tags_links(s: &str, expected_tags: Vec<Spanned<&str>>, expected_links: Vec<Spanned<&str>>) {
-    let tokens = bare_lex(s);
-    let spanned_tokens = tokens.spanned(end_of_input(s));
+#[test_case(r#"#a ^b #c-is-my-tag ^d.is_my/link"#, vec![("a", 0..2), ("c-is-my-tag", 6..18)], vec![("b", 3..5), ("d.is_my/link", 19..32)])]
+fn test_tags_links(
+    s: &str,
+    expected_tags: Vec<(&str, Range<usize>)>,
+    expected_links: Vec<(&str, Range<usize>)>,
+) {
+    let source_id = SourceId::default();
+    let tokens = bare_lex(source_id, s);
+    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
     let expected_tags = expected_tags
         .into_iter()
-        .map(|s| spanned(Tag::try_from(s.value).unwrap(), s.span))
+        .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
         .collect::<Vec<_>>();
     let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
 
     let expected_links = expected_links
         .into_iter()
-        .map(|s| spanned(Link::try_from(s.value).unwrap(), s.span))
+        .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
         .collect::<Vec<_>>();
     let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
 
@@ -112,13 +129,16 @@ fn test_tags_links(s: &str, expected_tags: Vec<Spanned<&str>>, expected_links: V
 #[test_case("2.718 #", "2.718")]
 #[test_case("3.141 # pi", "3.141")]
 fn expr_test(s: &str, expected: &str) {
-    let tokens = bare_lex(s);
-    let spanned = tokens.spanned(end_of_input(s));
+    let source_id = SourceId::default();
+    let tokens = bare_lex(source_id, s);
+    let spanned_tokens = tokens
+        .spanned(end_of_input(source_id, s))
+        .with_context(source_id);
 
     let result = expr()
         .map(|x| format!("{:?}", x))
         .then_ignore(any().repeated().collect::<Vec<Token>>())
-        .parse(spanned)
+        .parse(spanned_tokens)
         .into_result();
 
     assert_eq!(result, Ok(expected.to_owned()))
