@@ -4,6 +4,7 @@ use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parsers::{file, includes};
+use path_clean::PathClean;
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     fmt::{self, Formatter},
@@ -58,9 +59,10 @@ impl BeancountSources {
                     // TODO can we do this with &str for includes?
                     if let Some(includes) = includes().parse(spanned_tokens).into_output() {
                         for include in includes {
-                            let included_path = path
-                                .parent()
-                                .map_or(PathBuf::from(&include), |parent| parent.join(include));
+                            let included_path =
+                                path.parent().map_or(PathBuf::from(&include), |parent| {
+                                    parent.join(include).clean()
+                                });
                             if !content_paths.contains_key(&included_path)
                                 && !error_paths.contains_key(&included_path)
                             {
