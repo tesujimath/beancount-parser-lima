@@ -246,7 +246,7 @@ impl<'a> Display for Token<'a> {
 
 // TODO remove this temporary diagnostic
 pub fn dump_tokens(s: &str) {
-    for (tok, span) in lex(0, s) {
+    for (tok, span) in lex(SourceId::default(), s) {
         match tok {
             Token::Error(e) => println!("{:?} at {:?}", e, span),
             tok => println!("{:?}", tok),

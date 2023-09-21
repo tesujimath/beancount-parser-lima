@@ -11,6 +11,7 @@ pub struct BeancountStoreBuilder {
     accounts: HashMap<Account, AccountBuilder>,
     // accumulate errors as we go
     errors: BuilderErrors,
+    // Importantly, directives with the same date must be preserved in source file order.
 }
 
 impl BeancountStoreBuilder {

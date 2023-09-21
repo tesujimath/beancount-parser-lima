@@ -20,7 +20,8 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span {
 }
 
 /// a `SourceId` identifies a source file.
-pub type SourceId = u32;
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
+pub struct SourceId(u32);
 
 /// The transitive closure of all the include'd source files.
 pub struct BeancountSources {
@@ -34,7 +35,6 @@ impl BeancountSources {
         let mut content_paths = HashMap::new();
         let mut error_paths = HashMap::new();
         let mut paths = VecDeque::from([root_path.clone()]);
-        let mut next_source_id = 0;
 
         while !paths.is_empty() {
             let path = paths.pop_front().unwrap();
@@ -42,8 +42,7 @@ impl BeancountSources {
             match read(&path) {
                 Ok(content) => {
                     // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
-                    let source_id = next_source_id;
-                    next_source_id += 1;
+                    let source_id = SourceId(content_paths.len() as u32);
 
                     content_paths.insert(path.clone(), (source_id, content));
                     let (source_id, content) = content_paths.get(&path).unwrap();
@@ -212,6 +211,7 @@ where
     }
 
     /// Parse the sources, returning declarations or errors.
+    /// No date ordering is performed.  But see [BeancountStore].
     pub fn parse(&'t self) -> Result<Vec<Sourced<Directive<'t>>>, Vec<SourcedError<'t>>>
     where
         's: 't,

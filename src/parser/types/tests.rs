@@ -1,5 +1,5 @@
 #![cfg(test)]
-use super::*;
+use super::{super::SourceId, *};
 use proptest::prelude::*;
 use std::{
     collections::hash_map::DefaultHasher,
@@ -9,7 +9,13 @@ use test_case::test_case;
 use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 prop_compose! {
-    fn arb_span(sources: u32, maxlen: usize)(source_id in 0..sources, b in any::<usize>(), len in 0..maxlen) -> Span {
+    fn arb_source_id(max: u32)(id in 0..max) -> SourceId {
+         SourceId(id)
+    }
+}
+
+prop_compose! {
+    fn arb_span(max_sources: u32, maxlen: usize)(source_id in arb_source_id(max_sources), b in any::<usize>(), len in 0..maxlen) -> Span {
         chumsky::span::Span::new(source_id, b..b + len)
     }
 }
