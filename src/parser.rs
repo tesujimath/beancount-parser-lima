@@ -166,6 +166,13 @@ impl BeancountSources {
             .map(|(_, source_id_string, content)| (source_id_string.to_string(), content.as_str()))
             .collect()
     }
+
+    fn content_iter(&self) -> impl Iterator<Item = (SourceId, &str)> {
+        self.path_content
+            .iter()
+            .enumerate()
+            .map(|(i, (_, _, content))| (SourceId::from(i), content.as_str()))
+    }
 }
 
 fn path_to_string<P>(path: P) -> String
@@ -218,9 +225,8 @@ where
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = Vec::new();
 
-        // TODO make a better iterator for this
-        for (i, (_, _, content)) in sources.path_content.iter().enumerate() {
-            tokenized_sources.push(lex(SourceId::from(i), content));
+        for (source_id, content) in sources.content_iter() {
+            tokenized_sources.push(lex(source_id, content));
         }
 
         BeancountParser {
