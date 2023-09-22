@@ -6,13 +6,12 @@ use lexer::{lex, Token};
 use parsers::{file, includes};
 use path_clean::PathClean;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::{self, Display, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
 };
-use time::Date;
 use types::*;
 
 fn end_of_input(source_id: SourceId, s: &str) -> Span {
@@ -263,21 +262,8 @@ where
     where
         's: 't,
     {
-        self.parse_declarations().map(|declarations| {
-            let mut builder = DirectiveIteratorBuilder::new();
-
-            for (i, declarations) in declarations.into_iter().enumerate() {
-                eprintln!(
-                    "{} declarations in {}",
-                    declarations.len(),
-                    self.sources.path(SourceId::from(i)).to_string_lossy()
-                );
-                for declaration in declarations.into_iter() {
-                    builder.declaration(declaration)
-                }
-            }
-            builder.build().collect::<Vec<_>>()
-        })
+        self.parse_declarations()
+            .map(|declarations| DirectiveIterator::new(declarations).collect::<Vec<_>>())
     }
 
     /// Parse the sources, returning declarations or errors.
@@ -312,52 +298,83 @@ where
             Err(all_errors)
         }
     }
+
+    fn directives(&'t self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
+        std::iter::empty()
+    }
 }
 
-/// Builder for iterator for date-ordered traversal of `Directive`s.
-/// Importantly, directives with the same date must be preserved in source file order.
-#[derive(Default, Debug)]
-struct DirectiveIteratorBuilder<'t> {
-    date_buckets: BTreeMap<Date, Vec<Spanned<Directive<'t>>>>,
+/// Iterator for in-order traversal of `Directive`s.
+#[derive(Debug)]
+struct DirectiveIterator<'s, 't> {
+    included: HashMap<&'s Path, Span>,
+    current: VecDeque<Spanned<Declaration<'t>>>,
+    stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
+    remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     // TODO tags and metadata from push/pop pragma processing
 }
 
-impl<'t> DirectiveIteratorBuilder<'t> {
-    fn new() -> Self {
-        Self::default()
-    }
+impl<'s, 't> DirectiveIterator<'s, 't> {
+    fn new(all_declarations: Vec<Vec<Spanned<Declaration<'t>>>>) -> Self {
+        let mut remaining = all_declarations
+            .into_iter()
+            .map(VecDeque::from)
+            .collect::<VecDeque<_>>();
 
-    fn declaration<'a>(&'a mut self, declaration: Spanned<Declaration<'t>>)
-    where
-        't: 'a,
-    {
-        use Declaration::*;
+        let current = remaining.pop_front().unwrap_or(VecDeque::new());
 
-        match declaration.value {
-            Directive(directive) => {
-                let date = *directive.date();
-                let directive = spanned(directive, declaration.span);
-
-                match self.date_buckets.get_mut(&date) {
-                    None => {
-                        self.date_buckets.insert(date, Vec::new());
-                        let bucket = self.date_buckets.get_mut(&date).unwrap();
-                        bucket.push(directive);
-                    }
-                    Some(directives) => directives.push(directive),
-                }
-            }
-            Pragma(_pragma) => {
-                // TODO
-            }
+        DirectiveIterator {
+            included: HashMap::new(),
+            current,
+            stacked: VecDeque::new(),
+            remaining,
         }
     }
+}
 
-    fn build(&mut self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
-        let date_buckets = std::mem::take(&mut self.date_buckets);
-        date_buckets
-            .into_iter()
-            .flat_map(|(_date, directives)| directives.into_iter())
+impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
+    type Item = Spanned<Directive<'t>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.pop_front() {
+            Some(declaration) => {
+                match declaration.value {
+                    Declaration::Directive(directive) => Some(spanned(directive, declaration.span)),
+                    Declaration::Pragma(pragma) => {
+                        match pragma {
+                            Pragma::Include(_path) => {
+                                // TODO need to validate the path against what we have in remaining
+                                match self.remaining.pop_front() {
+                                    Some(mut switcheroo) => {
+                                        std::mem::swap(&mut self.current, &mut switcheroo);
+                                        self.stacked.push_front(switcheroo);
+                                    }
+
+                                    None => {
+                                        eprintln!("warning, include found but nothing remaining");
+                                    }
+                                }
+                            }
+
+                            Pragma::Placeholder(_) => {
+                                eprintln!("placeholder");
+                            }
+
+                            _ => (),
+                        }
+                        // TODO
+                        self.next()
+                    }
+                }
+            }
+            None => match self.stacked.pop_front() {
+                Some(current) => {
+                    self.current = current;
+                    self.next()
+                }
+                None => None,
+            },
+        }
     }
 }
 
