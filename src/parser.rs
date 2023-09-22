@@ -160,6 +160,12 @@ impl BeancountSources {
         &self.path_content[source_index].1
     }
 
+    /// Can't fail as SourceIds are constructed here
+    fn path(&self, source_id: SourceId) -> &Path {
+        let i: usize = source_id.into();
+        self.path_content[i].0.as_path()
+    }
+
     fn sources(&self) -> Vec<(String, &str)> {
         self.path_content
             .iter()
@@ -172,6 +178,22 @@ impl BeancountSources {
             .iter()
             .enumerate()
             .map(|(i, (_, _, content))| (SourceId::from(i), content.as_str()))
+    }
+
+    /// Build a source_id lookup from path
+    fn source_id_lookup(&self) -> HashMap<&Path, SourceId> {
+        let mut lookup = HashMap::new();
+
+        for (source_id, pathbuf) in self
+            .path_content
+            .iter()
+            .enumerate()
+            .map(|(i, (pathbuf, _, _))| (SourceId::from(i), pathbuf))
+        {
+            lookup.insert(pathbuf.as_path(), source_id);
+        }
+
+        lookup
     }
 }
 
@@ -241,51 +263,43 @@ where
     where
         's: 't,
     {
-        self.parse_declarations().map(|mut declarations_by_path| {
+        self.parse_declarations().map(|declarations| {
             let mut builder = DirectiveIteratorBuilder::new();
-            for (path, declarations) in declarations_by_path.drain() {
+
+            for (i, declarations) in declarations.into_iter().enumerate() {
                 eprintln!(
                     "{} declarations in {}",
                     declarations.len(),
-                    path.to_string_lossy()
+                    self.sources.path(SourceId::from(i)).to_string_lossy()
                 );
                 for declaration in declarations.into_iter() {
                     builder.declaration(declaration)
                 }
             }
-
             builder.build().collect::<Vec<_>>()
         })
     }
 
     /// Parse the sources, returning declarations or errors.
-    fn parse_declarations(
-        &'t self,
-    ) -> Result<HashMap<&'t Path, Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
+    /// The declarations are indexed by SourceId
+    fn parse_declarations(&'t self) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
     where
         's: 't,
     {
-        let mut all_outputs = HashMap::new();
+        let mut all_outputs = Vec::new();
         let mut all_errors = Vec::new();
 
-        for (i, (pathbuf, _, content)) in self.sources.path_content.iter().enumerate() {
-            let source_id = SourceId::from(i);
-            let path = pathbuf.as_path();
+        for (source_id, content) in self.sources.content_iter() {
+            let i_source: usize = source_id.into();
+            let tokens = &self.tokenized_sources[i_source];
 
-            let tokens = &self.tokenized_sources[i];
             let spanned_tokens = tokens
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
 
             let (output, errors) = file().parse(spanned_tokens).into_output_errors();
 
-            if let Some(output) = output {
-                all_outputs.insert(
-                    path,
-                    output, // .into_iter()
-                           // .map(|(d, span)| (d, Location::new(path, span))),
-                );
-            }
+            all_outputs.push(output.unwrap_or(Vec::new()));
 
             if !errors.is_empty() {
                 all_errors.extend(errors.into_iter().map(Error::from));
