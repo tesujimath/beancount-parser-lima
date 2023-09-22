@@ -207,7 +207,8 @@ type SpannedToken<'t> = (Token<'t>, Span);
 
 pub struct BeancountParser<'s, 't> {
     sources: &'s BeancountSources,
-    tokenized_sources: HashMap<&'t Path, (&'t str, Vec<SpannedToken<'t>>)>,
+    // indexed by source_id as per sources
+    tokenized_sources: Vec<Vec<SpannedToken<'t>>>,
 }
 
 impl<'s, 't> BeancountParser<'s, 't>
@@ -215,12 +216,11 @@ where
     's: 't,
 {
     pub fn new(sources: &'s BeancountSources) -> Self {
-        let mut tokenized_sources = HashMap::new();
+        let mut tokenized_sources = Vec::new();
 
-        for (i, (pathbuf, _, content)) in sources.path_content.iter().enumerate() {
-            let path = pathbuf.as_path();
-
-            tokenized_sources.insert(path, (content.as_str(), lex(SourceId::from(i), content)));
+        // TODO make a better iterator for this
+        for (i, (_, _, content)) in sources.path_content.iter().enumerate() {
+            tokenized_sources.push(lex(SourceId::from(i), content));
         }
 
         BeancountParser {
@@ -266,7 +266,7 @@ where
             let source_id = SourceId::from(i);
             let path = pathbuf.as_path();
 
-            let (_source, tokens) = self.tokenized_sources.get(path).unwrap();
+            let tokens = &self.tokenized_sources[i];
             let spanned_tokens = tokens
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
