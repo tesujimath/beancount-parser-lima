@@ -45,7 +45,7 @@ fn main() -> Result<()> {
                 );
             }
 
-            for directive in &directives {
+            for directive in directives {
                 if flags.show_allocations {
                     let directive_as_string = format!("{}", &directive.value());
                     directives_as_strings.push(directive_as_string);
