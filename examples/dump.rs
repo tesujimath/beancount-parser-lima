@@ -47,12 +47,12 @@ fn main() -> Result<()> {
 
             for directive in &directives {
                 if flags.show_allocations {
-                    let directive_as_string = format!("{}", &directive.spanned.value());
+                    let directive_as_string = format!("{}", &directive.value());
                     directives_as_strings.push(directive_as_string);
                     let last_directive = directives_as_strings.last().unwrap();
                     println!("{}\n", last_directive);
                 } else {
-                    println!("{}\n", &directive.spanned.value());
+                    println!("{}\n", &directive.value());
                 }
             }
 
@@ -62,8 +62,6 @@ fn main() -> Result<()> {
 
             Ok(())
         }
-        Err(errors) => sources
-            .write_sourced_errors(error_w, errors)
-            .map_err(|e| e.into()),
+        Err(errors) => sources.write_errors(error_w, errors).map_err(|e| e.into()),
     }
 }

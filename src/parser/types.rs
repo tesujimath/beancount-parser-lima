@@ -10,38 +10,26 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::empty,
     mem::swap,
-    path::Path,
 };
 use strum_macros::Display;
 use time::Date;
 
 pub type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
-/// Spanned and additionally with source path
-/// TODO: eventually this should perhaps be using &Path as the Span::Context,
-/// which requires bleeding edge chumsky at this time.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Sourced<'a, T> {
-    pub spanned: Spanned<T>,
-    pub source_path: &'a Path,
-}
-
 /// Our public error type
 #[derive(Debug)]
-pub struct SourcedError<'a> {
-    pub(crate) source_path: &'a Path,
+pub struct Error {
     pub(crate) span: Span,
     pub(crate) message: String,
     pub(crate) reason: Option<String>,
     pub(crate) contexts: Vec<(String, Span)>,
 }
 
-impl<'a> SourcedError<'a> {
-    pub(crate) fn from_parser_error(source_path: &'a Path, error: ParserError) -> Self {
+impl<'a> From<ParserError<'a>> for Error {
+    fn from(error: ParserError) -> Self {
         let error = error.map_token(|tok| tok.to_string());
 
-        SourcedError {
-            source_path,
+        Error {
             span: *error.span(),
             message: error.to_string(),
             reason: Some(error.reason().to_string()),
@@ -53,17 +41,20 @@ impl<'a> SourcedError<'a> {
     }
 }
 
-impl<'a> Display for SourcedError<'a> {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use chumsky::span::Span;
+
         write!(f, "{} ", self.message)?;
         if let Some(reason) = &self.reason {
             write!(f, "({}) ", reason)?;
         }
         write!(
             f,
-            "at {} of {}",
-            self.span,
-            self.source_path.to_string_lossy()
+            "at {}..{} of source {}",
+            self.span.start(),
+            self.span.end(),
+            self.span.context()
         )?;
         for context in self.contexts.iter() {
             write!(f, " while parsing {} at {}", context.0, context.1)?;
@@ -72,7 +63,7 @@ impl<'a> Display for SourcedError<'a> {
     }
 }
 
-impl<'a> std::error::Error for SourcedError<'a> {}
+impl std::error::Error for Error {}
 
 #[derive(Clone, Debug)]
 pub enum Declaration<'a> {

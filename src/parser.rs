@@ -6,8 +6,8 @@ use lexer::{lex, Token};
 use parsers::{file, includes};
 use path_clean::PathClean;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
-    fmt::{self, Formatter},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    fmt::{self, Display, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
@@ -23,36 +23,57 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span {
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
 pub struct SourceId(u32);
 
+impl From<usize> for SourceId {
+    fn from(value: usize) -> Self {
+        SourceId(value as u32)
+    }
+}
+
+impl From<SourceId> for usize {
+    fn from(value: SourceId) -> Self {
+        value.0 as usize
+    }
+}
+
+impl Display for SourceId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// The transitive closure of all the include'd source files.
 pub struct BeancountSources {
-    root_path: PathBuf,
-    content_paths: HashMap<PathBuf, (SourceId, String)>,
-    error_paths: HashMap<PathBuf, anyhow::Error>,
+    // The source_id is the index in `content_paths`, and the first of these is the `root_path`.
+    path_content: Vec<(PathBuf, String, String)>,
+    path_errors: Vec<(PathBuf, anyhow::Error)>,
 }
 
 impl BeancountSources {
     pub fn new(root_path: PathBuf) -> Self {
-        let mut content_paths = HashMap::new();
-        let mut error_paths = HashMap::new();
-        let mut paths = VecDeque::from([root_path.clone()]);
+        let mut path_content = Vec::new();
+        let mut path_errors = Vec::new();
 
-        while !paths.is_empty() {
-            let path = paths.pop_front().unwrap();
+        let mut pending_paths = VecDeque::from([root_path.clone()]);
+        let mut all_paths = HashSet::new();
+
+        while !pending_paths.is_empty() {
+            let path = pending_paths.pop_front().unwrap();
+            all_paths.insert(path.clone());
 
             match read(&path) {
                 Ok(content) => {
-                    // until Entry::insert_entry is stabilised, it seems we have to clone the PathBuf and do a double lookup
-                    let source_id = SourceId(content_paths.len() as u32);
+                    let source_id = SourceId::from(path_content.len());
+                    let source_id_string = path.to_string_lossy().into_owned();
 
-                    content_paths.insert(path.clone(), (source_id, content));
-                    let (source_id, content) = content_paths.get(&path).unwrap();
+                    path_content.push((path, source_id_string, content));
+                    let (path, _, content) = path_content.last().unwrap();
 
-                    let tokens = Some(lex(*source_id, content));
+                    let tokens = Some(lex(source_id, content));
                     let spanned_tokens = tokens
                         .as_ref()
                         .unwrap()
-                        .spanned(end_of_input(*source_id, content))
-                        .with_context(*source_id);
+                        .spanned(end_of_input(source_id, content))
+                        .with_context(source_id);
 
                     // ignore any errors in parsing, we'll pick them up in the next pass
                     // TODO can we do this with &str for includes?
@@ -62,10 +83,8 @@ impl BeancountSources {
                                 path.parent().map_or(PathBuf::from(&include), |parent| {
                                     parent.join(include).clean()
                                 });
-                            if !content_paths.contains_key(&included_path)
-                                && !error_paths.contains_key(&included_path)
-                            {
-                                paths.push_back(included_path);
+                            if !all_paths.contains(included_path.as_path()) {
+                                pending_paths.push_back(included_path);
                             } else {
                                 // TODO include cycle error
                                 writeln!(
@@ -80,22 +99,20 @@ impl BeancountSources {
                     };
                 }
                 Err(e) => {
-                    error_paths.insert(path, e);
+                    path_errors.push((path, e));
                 }
             }
         }
 
         Self {
-            root_path,
-            content_paths,
-            error_paths,
+            path_content,
+            path_errors,
         }
     }
 
     fn write_error_message<W>(
         &self,
         w: W,
-        src_id: String,
         span: Span,
         msg: String,
         reason: Option<String>,
@@ -106,45 +123,47 @@ impl BeancountSources {
     {
         use chumsky::span::Span;
 
-        Report::build(ReportKind::Error, src_id.clone(), span.start)
+        let src_id = self.source_id_string(&span);
+        Report::build(ReportKind::Error, src_id.to_string(), span.start)
             .with_message(msg)
             .with_labels(reason.into_iter().map(|reason| {
-                Label::new((src_id.clone(), span.start()..span.end()))
+                Label::new((src_id.to_string(), span.start()..span.end()))
                     .with_message(reason)
                     .with_color(Color::Red)
             }))
             .with_labels(contexts.into_iter().map(|(label, span)| {
-                Label::new((src_id.clone(), span.start()..span.end()))
-                    .with_message(lazy_format!("while parsing this {}", label))
-                    .with_color(Color::Yellow)
+                Label::new((
+                    self.source_id_string(&span).to_string(),
+                    span.start()..span.end(),
+                ))
+                .with_message(lazy_format!("while parsing this {}", label))
+                .with_color(Color::Yellow)
             }))
             .finish()
             .write(ariadne::sources(self.sources()), w)
     }
 
-    pub fn write_sourced_errors<W>(&self, w: W, errors: Vec<SourcedError>) -> io::Result<()>
+    pub fn write_errors<W>(&self, w: W, errors: Vec<Error>) -> io::Result<()>
     where
         W: Write + Copy,
     {
         for error in errors.into_iter() {
-            let src_id = path_to_string(error.source_path);
-
-            self.write_error_message(
-                w,
-                src_id.clone(),
-                error.span,
-                error.message,
-                error.reason,
-                error.contexts,
-            )?;
+            self.write_error_message(w, error.span, error.message, error.reason, error.contexts)?;
         }
         Ok(())
     }
 
+    fn source_id_string(&self, span: &Span) -> &str {
+        use chumsky::span::Span;
+
+        let source_index: usize = span.context().into();
+        &self.path_content[source_index].1
+    }
+
     fn sources(&self) -> Vec<(String, &str)> {
-        self.content_paths
+        self.path_content
             .iter()
-            .map(|(path, (_source_id, content))| (path_to_string(path), content.as_str()))
+            .map(|(_, source_id_string, content)| (source_id_string.to_string(), content.as_str()))
             .collect()
     }
 }
@@ -160,11 +179,11 @@ impl std::fmt::Debug for BeancountSources {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "BeancountSources(",)?;
 
-        for (path, (_source_id, content)) in &self.content_paths {
+        for (path, _, content) in &self.path_content {
             writeln!(f, "    {} ok len {},", path.display(), content.len())?;
         }
 
-        for (path, error) in &self.error_paths {
+        for (path, error) in &self.path_errors {
             writeln!(f, "    {} {},", path.display(), error)?;
         }
 
@@ -198,10 +217,10 @@ where
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = HashMap::new();
 
-        for (pathbuf, (source_id, content)) in &sources.content_paths {
+        for (i, (pathbuf, _, content)) in sources.path_content.iter().enumerate() {
             let path = pathbuf.as_path();
 
-            tokenized_sources.insert(path, (content.as_str(), lex(*source_id, content)));
+            tokenized_sources.insert(path, (content.as_str(), lex(SourceId::from(i), content)));
         }
 
         BeancountParser {
@@ -212,7 +231,7 @@ where
 
     /// Parse the sources, returning declarations or errors.
     /// No date ordering is performed.  But see [BeancountStore].
-    pub fn parse(&'t self) -> Result<Vec<Sourced<Directive<'t>>>, Vec<SourcedError<'t>>>
+    pub fn parse(&'t self) -> Result<Vec<Spanned<Directive<'t>>>, Vec<Error>>
     where
         's: 't,
     {
@@ -225,7 +244,7 @@ where
                     path.to_string_lossy()
                 );
                 for declaration in declarations.into_iter() {
-                    builder.declaration(declaration, path)
+                    builder.declaration(declaration)
                 }
             }
 
@@ -236,20 +255,21 @@ where
     /// Parse the sources, returning declarations or errors.
     fn parse_declarations(
         &'t self,
-    ) -> Result<HashMap<&'t Path, Vec<Spanned<Declaration<'t>>>>, Vec<SourcedError<'t>>>
+    ) -> Result<HashMap<&'t Path, Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
     where
         's: 't,
     {
         let mut all_outputs = HashMap::new();
-        let mut all_errors = HashMap::new();
+        let mut all_errors = Vec::new();
 
-        for (pathbuf, (source_id, content)) in &self.sources.content_paths {
+        for (i, (pathbuf, _, content)) in self.sources.path_content.iter().enumerate() {
+            let source_id = SourceId::from(i);
             let path = pathbuf.as_path();
 
             let (_source, tokens) = self.tokenized_sources.get(path).unwrap();
             let spanned_tokens = tokens
-                .spanned(end_of_input(*source_id, content))
-                .with_context(*source_id);
+                .spanned(end_of_input(source_id, content))
+                .with_context(source_id);
 
             let (output, errors) = file().parse(spanned_tokens).into_output_errors();
 
@@ -262,23 +282,14 @@ where
             }
 
             if !errors.is_empty() {
-                all_errors.insert(path, errors);
+                all_errors.extend(errors.into_iter().map(Error::from));
             }
         }
 
         if all_errors.is_empty() {
             Ok(all_outputs)
         } else {
-            let sourced_errors = all_errors
-                .into_iter()
-                .flat_map(|(path, errors)| {
-                    errors
-                        .into_iter()
-                        .map(|e| SourcedError::from_parser_error(path, e))
-                })
-                .collect::<Vec<_>>();
-
-            Err(sourced_errors)
+            Err(all_errors)
         }
     }
 }
@@ -287,7 +298,7 @@ where
 /// Importantly, directives with the same date must be preserved in source file order.
 #[derive(Default, Debug)]
 struct DirectiveIteratorBuilder<'t> {
-    date_buckets: BTreeMap<Date, Vec<Sourced<'t, Directive<'t>>>>,
+    date_buckets: BTreeMap<Date, Vec<Spanned<Directive<'t>>>>,
     // TODO tags and metadata from push/pop pragma processing
 }
 
@@ -296,7 +307,7 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         Self::default()
     }
 
-    fn declaration<'a>(&'a mut self, declaration: Spanned<Declaration<'t>>, source_path: &'t Path)
+    fn declaration<'a>(&'a mut self, declaration: Spanned<Declaration<'t>>)
     where
         't: 'a,
     {
@@ -305,17 +316,15 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         match declaration.value {
             Directive(directive) => {
                 let date = *directive.date();
-                let sourced = Sourced {
-                    spanned: spanned(directive, declaration.span),
-                    source_path,
-                };
+                let directive = spanned(directive, declaration.span);
+
                 match self.date_buckets.get_mut(&date) {
                     None => {
                         self.date_buckets.insert(date, Vec::new());
                         let bucket = self.date_buckets.get_mut(&date).unwrap();
-                        bucket.push(sourced);
+                        bucket.push(directive);
                     }
-                    Some(directives) => directives.push(sourced),
+                    Some(directives) => directives.push(directive),
                 }
             }
             Pragma(_pragma) => {
@@ -324,7 +333,7 @@ impl<'t> DirectiveIteratorBuilder<'t> {
         }
     }
 
-    fn build(&mut self) -> impl Iterator<Item = Sourced<'t, Directive<'t>>> {
+    fn build(&mut self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
         let date_buckets = std::mem::take(&mut self.date_buckets);
         date_buckets
             .into_iter()
