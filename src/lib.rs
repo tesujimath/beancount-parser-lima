@@ -5,5 +5,6 @@
 pub use parser::{dump_tokens, BeancountParser, BeancountSources};
 
 mod parser;
+mod sort;
 mod store;
 mod types;
