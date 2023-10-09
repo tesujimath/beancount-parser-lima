@@ -9,7 +9,9 @@ use std::alloc::System;
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-use beancount_parser::{parser::Directive, BeancountParser, BeancountSources, Dated, SortIterator};
+use beancount_parser::{
+    parser::Directive, BeancountParser, BeancountSources, Dated, SortIteratorAdaptor,
+};
 
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
@@ -38,8 +40,6 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
     match beancount_parser.parse() {
         Ok(directives) => {
-            writeln!(error_w, "parsed {} directives", directives.len())?;
-
             let mut directives_as_strings = Vec::new();
 
             if flags.show_allocations {

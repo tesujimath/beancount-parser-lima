@@ -3,7 +3,7 @@
 #![recursion_limit = "256"]
 
 pub use parser::{dump_tokens, BeancountParser, BeancountSources};
-pub use sort::SortIterator;
+pub use sort::SortIteratorAdaptor;
 pub use types::*;
 
 pub mod parser;

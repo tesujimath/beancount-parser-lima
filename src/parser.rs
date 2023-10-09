@@ -258,7 +258,7 @@ where
 
     /// Parse the sources, returning declarations or errors.
     /// No date ordering is performed.  But see [BeancountStore].
-    pub fn parse(&'t self) -> Result<ParseResult<'t>, Vec<Error>>
+    pub fn parse(&'t self) -> Result<ParseResult<'s, 't>, Vec<Error>>
     where
         's: 't,
     {
@@ -307,31 +307,21 @@ where
 /// A `ParseResult` is an iterator over directives.
 ///
 /// It may be useful to attach an ordering adapter to return them in date order.
-pub struct ParseResult<'t> {
-    directives: VecDeque<Spanned<Directive<'t>>>,
+pub struct ParseResult<'s, 't> {
+    directives: DirectiveIterator<'s, 't>,
 }
 
-impl<'t> ParseResult<'t> {
-    fn new(directives: impl Iterator<Item = Spanned<Directive<'t>>>) -> Self {
-        let directives = directives.collect();
-
+impl<'s, 't> ParseResult<'s, 't> {
+    fn new(directives: DirectiveIterator<'s, 't>) -> Self {
         ParseResult { directives }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.directives.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.directives.len()
-    }
 }
 
-impl<'t> Iterator for ParseResult<'t> {
+impl<'s, 't> Iterator for ParseResult<'s, 't> {
     type Item = Spanned<Directive<'t>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.directives.pop_front()
+        self.directives.next()
     }
 }
 

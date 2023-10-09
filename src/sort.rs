@@ -72,7 +72,7 @@ where
     }
 }
 
-pub trait SortIterator<K, V, F>: Iterator<Item = V> + Sized {
+pub trait SortIteratorAdaptor<K, V, F>: Iterator<Item = V> + Sized {
     /// Iterator adapter for stable sort.
     ///
     /// Items are returned in order of key, where items with the same key remain in their original order.
@@ -85,6 +85,6 @@ pub trait SortIterator<K, V, F>: Iterator<Item = V> + Sized {
     }
 }
 
-impl<K, V, F, I: Iterator<Item = V>> SortIterator<K, V, F> for I {}
+impl<K, V, F, I: Iterator<Item = V>> SortIteratorAdaptor<K, V, F> for I {}
 
 mod tests;
