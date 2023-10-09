@@ -9,9 +9,7 @@ use std::alloc::System;
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-use beancount_parser::{
-    parser::Directive, BeancountParser, BeancountSources, Dated, SortIteratorAdaptor,
-};
+use beancount_parser::{parser::Directive, BeancountParser, BeancountSources};
 
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
@@ -19,7 +17,7 @@ fn main() -> Result<()> {
         optional --show-allocations
 
         // Sort directives by date
-        optional --sort
+        optional --by-date
 
         /// File to parse
         required path: PathBuf
@@ -64,8 +62,8 @@ fn main() -> Result<()> {
                 }
             }
 
-            if flags.sort {
-                for directive in directives.sort(|d| d.value().date()) {
+            if flags.by_date {
+                for directive in directives.by_date() {
                     show_directive(
                         directive.value(),
                         flags.show_allocations,

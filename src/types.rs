@@ -3,7 +3,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 use strum_macros::{Display, EnumString};
-use time::Date;
 
 use crate::parser::SourceId;
 
@@ -166,11 +165,6 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value,)
     }
-}
-
-/// A trait for items which have a date
-pub trait Dated {
-    fn date(&self) -> Date;
 }
 
 mod tests;

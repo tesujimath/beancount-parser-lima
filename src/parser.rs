@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::{sort::SortIteratorAdaptor, types::*};
 use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
@@ -314,6 +314,10 @@ pub struct ParseResult<'s, 't> {
 impl<'s, 't> ParseResult<'s, 't> {
     fn new(directives: DirectiveIterator<'s, 't>) -> Self {
         ParseResult { directives }
+    }
+
+    pub fn by_date(self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
+        self.directives.sort(|d| d.value().date())
     }
 }
 

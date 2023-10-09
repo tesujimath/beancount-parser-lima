@@ -94,6 +94,11 @@ impl<'a> Display for Directive<'a> {
     }
 }
 
+/// A trait for items which have a date
+pub trait Dated {
+    fn date(&self) -> Date;
+}
+
 impl<'a> Dated for Directive<'a> {
     fn date(&self) -> Date {
         use Directive::*;
