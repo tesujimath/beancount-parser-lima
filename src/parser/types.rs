@@ -94,13 +94,8 @@ impl<'a> Display for Directive<'a> {
     }
 }
 
-/// A trait for items which have a date
-pub trait Dated {
-    fn date(&self) -> &Date;
-}
-
 impl<'a> Dated for Directive<'a> {
-    fn date(&self) -> &Date {
+    fn date(&self) -> Date {
         use Directive::*;
 
         match self {
@@ -152,8 +147,8 @@ impl<'a> Display for Transaction<'a> {
 }
 
 impl<'a> Dated for Transaction<'a> {
-    fn date(&self) -> &Date {
-        &self.date.value
+    fn date(&self) -> Date {
+        self.date.value
     }
 }
 
@@ -180,8 +175,8 @@ impl<'a> Display for Open<'a> {
 }
 
 impl<'a> Dated for Open<'a> {
-    fn date(&self) -> &Date {
-        &self.date.value
+    fn date(&self) -> Date {
+        self.date.value
     }
 }
 
@@ -204,8 +199,8 @@ impl<'a> Display for Close<'a> {
 }
 
 impl<'a> Dated for Close<'a> {
-    fn date(&self) -> &Date {
-        &self.date.value
+    fn date(&self) -> Date {
+        self.date.value
     }
 }
 
@@ -228,8 +223,8 @@ impl<'a> Display for Commodity<'a> {
 }
 
 impl<'a> Dated for Commodity<'a> {
-    fn date(&self) -> &Date {
-        &self.date.value
+    fn date(&self) -> Date {
+        self.date.value
     }
 }
 

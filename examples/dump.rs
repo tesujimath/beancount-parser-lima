@@ -9,12 +9,16 @@ use std::alloc::System;
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-use beancount_parser::{BeancountParser, BeancountSources};
+use beancount_parser::{parser::Directive, BeancountParser, BeancountSources, Dated, SortIterator};
 
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
         /// Show allocations
         optional --show-allocations
+
+        // Sort directives by date
+        optional --sort
+
         /// File to parse
         required path: PathBuf
     };
@@ -45,14 +49,36 @@ fn main() -> Result<()> {
                 );
             }
 
-            for directive in directives {
-                if flags.show_allocations {
-                    let directive_as_string = format!("{}", &directive.value());
+            fn show_directive(
+                directive: &Directive,
+                show_allocations: bool,
+                directives_as_strings: &mut Vec<String>,
+            ) {
+                if show_allocations {
+                    let directive_as_string = format!("{}", &directive);
                     directives_as_strings.push(directive_as_string);
                     let last_directive = directives_as_strings.last().unwrap();
                     println!("{}\n", last_directive);
                 } else {
-                    println!("{}\n", &directive.value());
+                    println!("{}\n", &directive);
+                }
+            }
+
+            if flags.sort {
+                for directive in directives.sort(|d| d.value().date()) {
+                    show_directive(
+                        directive.value(),
+                        flags.show_allocations,
+                        &mut directives_as_strings,
+                    );
+                }
+            } else {
+                for directive in directives {
+                    show_directive(
+                        directive.value(),
+                        flags.show_allocations,
+                        &mut directives_as_strings,
+                    );
                 }
             }
 
