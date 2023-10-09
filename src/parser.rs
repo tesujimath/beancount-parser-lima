@@ -12,7 +12,7 @@ use std::{
     io::{self, stderr, Read, Write},
     path::{Path, PathBuf},
 };
-use types::*;
+pub use types::*;
 
 fn end_of_input(source_id: SourceId, s: &str) -> Span {
     chumsky::span::Span::new(source_id, s.len()..s.len())
@@ -316,6 +316,10 @@ impl<'t> ParseResult<'t> {
         let directives = directives.collect();
 
         ParseResult { directives }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.directives.is_empty()
     }
 
     pub fn len(&self) -> usize {
