@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::{self, Debug},
+};
 
 /// See [sort].
 pub struct Sort<K, V> {
@@ -6,28 +9,8 @@ pub struct Sort<K, V> {
     tail_buckets: BTreeMap<K, VecDeque<V>>,
 }
 
-impl<K, V> Iterator for Sort<K, V>
-where
-    K: Ord,
-{
-    type Item = V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(head_bucket) = &mut self.head_bucket {
-            head_bucket.pop_front()
-        } else {
-            self.head_bucket = self.tail_buckets.pop_first().map(|(_k, v)| v);
-            if let Some(head_bucket) = &mut self.head_bucket {
-                head_bucket.pop_front()
-            } else {
-                None
-            }
-        }
-    }
-}
-
 impl<K, V> Sort<K, V> {
-    pub fn new<I, F>(iter: I, keyfn: F) -> Self
+    fn new<I, F>(iter: I, keyfn: F) -> Self
     where
         K: Ord + Copy,
         I: Iterator<Item = V>,
@@ -49,10 +32,43 @@ impl<K, V> Sort<K, V> {
                 }
             }
         }
+
         Sort {
             head_bucket: None,
             tail_buckets: buckets,
         }
+    }
+}
+
+impl<K, V> Iterator for Sort<K, V>
+where
+    K: Ord,
+{
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // do we need to get next bucket?
+        if match &self.head_bucket {
+            None => true,
+            Some(b) => b.is_empty(),
+        } {
+            self.head_bucket = self.tail_buckets.pop_first().map(|(_k, v)| v);
+        }
+
+        self.head_bucket.as_mut().and_then(|b| b.pop_front())
+    }
+}
+
+impl<K, V> Debug for Sort<K, V>
+where
+    K: Debug,
+    V: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Sort")
+            .field("head_bucket", &self.head_bucket)
+            .field("tail_bucket", &self.tail_buckets)
+            .finish()
     }
 }
 
@@ -70,3 +86,5 @@ pub trait SortIterator<K, V, F>: Iterator<Item = V> + Sized {
 }
 
 impl<K, V, F, I: Iterator<Item = V>> SortIterator<K, V, F> for I {}
+
+mod tests;

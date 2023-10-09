@@ -386,8 +386,6 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
                             Pragma::Placeholder(_) => {
                                 eprintln!("placeholder");
                             }
-
-                            _ => (),
                         }
                         // TODO
                         self.next()
