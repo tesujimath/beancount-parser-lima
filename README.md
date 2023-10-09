@@ -6,6 +6,12 @@ Yeah, Beancount is complicated, and I may have made some mistakes here.  Current
 
 - metadata tags/links for transaction get folded in with those in the transaction header line
 
+## Unsupported
+
+This is an incomplete list of what is currently unsupported.
+
+- plugins
+
 ## License
 
 Licensed under either of

@@ -81,12 +81,27 @@ where
 {
     use Pragma::*;
 
+    let tag = select_ref!(Token::Tag(tag) => tag);
+    let key = select_ref!(Token::Key(key) => key);
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
-    choice((just(Token::Include).ignore_then(string).map(Include),))
-        .then_ignore(just(Token::Eol))
-        .labelled("pragma")
-        .as_context()
+    choice((
+        just(Token::Pushtag)
+            .ignore_then(tag)
+            .map_with_span(|tag, span| Pushtag(spanned(tag, span))),
+        just(Token::Poptag).ignore_then(tag).map(Poptag),
+        just(Token::Pushmeta)
+            .ignore_then(meta_key_value())
+            .map(Pushmeta),
+        just(Token::Popmeta)
+            .ignore_then(key)
+            .then_ignore(just(Token::Colon))
+            .map(Popmeta),
+        just(Token::Include).ignore_then(string).map(Include),
+    ))
+    .then_ignore(just(Token::Eol))
+    .labelled("pragma")
+    .as_context()
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.
@@ -467,24 +482,32 @@ enum Metadatum<'a> {
 }
 
 /// Matches a single Metadatum on a single line.
+fn meta_key_value<'src, I>(
+) -> impl Parser<'src, I, MetaKeyValue<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let key = select_ref!(Token::Key(key) => key);
+
+    key.map_with_span(spanned)
+        .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
+        .map(|(key, value)| MetaKeyValue { key, value })
+}
+
+/// Matches a single Metadatum on a single line.
 fn metadatum_line<'src, I>() -> impl Parser<'src, I, Metadatum<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Metadatum::*;
 
-    let key = select_ref!(Token::Key(key) => key);
     let tag = select_ref!(Token::Tag(tag) => tag);
     let link = select_ref!(Token::Link(link) => link);
 
     just(Token::Indent)
         .ignore_then(
             choice((
-                key.map_with_span(spanned)
-                    .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
-                    .map_with_span(|(key, value), span| {
-                        KeyValue(spanned(MetaKeyValue { key, value }, span))
-                    }),
+                meta_key_value().map_with_span(spanned).map(KeyValue),
                 tag.map_with_span(spanned).map(Tag),
                 link.map_with_span(spanned).map(Link),
             ))

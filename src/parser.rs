@@ -336,7 +336,9 @@ struct DirectiveIterator<'s, 't> {
     current: VecDeque<Spanned<Declaration<'t>>>,
     stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
-    // TODO tags and metadata from push/pop pragma processing
+    // tags for pragma push/pop
+    tags: HashMap<&'t Tag<'t>, Span>,
+    meta_key_values: HashMap<&'t Key<'t>, Spanned<MetaValue<'t>>>,
 }
 
 impl<'s, 't> DirectiveIterator<'s, 't> {
@@ -353,6 +355,8 @@ impl<'s, 't> DirectiveIterator<'s, 't> {
             current,
             stacked: VecDeque::new(),
             remaining,
+            tags: HashMap::new(),
+            meta_key_values: HashMap::new(),
         }
     }
 }
@@ -365,9 +369,25 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
             Some(declaration) => {
                 match declaration.value {
                     Declaration::Directive(directive) => Some(spanned(directive, declaration.span)),
+
                     Declaration::Pragma(pragma) => {
+                        use Pragma::*;
+
                         match pragma {
-                            Pragma::Include(_path) => {
+                            Pushtag(tag) => {
+                                self.tags.insert(tag.value, tag.span);
+                            }
+                            Poptag(tag) => {
+                                self.tags.remove(tag);
+                            }
+                            Pushmeta(m) => {
+                                self.meta_key_values.insert(m.key.value, m.value);
+                            }
+                            Popmeta(key) => {
+                                self.meta_key_values.remove(key);
+                            }
+
+                            Include(_path) => {
                                 // TODO need to validate the path against what we have in remaining
                                 match self.remaining.pop_front() {
                                     Some(mut switcheroo) => {
@@ -379,10 +399,6 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
                                         eprintln!("warning, include found but nothing remaining");
                                     }
                                 }
-                            }
-
-                            Pragma::Placeholder(_) => {
-                                eprintln!("placeholder");
                             }
                         }
                         // TODO

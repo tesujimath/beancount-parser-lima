@@ -114,9 +114,14 @@ impl<'a> Dated for Directive<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Pragma<'a> {
-    // TODO
-    Placeholder(&'a str),
+    // we keep pushed tags with their span
+    // since it may be useful downstream to know where these came from
+    Pushtag(Spanned<&'a Tag<'a>>),
+    Poptag(&'a Tag<'a>),
+    Pushmeta(MetaKeyValue<'a>),
+    Popmeta(&'a Key<'a>),
     Include(&'a str),
+    // TODO option, and probably not plugin
 }
 
 #[derive(Clone, Debug)]
