@@ -166,8 +166,6 @@ pub struct Open<'a> {
     pub(crate) account: Spanned<&'a Account<'a>>,
     pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<Booking>>,
-    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
 }
 
@@ -176,9 +174,9 @@ impl<'a> Display for Open<'a> {
         write!(f, "{} open {}", self.date, self.account)?;
         format(f, &self.currencies, plain, " ", Some(" "))?;
         format(f, &self.booking, double_quoted, " ", Some(" "))?;
-        format(f, &self.tags, plain, " ", Some(" "))?;
-        format(f, &self.links, plain, " ", Some(" "))?;
-        self.metadata.fmt(f)
+        // we prefer to show tags and links inline rather then line by line in metadata
+        self.metadata.fmt_tags_links_inline(f)?;
+        self.metadata.fmt_keys_values(f)
     }
 }
 
@@ -192,17 +190,15 @@ impl<'a> Dated for Open<'a> {
 pub struct Close<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
-    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
 }
 
 impl<'a> Display for Close<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{} close {}", self.date, self.account)?;
-        format(f, &self.tags, plain, " ", Some(" "))?;
-        format(f, &self.links, plain, " ", Some(" "))?;
-        self.metadata.fmt(f)
+        // we prefer to show tags and links inline rather then line by line in metadata
+        self.metadata.fmt_tags_links_inline(f)?;
+        self.metadata.fmt_keys_values(f)
     }
 }
 
@@ -216,17 +212,15 @@ impl<'a> Dated for Close<'a> {
 pub struct Commodity<'a> {
     pub date: Spanned<Date>,
     pub currency: Spanned<&'a Currency<'a>>,
-    pub tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub links: HashSet<Spanned<&'a Link<'a>>>,
     pub metadata: Metadata<'a>,
 }
 
 impl<'a> Display for Commodity<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{} commodity {}", self.date, self.currency)?;
-        format(f, &self.tags, plain, " ", Some(" "))?;
-        format(f, &self.links, plain, " ", Some(" "))?;
-        self.metadata.fmt(f)
+        // we prefer to show tags and links inline rather then line by line in metadata
+        self.metadata.fmt_tags_links_inline(f)?;
+        self.metadata.fmt_keys_values(f)
     }
 }
 

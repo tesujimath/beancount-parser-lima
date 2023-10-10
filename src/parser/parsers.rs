@@ -181,15 +181,18 @@ pub fn open<'src, I>() -> impl Parser<'src, I, Open<'src>, extra::Err<ParserErro
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    group((open_header_line(), metadata())).map(
-        |((date, account, currencies, booking, (tags, links)), metadata)| Open {
-            date,
-            account,
-            currencies,
-            booking,
-            tags,
-            links,
-            metadata,
+    group((open_header_line(), metadata())).validate(
+        |((date, account, currencies, booking, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(tags, emitter);
+            metadata.merge_links(links, emitter);
+
+            Open {
+                date,
+                account,
+                currencies,
+                booking,
+                metadata,
+            }
         },
     )
 }
@@ -265,15 +268,18 @@ pub fn close<'src, I>() -> impl Parser<'src, I, Close<'src>, extra::Err<ParserEr
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    group((close_header_line(), metadata())).map(|((date, account, (tags, links)), metadata)| {
-        Close {
-            date,
-            account,
-            tags,
-            links,
-            metadata,
-        }
-    })
+    group((close_header_line(), metadata())).validate(
+        |((date, account, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(tags, emitter);
+            metadata.merge_links(links, emitter);
+
+            Close {
+                date,
+                account,
+                metadata,
+            }
+        },
+    )
 }
 
 /// Matches the first line of a close.
@@ -311,13 +317,16 @@ pub fn commodity<'src, I>() -> impl Parser<'src, I, Commodity<'src>, extra::Err<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    group((commodity_header_line(), metadata())).map(
-        |((date, currency, (tags, links)), metadata)| Commodity {
-            date,
-            currency,
-            tags,
-            links,
-            metadata,
+    group((commodity_header_line(), metadata())).validate(
+        |((date, currency, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(tags, emitter);
+            metadata.merge_links(links, emitter);
+
+            Commodity {
+                date,
+                currency,
+                metadata,
+            }
         },
     )
 }

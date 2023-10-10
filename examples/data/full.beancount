@@ -1,12 +1,13 @@
 ; an example Beancount file
 
-1970-01-01 commodity NZD
+1970-01-01 commodity NZD #downunder ^money.co.nz
 ;   ; New Zealand Dollar
 
-2016-03-01 open Assets:Bank:Current NZD
+2016-03-01 open Assets:Bank:Current NZD #money ^www.bank.com
 ;   check commodity == "NZD"
 
-2024-03-01 close Assets:Bank:Current
+2024-03-01 close Assets:Bank:Current #seeya
+  ^solong.and.thanks
 
 ; TODO this should be an error, can only open an account once:
 2025-03-01 open Assets:Bank:Current
