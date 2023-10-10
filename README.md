@@ -4,7 +4,7 @@ _Work in progress_
 
 Yeah, Beancount is complicated, and I may have made some mistakes here.  Current list of uncertainties, which is certainly not comprehensive.
 
-- metadata tags/links for transaction get folded in with those in the transaction header line
+- metadata tags/links for a directive get folded in with those in the directive header line
 
 ## Unsupported
 

@@ -57,8 +57,8 @@ fn test_transaction(
     assert_eq!(&result.flag, &expected_flag);
     assert_eq!(&result.payee, &expected_payee);
     assert_eq!(&result.narration, &expected_narration);
-    assert_eq!(&result.tags, &expected_tags);
-    assert_eq!(&result.links, &expected_links);
+    assert_eq!(&result.metadata.tags, &expected_tags);
+    assert_eq!(&result.metadata.links, &expected_links);
 }
 
 #[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]

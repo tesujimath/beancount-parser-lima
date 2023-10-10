@@ -118,29 +118,21 @@ where
             .repeated()
             .collect::<Vec<_>>(),
     ))
-    .map(
-        |((date, flag, s1, s2, (tags, links)), metadata, postings)| match (s1, s2) {
-            // a single string is narration
-            (Some(s1), None) => Transaction {
+    .validate(
+        |((date, flag, (payee, narration), (tags, links)), mut metadata, postings),
+         _span,
+         emitter| {
+            metadata.merge_tags(tags, emitter);
+            metadata.merge_links(links, emitter);
+
+            Transaction {
                 date,
                 flag,
-                payee: None,
-                narration: Some(s1),
-                tags,
-                links,
+                payee,
+                narration,
                 metadata,
                 postings,
-            },
-            (s1, s2) => Transaction {
-                date,
-                flag,
-                payee: s1,
-                narration: s2,
-                tags,
-                links,
-                metadata,
-                postings,
-            },
+            }
         },
     )
 }
@@ -152,8 +144,7 @@ fn transaction_header_line<'src, I>() -> impl Parser<
     (
         Spanned<Date>,
         Spanned<Flag>,
-        Option<Spanned<&'src str>>,
-        Option<Spanned<&'src str>>,
+        (Option<Spanned<&'src str>>, Option<Spanned<&'src str>>),
         (
             HashSet<Spanned<&'src Tag<'src>>>,
             HashSet<Spanned<&'src Link<'src>>>,
@@ -170,8 +161,16 @@ where
     group((
         date.map_with_span(spanned),
         txn().map_with_span(spanned),
-        string.map_with_span(spanned).or_not(),
-        string.map_with_span(spanned).or_not(),
+        // payee and narration get special handling in case one is omitted
+        group((
+            string.map_with_span(spanned).or_not(),
+            string.map_with_span(spanned).or_not(),
+        ))
+        .map(|(s1, s2)| match (s1, s2) {
+            // a single string is narration
+            (Some(s1), None) => (None, Some(s1)),
+            (s1, s2) => (s1, s2),
+        }),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))

@@ -1,6 +1,6 @@
 use super::lexer::Token;
 use crate::types::*;
-use chumsky::prelude::Rich;
+use chumsky::{input::Emitter, prelude::Rich};
 use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
@@ -130,8 +130,6 @@ pub struct Transaction<'a> {
     pub(crate) flag: Spanned<Flag>,
     pub(crate) payee: Option<Spanned<&'a str>>,
     pub(crate) narration: Option<Spanned<&'a str>>,
-    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
     pub(crate) metadata: Metadata<'a>,
     pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
@@ -142,9 +140,9 @@ impl<'a> Display for Transaction<'a> {
 
         format(f, &self.payee, double_quoted, " ", Some(" "))?;
         format(f, &self.narration, double_quoted, " ", Some(" "))?;
-        format(f, &self.tags, plain, " ", Some(" "))?;
-        format(f, &self.links, plain, " ", Some(" "))?;
-        self.metadata.fmt(f)?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        self.metadata.fmt_tags_links_inline(f)?;
+        self.metadata.fmt_keys_values(f)?;
         format(
             f,
             &self.postings,
@@ -486,15 +484,68 @@ pub struct Metadata<'a> {
     pub links: HashSet<Spanned<&'a Link<'a>>>,
 }
 
-impl<'a> Display for Metadata<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl<'a> Metadata<'a> {
+    pub fn merge_tags(
+        &mut self,
+        tags: HashSet<Spanned<&'a Tag<'a>>>,
+        emitter: &mut Emitter<ParserError<'a>>,
+    ) {
+        for tag in tags {
+            match self.tags.get(&tag) {
+                None => {
+                    self.tags.insert(tag);
+                }
+                Some(meta_tag) => {
+                    // TODO link the error to the tag with which it conflicts
+                    emitter.emit(Rich::custom(
+                        meta_tag.span,
+                        format!("duplicate tag {}", tag.value),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn merge_links(
+        &mut self,
+        links: HashSet<Spanned<&'a Link<'a>>>,
+        emitter: &mut Emitter<ParserError<'a>>,
+    ) {
+        for link in links {
+            match self.links.get(&link) {
+                None => {
+                    self.links.insert(link);
+                }
+                Some(meta_link) => {
+                    // TODO link the error to the link with which it conflicts
+                    emitter.emit(Rich::custom(
+                        meta_link.span,
+                        format!("duplicate link {}", link.value),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn fmt_tags_links_inline(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        format(f, &self.tags, plain, SPACE, Some(SPACE))?;
+        format(f, &self.links, plain, SPACE, Some(SPACE))
+    }
+
+    pub fn fmt_keys_values(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format(
             f,
             &self.key_values,
             key_value,
             NEWLINE_INDENT,
             Some(NEWLINE_INDENT),
-        )?;
+        )
+    }
+}
+
+impl<'a> Display for Metadata<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_keys_values(f)?;
         format(f, &self.tags, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
         format(f, &self.links, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))
     }
@@ -1224,6 +1275,7 @@ fn pad_if(condition: bool) -> &'static str {
     }
 }
 
+const SPACE: &str = " ";
 const NEWLINE: &str = "\n";
 const INDENT: &str = "  ";
 const NEWLINE_INDENT: &str = "\n  ";
