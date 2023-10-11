@@ -82,7 +82,7 @@ pub enum Directive<'a> {
 }
 
 impl<'a> Directive<'a> {
-    fn metadata_mut(&'a mut self) -> &'a mut Metadata {
+    pub fn metadata_mut(&'a mut self) -> &'a mut Metadata {
         use Directive::*;
 
         match self {
@@ -130,9 +130,9 @@ pub enum Pragma<'a> {
     // we keep pushed tags with their span
     // since it may be useful downstream to know where these came from
     Pushtag(Spanned<&'a Tag<'a>>),
-    Poptag(&'a Tag<'a>),
+    Poptag(Spanned<&'a Tag<'a>>),
     Pushmeta(MetaKeyValue<'a>),
-    Popmeta(&'a Key<'a>),
+    Popmeta(Spanned<&'a Key<'a>>),
     Include(&'a str),
     // TODO option, and probably not plugin
 }
@@ -534,25 +534,32 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub fn merge_key_values(
+    pub fn merge_key_values_ignoring_errors_for_now(
         &mut self,
-        key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
-        emitter: &mut Emitter<ParserError<'a>>,
+        key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+        // TODO some some emitter here
     ) {
         for (key, value) in key_values {
-            match self.key_values.get(&key) {
+            match self.key_values.get(key) {
                 None => {
-                    self.key_values.insert(key, value);
+                    self.key_values.insert(
+                        spanned(key.value, key.span),
+                        // We actually do have to clone to value here.
+                        // This is used for merging in metadata key/values from the push/pop stack,
+                        // which does in fact require cloning.
+                        spanned(value.value.clone(), value.span),
+                    );
                 }
-                Some(existing_value) => {
+                Some(_existing_value) => {
                     // TODO link the error to the key/value with which it conflicts
-                    emitter.emit(Rich::custom(
-                        existing_value.span,
-                        format!(
-                            "duplicate key/value {}: {}",
-                            key.value, existing_value.value
-                        ),
-                    ));
+                    // TODO emit the error
+                    // emitter.emit(Rich::custom(
+                    //     existing_value.span,
+                    //     format!(
+                    //         "duplicate key/value {}: {}",
+                    //         key.value, existing_value.value
+                    //     ),
+                    // ));
                 }
             }
         }

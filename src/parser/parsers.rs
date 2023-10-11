@@ -89,14 +89,16 @@ where
         just(Token::Pushtag)
             .ignore_then(tag)
             .map_with_span(|tag, span| Pushtag(spanned(tag, span))),
-        just(Token::Poptag).ignore_then(tag).map(Poptag),
+        just(Token::Poptag)
+            .ignore_then(tag)
+            .map_with_span(|tag, span| Poptag(spanned(tag, span))),
         just(Token::Pushmeta)
             .ignore_then(meta_key_value())
             .map(Pushmeta),
         just(Token::Popmeta)
             .ignore_then(key)
             .then_ignore(just(Token::Colon))
-            .map(Popmeta),
+            .map_with_span(|key, span| Popmeta(spanned(key, span))),
         just(Token::Include).ignore_then(string).map(Include),
     ))
     .then_ignore(just(Token::Eol))
