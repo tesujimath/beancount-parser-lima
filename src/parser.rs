@@ -317,7 +317,7 @@ impl<'s, 't> ParseResult<'s, 't> {
     }
 
     pub fn by_date(self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
-        self.directives.sort(|d| d.value().date())
+        self.directives.sort(|d| d.item().date())
     }
 }
 
@@ -367,7 +367,7 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.current.pop_front() {
             Some(declaration) => {
-                match declaration.value {
+                match declaration.item {
                     Declaration::Directive(mut directive) => {
                         directive.merge_tags_and_ignore_errors_for_now(&self.tags);
                         directive.merge_key_values_ignoring_errors_for_now(&self.meta_key_values);

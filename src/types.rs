@@ -99,21 +99,21 @@ pub enum Booking {
 /// Our span type
 pub type Span = chumsky::span::SimpleSpan<usize, SourceId>;
 
-/// A Spanned value may be located within a source file if the file path is known.
+/// A Spanned item may be located within a source file if the file path is known.
 /// The span is invisible with respect to equality and hashing.
 #[derive(Clone, Debug)]
 pub struct Spanned<T> {
-    pub(crate) value: T,
+    pub(crate) item: T,
     pub(crate) span: Span,
 }
 
-pub fn spanned<T>(value: T, span: Span) -> Spanned<T> {
-    Spanned { value, span }
+pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
+    Spanned { item, span }
 }
 
 impl<T> Spanned<T> {
-    pub fn value(&self) -> &T {
-        &self.value
+    pub fn item(&self) -> &T {
+        &self.item
     }
 
     pub fn span(&self) -> &Span {
@@ -122,7 +122,7 @@ impl<T> Spanned<T> {
 
     pub fn as_ref(&self) -> Spanned<&T> {
         Spanned {
-            value: &self.value,
+            item: &self.item,
             span: self.span,
         }
     }
@@ -132,7 +132,7 @@ impl<T> Spanned<T> {
         F: FnOnce(&T) -> U,
     {
         Spanned {
-            value: f(&self.value),
+            item: f(&self.item),
             span: self.span,
         }
     }
@@ -143,7 +143,7 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
+        self.item.eq(&other.item)
     }
 }
 
@@ -154,7 +154,7 @@ where
     T: Hash,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state)
+        self.item.hash(state)
     }
 }
 
@@ -165,7 +165,7 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value,)
+        write!(f, "{}", self.item,)
     }
 }
 

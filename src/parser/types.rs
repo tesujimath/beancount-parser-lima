@@ -81,7 +81,7 @@ pub struct Directive<'a> {
 
 impl<'a> Directive<'a> {
     pub fn date(&self) -> Date {
-        self.date.value
+        self.date.item
     }
 
     // TODO don't ignore errors
@@ -104,10 +104,10 @@ impl<'a> Display for Directive<'a> {
         use DirectiveVariant::*;
 
         match &self.variant {
-            Transaction(x) => x.fmt(f, self.date.value, &self.metadata),
-            Open(x) => x.fmt(f, self.date.value, &self.metadata),
-            Close(x) => x.fmt(f, self.date.value, &self.metadata),
-            Commodity(x) => x.fmt(f, self.date.value, &self.metadata),
+            Transaction(x) => x.fmt(f, self.date.item, &self.metadata),
+            Open(x) => x.fmt(f, self.date.item, &self.metadata),
+            Close(x) => x.fmt(f, self.date.item, &self.metadata),
+            Commodity(x) => x.fmt(f, self.date.item, &self.metadata),
         }
     }
 }
@@ -436,7 +436,7 @@ impl<'a> Display for Posting<'a> {
             f,
             "{}{}",
             if self.flag.is_some() { " " } else { "" },
-            &self.account.value
+            &self.account.item
         )?;
 
         simple_format(f, &self.amount, Some(" "))?;
@@ -470,7 +470,7 @@ impl<'a> Metadata<'a> {
                     // TODO link the error to the tag with which it conflicts
                     emitter.emit(Rich::custom(
                         existing_tag.span,
-                        format!("duplicate tag {}", tag.value),
+                        format!("duplicate tag {}", tag.item),
                     ));
                 }
             }
@@ -515,7 +515,7 @@ impl<'a> Metadata<'a> {
                     // TODO link the error to the link with which it conflicts
                     emitter.emit(Rich::custom(
                         existing_link.span,
-                        format!("duplicate link {}", link.value),
+                        format!("duplicate link {}", link.item),
                     ));
                 }
             }
@@ -953,7 +953,7 @@ pub struct Amount<'a> {
 
 impl<'a> Display for Amount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        write!(format, "{} {}", &self.number.value, &self.currency.value)
+        write!(format, "{} {}", &self.number.item, &self.currency.item)
     }
 }
 
@@ -1022,23 +1022,23 @@ pub struct CostSpec<'a> {
 impl<'a> Display for CostSpec<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(per_unit) = &self.per_unit {
-            write!(f, "{} ", per_unit.value)?;
+            write!(f, "{} ", per_unit.item)?;
         }
 
         if let Some(total) = &self.total {
-            write!(f, "# {} ", total.value)?;
+            write!(f, "# {} ", total.item)?;
         }
 
         if let Some(currency) = &self.currency {
-            write!(f, "{} ", currency.value)?;
+            write!(f, "{} ", currency.item)?;
         }
 
         if let Some(date) = &self.date {
-            write!(f, "{} ", date.value)?;
+            write!(f, "{} ", date.item)?;
         }
 
         if let Some(label) = &self.label {
-            write!(f, "\"{}\" ", label.value)?;
+            write!(f, "\"{}\" ", label.item)?;
         }
 
         if self.merge {

@@ -65,7 +65,7 @@ fn main() -> Result<()> {
             if flags.by_date {
                 for directive in directives.by_date() {
                     show_directive(
-                        directive.value(),
+                        directive.item(),
                         flags.show_allocations,
                         &mut directives_as_strings,
                     );
@@ -73,7 +73,7 @@ fn main() -> Result<()> {
             } else {
                 for directive in directives {
                     show_directive(
-                        directive.value(),
+                        directive.item(),
                         flags.show_allocations,
                         &mut directives_as_strings,
                     );

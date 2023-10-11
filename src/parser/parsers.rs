@@ -235,7 +235,7 @@ where
                         if currencies.contains(&currency) {
                             emitter.emit(Rich::custom(
                                 currency.span,
-                                format!("duplicate currency {}", currency.value),
+                                format!("duplicate currency {}", currency.item),
                             ))
                         } else {
                             currencies.insert(currency);
@@ -439,13 +439,13 @@ where
                     KeyValue(kv) => {
                         use hash_map::Entry::*;
 
-                        let MetaKeyValue { key, value } = kv.value;
+                        let MetaKeyValue { key, value } = kv.item;
 
                         let key_span = key.span;
                         match m.key_values.entry(key) {
                             Occupied(entry) => emitter.emit(Rich::custom(
                                 key_span,
-                                format!("duplicate key {}", entry.key().value),
+                                format!("duplicate key {}", entry.key().item),
                             )),
                             Vacant(entry) => {
                                 entry.insert(value);
@@ -458,7 +458,7 @@ where
                         if m.tags.contains(&tag) {
                             emitter.emit(Rich::custom(
                                 tag.span,
-                                format!("duplicate tag {}", tag.value),
+                                format!("duplicate tag {}", tag.item),
                             ))
                         } else {
                             m.tags.insert(tag);
@@ -470,7 +470,7 @@ where
                         if m.links.contains(&link) {
                             emitter.emit(Rich::custom(
                                 link.span,
-                                format!("duplicate link {}", link.value),
+                                format!("duplicate link {}", link.item),
                             ))
                         } else {
                             m.links.insert(link);
@@ -676,7 +676,7 @@ where
                 .fold(
                     // accumulate the `CostComp`s in a `CostSpecBuilder`
                     CostSpecBuilder::default(),
-                    |builder, cost_comp| match cost_comp.value {
+                    |builder, cost_comp| match cost_comp.item {
                         ScopedAmount(compound_amount) => match compound_amount {
                             BareCurrency(cur) => builder.currency(cur, cost_comp.span),
                             BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
@@ -753,7 +753,7 @@ where
                     if tags.contains(&tag) {
                         emitter.emit(Rich::custom(
                             tag.span,
-                            format!("duplicate tag {}", tag.value),
+                            format!("duplicate tag {}", tag.item),
                         ))
                     } else {
                         tags.insert(tag);
@@ -765,7 +765,7 @@ where
                     if links.contains(&link) {
                         emitter.emit(Rich::custom(
                             link.span,
-                            format!("duplicate link {}", link.value),
+                            format!("duplicate link {}", link.item),
                         ))
                     } else {
                         links.insert(link);
