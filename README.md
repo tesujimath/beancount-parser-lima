@@ -1,4 +1,4 @@
-_Work in progress_
+_Work in progress.  I have no headspace to review and incorporate contributions for now, sorry, but that will change._
 
 ## Uncertainties / TODOs
 
