@@ -81,6 +81,19 @@ pub enum Directive<'a> {
     // TODO other directives
 }
 
+impl<'a> Directive<'a> {
+    fn metadata_mut(&'a mut self) -> &'a mut Metadata {
+        use Directive::*;
+
+        match self {
+            Transaction(x) => &mut x.metadata,
+            Open(x) => &mut x.metadata,
+            Close(x) => &mut x.metadata,
+            Commodity(x) => &mut x.metadata,
+        }
+    }
+}
+
 impl<'a> Display for Directive<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Directive::*;
@@ -489,10 +502,10 @@ impl<'a> Metadata<'a> {
                 None => {
                     self.tags.insert(tag);
                 }
-                Some(meta_tag) => {
+                Some(existing_tag) => {
                     // TODO link the error to the tag with which it conflicts
                     emitter.emit(Rich::custom(
-                        meta_tag.span,
+                        existing_tag.span,
                         format!("duplicate tag {}", tag.value),
                     ));
                 }
@@ -510,11 +523,35 @@ impl<'a> Metadata<'a> {
                 None => {
                     self.links.insert(link);
                 }
-                Some(meta_link) => {
+                Some(existing_link) => {
                     // TODO link the error to the link with which it conflicts
                     emitter.emit(Rich::custom(
-                        meta_link.span,
+                        existing_link.span,
                         format!("duplicate link {}", link.value),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn merge_key_values(
+        &mut self,
+        key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+        emitter: &mut Emitter<ParserError<'a>>,
+    ) {
+        for (key, value) in key_values {
+            match self.key_values.get(&key) {
+                None => {
+                    self.key_values.insert(key, value);
+                }
+                Some(existing_value) => {
+                    // TODO link the error to the key/value with which it conflicts
+                    emitter.emit(Rich::custom(
+                        existing_value.span,
+                        format!(
+                            "duplicate key/value {}: {}",
+                            key.value, existing_value.value
+                        ),
                     ));
                 }
             }
