@@ -158,6 +158,8 @@ where
     }
 }
 
+impl<T> Copy for Spanned<T> where T: Copy {}
+
 impl<T> Display for Spanned<T>
 where
     T: Display,

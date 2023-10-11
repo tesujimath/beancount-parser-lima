@@ -430,7 +430,7 @@ pub struct Posting<'a> {
 
 impl<'a> Display for Posting<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        simple_format(f, &self.flag, None)?;
+        simple_format(f, self.flag, None)?;
 
         write!(
             f,
@@ -440,7 +440,7 @@ impl<'a> Display for Posting<'a> {
         )?;
 
         simple_format(f, &self.amount, Some(" "))?;
-        simple_format(f, &self.currency, Some(" "))?;
+        simple_format(f, self.currency, Some(" "))?;
         simple_format(f, &self.cost_spec, Some(" "))?;
         simple_format(f, &self.price_annotation, Some(" "))?;
 
@@ -487,7 +487,7 @@ impl<'a> Metadata<'a> {
             match self.tags.get(tag) {
                 None => {
                     // TODO better deref/as_ref for Spanned
-                    self.tags.insert(spanned(tag.value, tag.span));
+                    self.tags.insert(*tag);
                 }
                 Some(_existing_tag) => {
                     // TODO link the error to the tag with which it conflicts
@@ -531,11 +531,11 @@ impl<'a> Metadata<'a> {
             match self.key_values.get(key) {
                 None => {
                     self.key_values.insert(
-                        spanned(key.value, key.span),
-                        // We actually do have to clone to value here.
+                        *key,
+                        // Sadly we do have to clone to value here.
                         // This is used for merging in metadata key/values from the push/pop stack,
                         // which does in fact require cloning.
-                        spanned(value.value.clone(), value.span),
+                        value.clone(),
                     );
                 }
                 Some(_existing_value) => {
