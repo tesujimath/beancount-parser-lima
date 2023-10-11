@@ -54,11 +54,15 @@ fn test_transaction(
     assert!(result.is_ok());
     let result = result.unwrap();
     assert_eq!(&result.date, &expected_date);
-    assert_eq!(&result.flag, &expected_flag);
-    assert_eq!(&result.payee, &expected_payee);
-    assert_eq!(&result.narration, &expected_narration);
     assert_eq!(&result.metadata.tags, &expected_tags);
     assert_eq!(&result.metadata.links, &expected_links);
+    assert!(
+        matches!(&result.variant, DirectiveVariant::Transaction(x) if
+            x.flag == expected_flag &&
+            x.payee == expected_payee &&
+            x.narration == expected_narration
+        )
+    )
 }
 
 #[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]

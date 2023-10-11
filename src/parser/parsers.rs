@@ -56,17 +56,12 @@ pub fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use Directive::*;
-
     choice((
-        transaction()
-            .map(Transaction)
-            .labelled("transaction")
-            .as_context(),
+        transaction().labelled("transaction").as_context(),
         choice((
-            open().map(Open),
-            close().map(Close),
-            commodity().map(Commodity),
+            open(),
+            close(),
+            commodity(),
             // TODO other directives
         ))
         .labelled("directive")
@@ -107,8 +102,7 @@ where
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.
-pub fn transaction<'src, I>(
-) -> impl Parser<'src, I, Transaction<'src>, extra::Err<ParserError<'src>>>
+pub fn transaction<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -127,13 +121,15 @@ where
             metadata.merge_tags(tags, emitter);
             metadata.merge_links(links, emitter);
 
-            Transaction {
+            Directive {
                 date,
-                flag,
-                payee,
-                narration,
                 metadata,
-                postings,
+                variant: DirectiveVariant::Transaction(Transaction {
+                    flag,
+                    payee,
+                    narration,
+                    postings,
+                }),
             }
         },
     )
@@ -179,7 +175,7 @@ where
 }
 
 /// Matches a open, including metadata, over several lines.
-pub fn open<'src, I>() -> impl Parser<'src, I, Open<'src>, extra::Err<ParserError<'src>>>
+pub fn open<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -188,12 +184,14 @@ where
             metadata.merge_tags(tags, emitter);
             metadata.merge_links(links, emitter);
 
-            Open {
+            Directive {
                 date,
-                account,
-                currencies,
-                booking,
                 metadata,
+                variant: DirectiveVariant::Open(Open {
+                    account,
+                    currencies,
+                    booking,
+                }),
             }
         },
     )
@@ -266,7 +264,7 @@ where
 }
 
 /// Matches a close, including metadata, over several lines.
-pub fn close<'src, I>() -> impl Parser<'src, I, Close<'src>, extra::Err<ParserError<'src>>>
+pub fn close<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -275,10 +273,10 @@ where
             metadata.merge_tags(tags, emitter);
             metadata.merge_links(links, emitter);
 
-            Close {
+            Directive {
                 date,
-                account,
                 metadata,
+                variant: DirectiveVariant::Close(Close { account }),
             }
         },
     )
@@ -315,7 +313,7 @@ where
 }
 
 /// Matches a commodity, including metadata, over several lines.
-pub fn commodity<'src, I>() -> impl Parser<'src, I, Commodity<'src>, extra::Err<ParserError<'src>>>
+pub fn commodity<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -324,10 +322,10 @@ where
             metadata.merge_tags(tags, emitter);
             metadata.merge_links(links, emitter);
 
-            Commodity {
+            Directive {
                 date,
-                currency,
                 metadata,
+                variant: DirectiveVariant::Commodity(Commodity { currency }),
             }
         },
     )

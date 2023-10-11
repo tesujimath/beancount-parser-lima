@@ -73,25 +73,20 @@ pub enum Declaration<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub enum Directive<'a> {
-    Transaction(Transaction<'a>),
-    Open(Open<'a>),
-    Close(Close<'a>),
-    Commodity(Commodity<'a>),
-    // TODO other directives
+pub struct Directive<'a> {
+    pub(crate) date: Spanned<Date>,
+    pub(crate) metadata: Metadata<'a>,
+    pub(crate) variant: DirectiveVariant<'a>,
 }
 
 impl<'a> Directive<'a> {
+    pub fn date(&self) -> Date {
+        self.date.value
+    }
+
     // TODO don't ignore errors
     pub fn merge_tags_and_ignore_errors_for_now(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>) {
-        use Directive::*;
-
-        match self {
-            Transaction(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
-            Open(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
-            Close(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
-            Commodity(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
-        }
+        self.metadata.merge_tags_ignoring_errors_for_now(tags);
     }
 
     // TODO don't ignore errors
@@ -99,54 +94,31 @@ impl<'a> Directive<'a> {
         &mut self,
         key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
     ) {
-        use Directive::*;
-
-        match self {
-            Transaction(x) => x
-                .metadata
-                .merge_key_values_ignoring_errors_for_now(key_values),
-            Open(x) => x
-                .metadata
-                .merge_key_values_ignoring_errors_for_now(key_values),
-            Close(x) => x
-                .metadata
-                .merge_key_values_ignoring_errors_for_now(key_values),
-            Commodity(x) => x
-                .metadata
-                .merge_key_values_ignoring_errors_for_now(key_values),
-        }
+        self.metadata
+            .merge_key_values_ignoring_errors_for_now(key_values);
     }
 }
 
 impl<'a> Display for Directive<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use Directive::*;
+        use DirectiveVariant::*;
 
-        match &self {
-            Transaction(x) => x.fmt(f),
-            Open(x) => x.fmt(f),
-            Close(x) => x.fmt(f),
-            Commodity(x) => x.fmt(f),
+        match &self.variant {
+            Transaction(x) => x.fmt(f, self.date.value, &self.metadata),
+            Open(x) => x.fmt(f, self.date.value, &self.metadata),
+            Close(x) => x.fmt(f, self.date.value, &self.metadata),
+            Commodity(x) => x.fmt(f, self.date.value, &self.metadata),
         }
     }
 }
 
-/// A trait for items which have a date
-pub trait Dated {
-    fn date(&self) -> Date;
-}
-
-impl<'a> Dated for Directive<'a> {
-    fn date(&self) -> Date {
-        use Directive::*;
-
-        match self {
-            Transaction(x) => x.date(),
-            Open(x) => x.date(),
-            Close(x) => x.date(),
-            Commodity(x) => x.date(),
-        }
-    }
+#[derive(Clone, Debug)]
+pub enum DirectiveVariant<'a> {
+    Transaction(Transaction<'a>),
+    Open(Open<'a>),
+    Close(Close<'a>),
+    Commodity(Commodity<'a>),
+    // TODO other directives
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -163,23 +135,21 @@ pub enum Pragma<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Transaction<'a> {
-    pub(crate) date: Spanned<Date>,
     pub(crate) flag: Spanned<Flag>,
     pub(crate) payee: Option<Spanned<&'a str>>,
     pub(crate) narration: Option<Spanned<&'a str>>,
-    pub(crate) metadata: Metadata<'a>,
     pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
 
-impl<'a> Display for Transaction<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}", self.date, self.flag)?;
+impl<'a> Transaction<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} {}", date, self.flag)?;
 
         format(f, &self.payee, double_quoted, " ", Some(" "))?;
         format(f, &self.narration, double_quoted, " ", Some(" "))?;
         // we prefer to show tags and links inline rather then line by line in metadata
-        self.metadata.fmt_tags_links_inline(f)?;
-        self.metadata.fmt_keys_values(f)?;
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)?;
         format(
             f,
             &self.postings,
@@ -191,79 +161,49 @@ impl<'a> Display for Transaction<'a> {
     }
 }
 
-impl<'a> Dated for Transaction<'a> {
-    fn date(&self) -> Date {
-        self.date.value
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Open<'a> {
-    pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
     pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<Booking>>,
-    pub(crate) metadata: Metadata<'a>,
 }
 
-impl<'a> Display for Open<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} open {}", self.date, self.account)?;
+impl<'a> Open<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} open {}", date, self.account)?;
         format(f, &self.currencies, plain, " ", Some(" "))?;
         format(f, &self.booking, double_quoted, " ", Some(" "))?;
         // we prefer to show tags and links inline rather then line by line in metadata
-        self.metadata.fmt_tags_links_inline(f)?;
-        self.metadata.fmt_keys_values(f)
-    }
-}
-
-impl<'a> Dated for Open<'a> {
-    fn date(&self) -> Date {
-        self.date.value
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Close<'a> {
-    pub(crate) date: Spanned<Date>,
     pub(crate) account: Spanned<&'a Account<'a>>,
-    pub(crate) metadata: Metadata<'a>,
 }
 
-impl<'a> Display for Close<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} close {}", self.date, self.account)?;
+impl<'a> Close<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} close {}", date, self.account)?;
         // we prefer to show tags and links inline rather then line by line in metadata
-        self.metadata.fmt_tags_links_inline(f)?;
-        self.metadata.fmt_keys_values(f)
-    }
-}
-
-impl<'a> Dated for Close<'a> {
-    fn date(&self) -> Date {
-        self.date.value
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Commodity<'a> {
-    pub date: Spanned<Date>,
     pub currency: Spanned<&'a Currency<'a>>,
-    pub metadata: Metadata<'a>,
 }
 
-impl<'a> Display for Commodity<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} commodity {}", self.date, self.currency)?;
+impl<'a> Commodity<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} commodity {}", date, self.currency)?;
         // we prefer to show tags and links inline rather then line by line in metadata
-        self.metadata.fmt_tags_links_inline(f)?;
-        self.metadata.fmt_keys_values(f)
-    }
-}
-
-impl<'a> Dated for Commodity<'a> {
-    fn date(&self) -> Date {
-        self.date.value
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
     }
 }
 
