@@ -82,14 +82,38 @@ pub enum Directive<'a> {
 }
 
 impl<'a> Directive<'a> {
-    pub fn metadata_mut(&'a mut self) -> &'a mut Metadata {
+    // TODO don't ignore errors
+    pub fn merge_tags_and_ignore_errors_for_now(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>) {
         use Directive::*;
 
         match self {
-            Transaction(x) => &mut x.metadata,
-            Open(x) => &mut x.metadata,
-            Close(x) => &mut x.metadata,
-            Commodity(x) => &mut x.metadata,
+            Transaction(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
+            Open(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
+            Close(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
+            Commodity(x) => x.metadata.merge_tags_ignoring_errors_for_now(tags),
+        }
+    }
+
+    // TODO don't ignore errors
+    pub fn merge_key_values_ignoring_errors_for_now(
+        &mut self,
+        key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+    ) {
+        use Directive::*;
+
+        match self {
+            Transaction(x) => x
+                .metadata
+                .merge_key_values_ignoring_errors_for_now(key_values),
+            Open(x) => x
+                .metadata
+                .merge_key_values_ignoring_errors_for_now(key_values),
+            Close(x) => x
+                .metadata
+                .merge_key_values_ignoring_errors_for_now(key_values),
+            Commodity(x) => x
+                .metadata
+                .merge_key_values_ignoring_errors_for_now(key_values),
         }
     }
 }
@@ -508,6 +532,30 @@ impl<'a> Metadata<'a> {
                         existing_tag.span,
                         format!("duplicate tag {}", tag.value),
                     ));
+                }
+            }
+        }
+    }
+
+    // TODO use an Emit trait here and above, collecting errors
+    pub fn merge_tags_ignoring_errors_for_now(
+        &mut self,
+        tags: &HashSet<Spanned<&'a Tag<'a>>>,
+        // errors: &mut Vec<ParserError<'a>>,
+    ) {
+        for tag in tags {
+            match self.tags.get(tag) {
+                None => {
+                    // TODO better deref/as_ref for Spanned
+                    self.tags.insert(spanned(tag.value, tag.span));
+                }
+                Some(_existing_tag) => {
+                    // TODO link the error to the tag with which it conflicts
+                    // TODO collect the errors in an Emit thing
+                    // errors.push(Rich::custom(
+                    //     existing_tag.span,
+                    //     format!("duplicate tag {}", tag.value),
+                    // ));
                 }
             }
         }

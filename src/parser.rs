@@ -368,8 +368,10 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
         match self.current.pop_front() {
             Some(declaration) => {
                 match declaration.value {
-                    Declaration::Directive(directive) => {
-                        // directive.metadata_mut().merge_tags(&self.tags, NullEmitter);
+                    Declaration::Directive(mut directive) => {
+                        directive.merge_tags_and_ignore_errors_for_now(&self.tags);
+                        directive.merge_key_values_ignoring_errors_for_now(&self.meta_key_values);
+
                         Some(spanned(directive, declaration.span))
                     }
 
