@@ -47,7 +47,7 @@ where
     use Declaration::*;
 
     choice((directive().map(Directive), pragma().map(Pragma)))
-        .map_with_span(spanned)
+        .map_with(spanned_extra)
         .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
 }
 
@@ -83,17 +83,17 @@ where
     choice((
         just(Token::Pushtag)
             .ignore_then(tag)
-            .map_with_span(|tag, span| Pushtag(spanned(tag, span))),
+            .map_with(|tag, e| Pushtag(spanned(tag, e.span()))),
         just(Token::Poptag)
             .ignore_then(tag)
-            .map_with_span(|tag, span| Poptag(spanned(tag, span))),
+            .map_with(|tag, e| Poptag(spanned(tag, e.span()))),
         just(Token::Pushmeta)
             .ignore_then(meta_key_value())
             .map(Pushmeta),
         just(Token::Popmeta)
             .ignore_then(key)
             .then_ignore(just(Token::Colon))
-            .map_with_span(|key, span| Popmeta(spanned(key, span))),
+            .map_with(|key, e| Popmeta(spanned(key, e.span()))),
         just(Token::Include).ignore_then(string).map(Include),
     ))
     .then_ignore(just(Token::Eol))
@@ -110,7 +110,7 @@ where
         transaction_header_line(),
         metadata(),
         posting()
-            .map_with_span(spanned)
+            .map_with(spanned_extra)
             .repeated()
             .collect::<Vec<_>>(),
     ))
@@ -157,12 +157,12 @@ where
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
     group((
-        date.map_with_span(spanned),
-        txn().map_with_span(spanned),
+        date.map_with(spanned_extra),
+        txn().map_with(spanned_extra),
         // payee and narration get special handling in case one is omitted
         group((
-            string.map_with_span(spanned).or_not(),
-            string.map_with_span(spanned).or_not(),
+            string.map_with(spanned_extra).or_not(),
+            string.map_with(spanned_extra).or_not(),
         ))
         .map(|(s1, s2)| match (s1, s2) {
             // a single string is narration
@@ -221,11 +221,11 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        date.map_with_span(spanned),
+        date.map_with(spanned_extra),
         just(Token::Open),
-        account.map_with_span(spanned),
+        account.map_with(spanned_extra),
         currency
-            .map_with_span(spanned)
+            .map_with(spanned_extra)
             .repeated()
             .collect::<Vec<_>>()
             .validate(|currencies, _span, emitter| {
@@ -244,7 +244,7 @@ where
                         currencies
                     })
             }),
-        booking().map_with_span(spanned).or_not(),
+        booking().map_with(spanned_extra).or_not(),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -303,9 +303,9 @@ where
     let account = select_ref!(Token::Account(acc) => acc);
 
     group((
-        date.map_with_span(spanned),
+        date.map_with(spanned_extra),
         just(Token::Close),
-        account.map_with_span(spanned),
+        account.map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -352,9 +352,9 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        date.map_with_span(spanned),
+        date.map_with(spanned_extra),
         just(Token::Commodity),
-        currency.map_with_span(spanned),
+        currency.map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -394,12 +394,12 @@ where
     just(Token::Indent)
         .ignore_then(
             group((
-                flag().map_with_span(spanned).or_not(),
-                account.map_with_span(spanned),
-                expr().map_with_span(spanned).or_not(),
-                currency.map_with_span(spanned).or_not(),
-                cost_spec().map_with_span(spanned).or_not(),
-                price_annotation().map_with_span(spanned).or_not(),
+                flag().map_with(spanned_extra).or_not(),
+                account.map_with(spanned_extra),
+                expr().map_with(spanned_extra).or_not(),
+                currency.map_with(spanned_extra).or_not(),
+                cost_spec().map_with(spanned_extra).or_not(),
+                price_annotation().map_with(spanned_extra).or_not(),
             ))
             .then_ignore(just(Token::Eol))
             .then(metadata())
@@ -492,8 +492,8 @@ where
 {
     let key = select_ref!(Token::Key(key) => key);
 
-    key.map_with_span(spanned)
-        .then(just(Token::Colon).ignore_then(meta_value().map_with_span(spanned)))
+    key.map_with(spanned_extra)
+        .then(just(Token::Colon).ignore_then(meta_value().map_with(spanned_extra)))
         .map(|(key, value)| MetaKeyValue { key, value })
 }
 
@@ -510,9 +510,9 @@ where
     just(Token::Indent)
         .ignore_then(
             choice((
-                meta_key_value().map_with_span(spanned).map(KeyValue),
-                tag.map_with_span(spanned).map(Tag),
-                link.map_with_span(spanned).map(Link),
+                meta_key_value().map_with(spanned_extra).map(KeyValue),
+                tag.map_with(spanned_extra).map(Tag),
+                link.map_with(spanned_extra).map(Link),
             ))
             .then_ignore(just(Token::Eol)),
         )
@@ -567,8 +567,8 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        expr_value().map_with_span(spanned),
-        currency.map_with_span(spanned),
+        expr_value().map_with(spanned_extra),
+        currency.map_with(spanned_extra),
     ))
     .map(Amount::new)
 }
@@ -581,8 +581,8 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        expr().map_with_span(spanned).or_not(),
-        currency.map_with_span(spanned).or_not(),
+        expr().map_with(spanned_extra).or_not(),
+        currency.map_with(spanned_extra).or_not(),
     ))
     .map(LooseAmount::new)
 }
@@ -659,7 +659,7 @@ where
     just(Token::Lcurl)
         .ignore_then(
             cost_comp()
-                .map_with_span(spanned)
+                .map_with(spanned_extra)
                 .repeated()
                 .at_least(1)
                 .collect::<Vec<_>>(),
@@ -735,8 +735,8 @@ where
     let link = select_ref!(Token::Link(link) => link);
 
     choice((
-        tag.map_with_span(spanned).map(Either::Left),
-        link.map_with_span(spanned).map(Either::Right),
+        tag.map_with(spanned_extra).map(Either::Left),
+        link.map_with(spanned_extra).map(Either::Right),
     ))
     .repeated()
     .collect::<Vec<_>>()

@@ -1,3 +1,7 @@
+use chumsky::{
+    extra::ParserExtra,
+    input::{Input, MapExtra},
+};
 use std::{
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
@@ -109,6 +113,18 @@ pub struct Spanned<T> {
 
 pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
     Spanned { item, span }
+}
+
+/// for use with `map_with`
+pub fn spanned_extra<'a, 'b, T, I, E>(item: T, e: &mut MapExtra<'a, 'b, I, E>) -> Spanned<T>
+where
+    I: Input<'a, Span = Span>,
+    E: ParserExtra<'a, I>,
+{
+    Spanned {
+        item,
+        span: e.span(),
+    }
 }
 
 impl<T> Spanned<T> {
