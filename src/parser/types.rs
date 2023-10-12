@@ -1,6 +1,6 @@
 use super::lexer::Token;
 use crate::types::*;
-use chumsky::{input::Emitter, prelude::Rich};
+use chumsky::prelude::Rich;
 use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
@@ -86,7 +86,7 @@ impl<'a> Directive<'a> {
 
     // TODO don't ignore errors
     pub fn merge_tags_and_ignore_errors_for_now(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>) {
-        self.metadata.merge_tags_ignoring_errors_for_now(tags);
+        self.metadata.merge_tags(tags, &mut NullEmitter);
     }
 
     // TODO don't ignore errors
@@ -94,8 +94,7 @@ impl<'a> Directive<'a> {
         &mut self,
         key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
     ) {
-        self.metadata
-            .merge_key_values_ignoring_errors_for_now(key_values);
+        self.metadata.merge_key_values(key_values, &mut NullEmitter);
     }
 }
 
@@ -456,15 +455,14 @@ pub struct Metadata<'a> {
 }
 
 impl<'a> Metadata<'a> {
-    pub fn merge_tags(
-        &mut self,
-        tags: HashSet<Spanned<&'a Tag<'a>>>,
-        emitter: &mut Emitter<ParserError<'a>>,
-    ) {
+    pub fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
+    where
+        E: Emit<ParserError<'a>>,
+    {
         for tag in tags {
-            match self.tags.get(&tag) {
+            match self.tags.get(tag) {
                 None => {
-                    self.tags.insert(tag);
+                    self.tags.insert(*tag);
                 }
                 Some(existing_tag) => {
                     // TODO link the error to the tag with which it conflicts
@@ -477,39 +475,14 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    // TODO use an Emit trait here and above, collecting errors
-    pub fn merge_tags_ignoring_errors_for_now(
-        &mut self,
-        tags: &HashSet<Spanned<&'a Tag<'a>>>,
-        // errors: &mut Vec<ParserError<'a>>,
-    ) {
-        for tag in tags {
-            match self.tags.get(tag) {
-                None => {
-                    // TODO better deref/as_ref for Spanned
-                    self.tags.insert(*tag);
-                }
-                Some(_existing_tag) => {
-                    // TODO link the error to the tag with which it conflicts
-                    // TODO collect the errors in an Emit thing
-                    // errors.push(Rich::custom(
-                    //     existing_tag.span,
-                    //     format!("duplicate tag {}", tag.value),
-                    // ));
-                }
-            }
-        }
-    }
-
-    pub fn merge_links(
-        &mut self,
-        links: HashSet<Spanned<&'a Link<'a>>>,
-        emitter: &mut Emitter<ParserError<'a>>,
-    ) {
+    pub fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
+    where
+        E: Emit<ParserError<'a>>,
+    {
         for link in links {
-            match self.links.get(&link) {
+            match self.links.get(link) {
                 None => {
-                    self.links.insert(link);
+                    self.links.insert(*link);
                 }
                 Some(existing_link) => {
                     // TODO link the error to the link with which it conflicts
@@ -522,32 +495,30 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub fn merge_key_values_ignoring_errors_for_now(
+    pub fn merge_key_values<E>(
         &mut self,
         key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
-        // TODO some some emitter here
-    ) {
+        emitter: &mut E,
+    ) where
+        E: Emit<ParserError<'a>>,
+    {
         for (key, value) in key_values {
             match self.key_values.get(key) {
                 None => {
                     self.key_values.insert(
                         *key,
-                        // Sadly we do have to clone to value here.
-                        // This is used for merging in metadata key/values from the push/pop stack,
-                        // which does in fact require cloning.
+                        // Sadly we do have to clone the value here, so we can
+                        // merge in metadata key/values from the push/pop stack
+                        // without consuming it.
                         value.clone(),
                     );
                 }
-                Some(_existing_value) => {
+                Some(existing_value) => {
                     // TODO link the error to the key/value with which it conflicts
-                    // TODO emit the error
-                    // emitter.emit(Rich::custom(
-                    //     existing_value.span,
-                    //     format!(
-                    //         "duplicate key/value {}: {}",
-                    //         key.value, existing_value.value
-                    //     ),
-                    // ));
+                    emitter.emit(Rich::custom(
+                        existing_value.span,
+                        format!("duplicate key/value {}: {}", key.item, existing_value.item),
+                    ));
                 }
             }
         }
@@ -1215,6 +1186,30 @@ impl Display for CostSpecErrors {
 }
 
 impl std::error::Error for CostSpecErrors {}
+
+/// `Emit` trait enables use of own functions which emit errors
+pub trait Emit<E> {
+    fn emit(&mut self, err: E);
+}
+
+impl<E> Emit<E> for chumsky::input::Emitter<E> {
+    fn emit(&mut self, err: E) {
+        self.emit(err)
+    }
+}
+
+// simple collection of errors in a Vec
+impl<E> Emit<E> for Vec<E> {
+    fn emit(&mut self, err: E) {
+        self.push(err)
+    }
+}
+// a degenerate error sink
+struct NullEmitter;
+
+impl<E> Emit<E> for NullEmitter {
+    fn emit(&mut self, _err: E) {}
+}
 
 // TODO move this formatting stuff somewhere else, like format submodule
 

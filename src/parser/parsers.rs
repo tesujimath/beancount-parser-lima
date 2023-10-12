@@ -118,8 +118,8 @@ where
         |((date, flag, (payee, narration), (tags, links)), mut metadata, postings),
          _span,
          emitter| {
-            metadata.merge_tags(tags, emitter);
-            metadata.merge_links(links, emitter);
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
 
             Directive {
                 date,
@@ -181,8 +181,8 @@ where
 {
     group((open_header_line(), metadata())).validate(
         |((date, account, currencies, booking, (tags, links)), mut metadata), _span, emitter| {
-            metadata.merge_tags(tags, emitter);
-            metadata.merge_links(links, emitter);
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
 
             Directive {
                 date,
@@ -270,8 +270,8 @@ where
 {
     group((close_header_line(), metadata())).validate(
         |((date, account, (tags, links)), mut metadata), _span, emitter| {
-            metadata.merge_tags(tags, emitter);
-            metadata.merge_links(links, emitter);
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
 
             Directive {
                 date,
@@ -319,8 +319,8 @@ where
 {
     group((commodity_header_line(), metadata())).validate(
         |((date, currency, (tags, links)), mut metadata), _span, emitter| {
-            metadata.merge_tags(tags, emitter);
-            metadata.merge_links(links, emitter);
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
 
             Directive {
                 date,
