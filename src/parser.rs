@@ -239,6 +239,14 @@ pub struct BeancountParser<'s, 't> {
     tokenized_sources: Vec<Vec<SpannedToken<'t>>>,
 }
 
+// We seem to need to actual input type in places, ugh!
+// It makes me sad that I had to do this.  Perhaps when the
+// dust has settled I'll find a way to get rid of it.
+type ConcreteInput<'t> = chumsky::input::WithContext<
+    Span,
+    chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
+>;
+
 impl<'s, 't> BeancountParser<'s, 't>
 where
     's: 't,

@@ -2,11 +2,10 @@
 
 2016-03-01 open Expenses:Technology NZD NZD GBP
 
-2023-05-29 * "JB HiFI" "" #technology #abc #technology ^birthday ^mother ^birthday
+2023-05-29 * "JB HiFI" "" #technology #abc #technology #tag1 ^birthday ^mother ^birthday
   m1: "s1"
   m2: 101
   m1: NZD
-  #tag1
   #tag1
   #tag2
   ^link1

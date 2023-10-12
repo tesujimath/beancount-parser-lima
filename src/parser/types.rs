@@ -1,6 +1,6 @@
-use super::lexer::Token;
+use super::{lexer::Token, ConcreteInput};
 use crate::types::*;
-use chumsky::prelude::Rich;
+use chumsky::{label::LabelError, prelude::Rich};
 use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
@@ -452,11 +452,10 @@ impl<'a> Metadata<'a> {
                     self.tags.insert(*tag);
                 }
                 Some(existing_tag) => {
-                    // TODO link the error to the tag with which it conflicts
-                    emitter.emit(Rich::custom(
-                        existing_tag.span,
-                        format!("duplicate tag {}", tag),
-                    ));
+                    let mut error =
+                        Rich::custom(existing_tag.span, format!("duplicate tag {}", tag));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "tag", tag.span);
+                    emitter.emit(error);
                 }
             }
         }
@@ -472,11 +471,10 @@ impl<'a> Metadata<'a> {
                     self.links.insert(*link);
                 }
                 Some(existing_link) => {
-                    // TODO link the error to the link with which it conflicts
-                    emitter.emit(Rich::custom(
-                        existing_link.span,
-                        format!("duplicate link {}", link),
-                    ));
+                    let mut error =
+                        Rich::custom(existing_link.span, format!("duplicate link {}", link));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "link", link.span);
+                    emitter.emit(error);
                 }
             }
         }
@@ -501,11 +499,10 @@ impl<'a> Metadata<'a> {
                     );
                 }
                 Some((existing_key, _existing_value)) => {
-                    // TODO link the error to the key/value with which it conflicts
-                    emitter.emit(Rich::custom(
-                        existing_key.span,
-                        format!("duplicate metadata key {}:", key),
-                    ));
+                    let mut error =
+                        Rich::custom(existing_key.span, format!("duplicate key {}", key));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "key", key.span);
+                    emitter.emit(error);
                 }
             }
         }
