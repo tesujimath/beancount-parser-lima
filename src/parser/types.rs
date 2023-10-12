@@ -422,7 +422,7 @@ impl<'a> Display for Posting<'a> {
             f,
             "{}{}",
             if self.flag.is_some() { " " } else { "" },
-            &self.account.item
+            &self.account
         )?;
 
         simple_format(f, &self.amount, Some(" "))?;
@@ -455,7 +455,7 @@ impl<'a> Metadata<'a> {
                     // TODO link the error to the tag with which it conflicts
                     emitter.emit(Rich::custom(
                         existing_tag.span,
-                        format!("duplicate tag {}", tag.item),
+                        format!("duplicate tag {}", tag),
                     ));
                 }
             }
@@ -475,7 +475,7 @@ impl<'a> Metadata<'a> {
                     // TODO link the error to the link with which it conflicts
                     emitter.emit(Rich::custom(
                         existing_link.span,
-                        format!("duplicate link {}", link.item),
+                        format!("duplicate link {}", link),
                     ));
                 }
             }
@@ -504,7 +504,7 @@ impl<'a> Metadata<'a> {
                     // TODO link the error to the key/value with which it conflicts
                     emitter.emit(Rich::custom(
                         existing_key.span,
-                        format!("duplicate metadata key {}:", key.item),
+                        format!("duplicate metadata key {}:", key),
                     ));
                 }
             }
@@ -911,7 +911,7 @@ pub struct Amount<'a> {
 
 impl<'a> Display for Amount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        write!(format, "{} {}", &self.number.item, &self.currency.item)
+        write!(format, "{} {}", &self.number, &self.currency)
     }
 }
 
@@ -980,23 +980,23 @@ pub struct CostSpec<'a> {
 impl<'a> Display for CostSpec<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(per_unit) = &self.per_unit {
-            write!(f, "{} ", per_unit.item)?;
+            write!(f, "{} ", per_unit)?;
         }
 
         if let Some(total) = &self.total {
-            write!(f, "# {} ", total.item)?;
+            write!(f, "# {} ", total)?;
         }
 
         if let Some(currency) = &self.currency {
-            write!(f, "{} ", currency.item)?;
+            write!(f, "{} ", currency)?;
         }
 
         if let Some(date) = &self.date {
-            write!(f, "{} ", date.item)?;
+            write!(f, "{} ", date)?;
         }
 
         if let Some(label) = &self.label {
-            write!(f, "\"{}\" ", label.item)?;
+            write!(f, "\"{}\" ", label)?;
         }
 
         if self.merge {

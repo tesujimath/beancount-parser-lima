@@ -235,7 +235,7 @@ where
                         if currencies.contains(&currency) {
                             emitter.emit(Rich::custom(
                                 currency.span,
-                                format!("duplicate currency {}", currency.item),
+                                format!("duplicate currency {}", currency),
                             ))
                         } else {
                             currencies.insert(currency);
@@ -445,7 +445,7 @@ where
                         match m.key_values.entry(key) {
                             Occupied(entry) => emitter.emit(Rich::custom(
                                 key_span,
-                                format!("duplicate key {}", entry.key().item),
+                                format!("duplicate key {}", entry.key()),
                             )),
                             Vacant(entry) => {
                                 entry.insert(value);
@@ -456,10 +456,7 @@ where
                     }
                     Tag(tag) => {
                         if m.tags.contains(&tag) {
-                            emitter.emit(Rich::custom(
-                                tag.span,
-                                format!("duplicate tag {}", tag.item),
-                            ))
+                            emitter.emit(Rich::custom(tag.span, format!("duplicate tag {}", tag)))
                         } else {
                             m.tags.insert(tag);
                         }
@@ -468,10 +465,8 @@ where
                     }
                     Link(link) => {
                         if m.links.contains(&link) {
-                            emitter.emit(Rich::custom(
-                                link.span,
-                                format!("duplicate link {}", link.item),
-                            ))
+                            emitter
+                                .emit(Rich::custom(link.span, format!("duplicate link {}", link)))
                         } else {
                             m.links.insert(link);
                         }
@@ -751,10 +746,7 @@ where
             |(mut tags, mut links), item| match item {
                 Either::Left(tag) => {
                     if tags.contains(&tag) {
-                        emitter.emit(Rich::custom(
-                            tag.span,
-                            format!("duplicate tag {}", tag.item),
-                        ))
+                        emitter.emit(Rich::custom(tag.span, format!("duplicate tag {}", tag)))
                     } else {
                         tags.insert(tag);
                     }
@@ -763,10 +755,7 @@ where
                 }
                 Either::Right(link) => {
                     if links.contains(&link) {
-                        emitter.emit(Rich::custom(
-                            link.span,
-                            format!("duplicate link {}", link.item),
-                        ))
+                        emitter.emit(Rich::custom(link.span, format!("duplicate link {}", link)))
                     } else {
                         links.insert(link);
                     }
