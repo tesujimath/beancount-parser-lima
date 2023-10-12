@@ -1186,9 +1186,12 @@ impl<E> Emit<E> for chumsky::input::Emitter<E> {
 }
 
 // simple collection of errors in a Vec
-impl<E> Emit<E> for Vec<E> {
+impl<E> Emit<E> for Vec<Error>
+where
+    E: Into<Error>,
+{
     fn emit(&mut self, err: E) {
-        self.push(err)
+        self.push(err.into())
     }
 }
 // a degenerate error sink

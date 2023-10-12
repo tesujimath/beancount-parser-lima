@@ -261,25 +261,21 @@ where
     where
         's: 't,
     {
-        self.parse_declarations()
-            .and_then(|declarations| {
-                let mut p = PragmaProcessor::new(declarations);
-                let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
+        self.parse_declarations().and_then(|declarations| {
+            let mut p = PragmaProcessor::new(declarations);
+            let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
 
-                if p.errors.is_empty() {
-                    Ok(sorted_directives)
-                } else {
-                    Err(p.errors)
-                }
-            })
-            .map_err(|errors| errors.into_iter().map(Error::from).collect())
+            if p.errors.is_empty() {
+                Ok(sorted_directives)
+            } else {
+                Err(p.errors)
+            }
+        })
     }
 
     /// Parse the sources, returning declarations or errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(
-        &'t self,
-    ) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<ParserError<'t>>>
+    fn parse_declarations(&'t self) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
     where
         's: 't,
     {
@@ -306,7 +302,7 @@ where
         if all_errors.is_empty() {
             Ok(all_outputs)
         } else {
-            Err(all_errors)
+            Err(all_errors.into_iter().map(Error::from).collect())
         }
     }
 }
@@ -324,7 +320,7 @@ struct PragmaProcessor<'s, 't> {
     tags: HashSet<Spanned<&'t Tag<'t>>>,
     meta_key_values: HashMap<Spanned<&'t Key<'t>>, Spanned<MetaValue<'t>>>,
     // errors, for collection when the iterator is exhausted
-    errors: Vec<ParserError<'t>>,
+    errors: Vec<Error>,
 }
 
 impl<'s, 't> PragmaProcessor<'s, 't> {
