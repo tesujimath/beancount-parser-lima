@@ -269,21 +269,22 @@ where
     where
         's: 't,
     {
-        self.parse_declarations().and_then(|declarations| {
-            let mut p = PragmaProcessor::new(declarations);
-            let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
+        let (all_declarations, mut errors) = self.parse_declarations();
+        let mut p = PragmaProcessor::new(all_declarations);
 
-            if p.errors.is_empty() {
-                Ok(sorted_directives)
-            } else {
-                Err(p.errors)
-            }
-        })
+        let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
+        errors.append(&mut p.errors);
+
+        if errors.is_empty() {
+            Ok(sorted_directives)
+        } else {
+            Err(errors)
+        }
     }
 
-    /// Parse the sources, returning declarations or errors.
+    /// Parse the sources, returning declarations and any errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
+    fn parse_declarations(&'t self) -> (Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>)
     where
         's: 't,
     {
@@ -301,17 +302,13 @@ where
             let (output, errors) = file().parse(spanned_tokens).into_output_errors();
 
             all_outputs.push(output.unwrap_or(Vec::new()));
-
-            if !errors.is_empty() {
-                all_errors.extend(errors);
-            }
+            all_errors.extend(errors);
         }
 
-        if all_errors.is_empty() {
-            Ok(all_outputs)
-        } else {
-            Err(all_errors.into_iter().map(Error::from).collect())
-        }
+        (
+            all_outputs,
+            all_errors.into_iter().map(Error::from).collect(),
+        )
     }
 }
 

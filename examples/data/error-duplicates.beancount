@@ -17,3 +17,21 @@
   Assets:Bank:Current                           -39.65 NZD
   ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
   Expenses:Groceries
+
+2023-05-30 * "The Innocuous Company ;"
+  Assets:Bank:Current                           -10.50 NZD
+  Expenses:Technology
+
+pushtag #essential
+
+pushmeta importance: "1"
+
+2023-05-30 * "New World Gardens North East Va ;" #essential
+  importance: "2"
+  Assets:Bank:Current                           -39.65 NZD
+  ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
+  Expenses:Groceries
+
+popmeta importance:
+
+poptag #essential
