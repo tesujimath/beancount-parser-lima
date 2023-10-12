@@ -83,19 +83,6 @@ impl<'a> Directive<'a> {
     pub fn date(&self) -> Date {
         self.date.item
     }
-
-    // TODO don't ignore errors
-    pub fn merge_tags_and_ignore_errors_for_now(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>) {
-        self.metadata.merge_tags(tags, &mut NullEmitter);
-    }
-
-    // TODO don't ignore errors
-    pub fn merge_key_values_ignoring_errors_for_now(
-        &mut self,
-        key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
-    ) {
-        self.metadata.merge_key_values(key_values, &mut NullEmitter);
-    }
 }
 
 impl<'a> Display for Directive<'a> {
@@ -503,7 +490,7 @@ impl<'a> Metadata<'a> {
         E: Emit<ParserError<'a>>,
     {
         for (key, value) in key_values {
-            match self.key_values.get(key) {
+            match self.key_values.get_key_value(key) {
                 None => {
                     self.key_values.insert(
                         *key,
@@ -513,11 +500,11 @@ impl<'a> Metadata<'a> {
                         value.clone(),
                     );
                 }
-                Some(existing_value) => {
+                Some((existing_key, _existing_value)) => {
                     // TODO link the error to the key/value with which it conflicts
                     emitter.emit(Rich::custom(
-                        existing_value.span,
-                        format!("duplicate key/value {}: {}", key.item, existing_value.item),
+                        existing_key.span,
+                        format!("duplicate metadata key {}:", key.item),
                     ));
                 }
             }

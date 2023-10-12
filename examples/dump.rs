@@ -16,9 +16,6 @@ fn main() -> Result<()> {
         /// Show allocations
         optional --show-allocations
 
-        // Sort directives by date
-        optional --by-date
-
         /// File to parse
         required path: PathBuf
     };
@@ -62,22 +59,12 @@ fn main() -> Result<()> {
                 }
             }
 
-            if flags.by_date {
-                for directive in directives.by_date() {
-                    show_directive(
-                        directive.item(),
-                        flags.show_allocations,
-                        &mut directives_as_strings,
-                    );
-                }
-            } else {
-                for directive in directives {
-                    show_directive(
-                        directive.item(),
-                        flags.show_allocations,
-                        &mut directives_as_strings,
-                    );
-                }
+            for directive in directives {
+                show_directive(
+                    directive.item(),
+                    flags.show_allocations,
+                    &mut directives_as_strings,
+                );
             }
 
             if flags.show_allocations {

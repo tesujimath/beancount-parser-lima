@@ -256,19 +256,30 @@ where
         }
     }
 
-    /// Parse the sources, returning declarations or errors.
-    /// No date ordering is performed.  But see [BeancountStore].
-    pub fn parse(&'t self) -> Result<ParseResult<'s, 't>, Vec<Error>>
+    /// Parse the sources, returning directives sorted by date or errors.
+    pub fn parse(&'t self) -> Result<Vec<Spanned<Directive<'t>>>, Vec<Error>>
     where
         's: 't,
     {
         self.parse_declarations()
-            .map(|declarations| ParseResult::new(DirectiveIterator::new(declarations)))
+            .and_then(|declarations| {
+                let mut p = PragmaProcessor::new(declarations);
+                let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
+
+                if p.errors.is_empty() {
+                    Ok(sorted_directives)
+                } else {
+                    Err(p.errors)
+                }
+            })
+            .map_err(|errors| errors.into_iter().map(Error::from).collect())
     }
 
     /// Parse the sources, returning declarations or errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>>
+    fn parse_declarations(
+        &'t self,
+    ) -> Result<Vec<Vec<Spanned<Declaration<'t>>>>, Vec<ParserError<'t>>>
     where
         's: 't,
     {
@@ -288,7 +299,7 @@ where
             all_outputs.push(output.unwrap_or(Vec::new()));
 
             if !errors.is_empty() {
-                all_errors.extend(errors.into_iter().map(Error::from));
+                all_errors.extend(errors);
             }
         }
 
@@ -298,40 +309,13 @@ where
             Err(all_errors)
         }
     }
-
-    fn directives(&'t self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
-        std::iter::empty()
-    }
 }
 
-/// A `ParseResult` is an iterator over directives.
+/// `PragmaProcessor` is an iterator which folds in the pragmas into the sequence of `Directive`s.
 ///
-/// It may be useful to attach an ordering adapter to return them in date order.
-pub struct ParseResult<'s, 't> {
-    directives: DirectiveIterator<'s, 't>,
-}
-
-impl<'s, 't> ParseResult<'s, 't> {
-    fn new(directives: DirectiveIterator<'s, 't>) -> Self {
-        ParseResult { directives }
-    }
-
-    pub fn by_date(self) -> impl Iterator<Item = Spanned<Directive<'t>>> {
-        self.directives.sort(|d| d.item().date())
-    }
-}
-
-impl<'s, 't> Iterator for ParseResult<'s, 't> {
-    type Item = Spanned<Directive<'t>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.directives.next()
-    }
-}
-
-/// Iterator for in-order traversal of `Directive`s.
+/// When the iterator is exhausted, any errors should be collected by the caller.
 #[derive(Debug)]
-struct DirectiveIterator<'s, 't> {
+struct PragmaProcessor<'s, 't> {
     included: HashMap<&'s Path, Span>,
     current: VecDeque<Spanned<Declaration<'t>>>,
     stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
@@ -339,9 +323,11 @@ struct DirectiveIterator<'s, 't> {
     // tags and meta key/values for pragma push/pop
     tags: HashSet<Spanned<&'t Tag<'t>>>,
     meta_key_values: HashMap<Spanned<&'t Key<'t>>, Spanned<MetaValue<'t>>>,
+    // errors, for collection when the iterator is exhausted
+    errors: Vec<ParserError<'t>>,
 }
 
-impl<'s, 't> DirectiveIterator<'s, 't> {
+impl<'s, 't> PragmaProcessor<'s, 't> {
     fn new(all_declarations: Vec<Vec<Spanned<Declaration<'t>>>>) -> Self {
         let mut remaining = all_declarations
             .into_iter()
@@ -350,18 +336,19 @@ impl<'s, 't> DirectiveIterator<'s, 't> {
 
         let current = remaining.pop_front().unwrap_or(VecDeque::new());
 
-        DirectiveIterator {
+        PragmaProcessor {
             included: HashMap::new(),
             current,
             stacked: VecDeque::new(),
             remaining,
             tags: HashSet::new(),
             meta_key_values: HashMap::new(),
+            errors: Vec::new(),
         }
     }
 }
 
-impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
+impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
     type Item = Spanned<Directive<'t>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -369,8 +356,10 @@ impl<'s, 't> Iterator for DirectiveIterator<'s, 't> {
             Some(declaration) => {
                 match declaration.item {
                     Declaration::Directive(mut directive) => {
-                        directive.merge_tags_and_ignore_errors_for_now(&self.tags);
-                        directive.merge_key_values_ignoring_errors_for_now(&self.meta_key_values);
+                        directive.metadata.merge_tags(&self.tags, &mut self.errors);
+                        directive
+                            .metadata
+                            .merge_key_values(&self.meta_key_values, &mut self.errors);
 
                         Some(spanned(directive, declaration.span))
                     }

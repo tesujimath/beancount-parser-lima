@@ -13,3 +13,8 @@
   ^birthday
   Assets:Bank:Current                           -39.65 NZD
   Expenses:Technology
+
+2023-05-30 * "New World Gardens North East Va ;" #essential
+  Assets:Bank:Current                           -39.65 NZD
+  ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
+  Expenses:Groceries
