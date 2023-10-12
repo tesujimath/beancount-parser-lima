@@ -137,13 +137,13 @@ pub struct MetadataBuilder {
 }
 
 impl MetadataBuilder {
+    /// Add the `tags`, which are assumed to be free of duplicates.
     pub fn tags<C, S>(mut self, symbol_table: &mut StringInterner, tags: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for tag in tags {
-            // TODO check duplicates
             self.tags
                 .insert(tag.map(|tag| symbol_table.get_or_intern(tag)));
         }
@@ -151,13 +151,13 @@ impl MetadataBuilder {
         self
     }
 
+    /// Add the `links`, which are assumed to be free of duplicates.
     pub fn links<C, S>(mut self, symbol_table: &mut StringInterner, links: C) -> Self
     where
         C: IntoIterator<Item = Spanned<S>>,
         S: AsRef<str>,
     {
         for link in links {
-            // TODO check duplicates
             self.links
                 .insert(link.map(|link| symbol_table.get_or_intern(link)));
         }
@@ -165,6 +165,7 @@ impl MetadataBuilder {
         self
     }
 
+    /// Add the `key_values`, which are assumed to be free of duplicate keys.
     pub fn key_values<'a, C, K>(
         mut self,
         symbol_table: &mut impl SymbolTable,
@@ -175,7 +176,6 @@ impl MetadataBuilder {
         K: AsRef<str>,
     {
         for (k, v) in keys_values {
-            // TODO check duplicates
             self.key_values.insert(
                 k.map(|k| symbol_table.get_or_intern(k)),
                 v.map(|v| MetaValue::symbol_from(v, symbol_table)),
