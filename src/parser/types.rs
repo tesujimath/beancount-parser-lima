@@ -290,7 +290,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
                 Err(AccountNameError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter_map(|c| (!AccountName::is_valid_subsequent(&c)).then_some(c))
+                    .filter(|c| (!AccountName::is_valid_subsequent(c)))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
                     Ok(AccountName(s))
@@ -403,7 +403,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
             } else {
                 let bad_intermediates = intermediate
                     .into_iter()
-                    .filter_map(|c| (!Currency::is_valid_intermediate(&c)).then_some(c))
+                    .filter(|c| (!Currency::is_valid_intermediate(c)))
                     .collect::<Vec<char>>();
                 if !bad_intermediates.is_empty() {
                     Err(CurrencyError(Intermediate(bad_intermediates)))
@@ -731,7 +731,7 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         let bad_chars = s
             .chars()
-            .filter_map(|c| (!TagOrLinkIdentifier::is_valid_char(&c)).then_some(c))
+            .filter(|c| (!TagOrLinkIdentifier::is_valid_char(c)))
             .collect::<Vec<char>>();
         if bad_chars.is_empty() {
             Ok(TagOrLinkIdentifier(s))
@@ -816,7 +816,7 @@ impl<'a> TryFrom<&'a str> for Key<'a> {
                 Err(KeyError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter_map(|c| (!Key::is_valid_subsequent(&c)).then_some(c))
+                    .filter(|c| (!Key::is_valid_subsequent(c)))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
                     Ok(Key(s))
