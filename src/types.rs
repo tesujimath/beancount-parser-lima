@@ -414,6 +414,16 @@ pub struct Account<'a> {
     pub(crate) names: NonEmpty<AccountName<'a>>,
 }
 
+impl<'a> Account<'a> {
+    pub fn account_type(&self) -> AccountType {
+        self.account_type
+    }
+
+    pub fn names(&self) -> impl Iterator<Item = &AccountName> {
+        self.names.iter()
+    }
+}
+
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.account_type)?;
@@ -622,7 +632,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
 pub struct Posting<'a> {
     pub(crate) flag: Option<Spanned<Flag>>,
     pub(crate) account: Spanned<&'a Account<'a>>,
-    pub(crate) amount: Option<Spanned<Expr>>,
+    pub(crate) amount: Option<Spanned<ExprValue>>,
     pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
     pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
@@ -638,7 +648,7 @@ impl<'a> Posting<'a> {
         &self.account
     }
 
-    pub fn amount(&self) -> Option<&Spanned<Expr>> {
+    pub fn amount(&self) -> Option<&Spanned<ExprValue>> {
         self.amount.as_ref()
     }
 }
@@ -961,8 +971,14 @@ impl<'a> TryFrom<&'a str> for Key<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// An `Expr` which has been evaluated.
 pub struct ExprValue {
-    pub value: Decimal,
+    value: Decimal,
     expr: Expr,
+}
+
+impl ExprValue {
+    pub fn value(&self) -> Decimal {
+        self.value
+    }
 }
 
 impl From<Expr> for ExprValue {
@@ -1059,14 +1075,14 @@ impl fmt::Debug for Expr {
 
 /// An expression which quantifies a total or per-unit.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum ScopedExpr {
-    PerUnit(Expr),
-    Total(Expr),
+pub enum ScopedExprValue {
+    PerUnit(ExprValue),
+    Total(ExprValue),
 }
 
-impl Display for ScopedExpr {
+impl Display for ScopedExprValue {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::ScopedExpr::*;
+        use self::ScopedExprValue::*;
 
         match self {
             PerUnit(e) => write!(format, "{}", e),
@@ -1107,12 +1123,17 @@ impl<'a> Amount<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// An amount where each element may not actually be specified.
 pub struct LooseAmount<'a> {
-    number: Option<Spanned<Expr>>,
+    number: Option<Spanned<ExprValue>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
 }
 
 impl<'a> LooseAmount<'a> {
-    pub fn new(amount: (Option<Spanned<Expr>>, Option<Spanned<&'a Currency<'a>>>)) -> Self {
+    pub fn new(
+        amount: (
+            Option<Spanned<ExprValue>>,
+            Option<Spanned<&'a Currency<'a>>>,
+        ),
+    ) -> Self {
         LooseAmount {
             number: amount.0,
             currency: amount.1,
@@ -1124,8 +1145,8 @@ impl<'a> LooseAmount<'a> {
 /// An amount which specifies a total or per-unit, or simply just a currency.
 pub enum ScopedAmount<'a> {
     BareCurrency(&'a Currency<'a>),
-    BareAmount(ScopedExpr),
-    CurrencyAmount(ScopedExpr, &'a Currency<'a>),
+    BareAmount(ScopedExprValue),
+    CurrencyAmount(ScopedExprValue, &'a Currency<'a>),
 }
 
 impl<'a> Display for ScopedAmount<'a> {
@@ -1141,8 +1162,8 @@ impl<'a> Display for ScopedAmount<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CostSpec<'a> {
-    per_unit: Option<Spanned<Expr>>,
-    total: Option<Spanned<Expr>>,
+    per_unit: Option<Spanned<ExprValue>>,
+    total: Option<Spanned<ExprValue>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
     date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
@@ -1182,8 +1203,8 @@ impl<'a> Display for CostSpec<'a> {
 #[derive(Default, Debug)]
 /// Only allows setting each field once, and requires at least one field to be set before building.
 pub struct CostSpecBuilder<'a> {
-    per_unit: Option<Spanned<Expr>>,
-    total: Option<Spanned<Expr>>,
+    per_unit: Option<Spanned<ExprValue>>,
+    total: Option<Spanned<ExprValue>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
     date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
@@ -1192,8 +1213,8 @@ pub struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: ScopedExpr, span: Span) -> Self {
-        use ScopedExpr::*;
+    pub fn compound_expr(self, value: ScopedExprValue, span: Span) -> Self {
+        use ScopedExprValue::*;
 
         match value {
             PerUnit(value) => self.per_unit(spanned(value, span)),
@@ -1201,7 +1222,7 @@ impl<'a> CostSpecBuilder<'a> {
         }
     }
 
-    fn per_unit(mut self, value: Spanned<Expr>) -> Self {
+    fn per_unit(mut self, value: Spanned<ExprValue>) -> Self {
         if self.per_unit.is_none() {
             self.per_unit = Some(value);
         } else {
@@ -1210,7 +1231,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    fn total(mut self, value: Spanned<Expr>) -> Self {
+    fn total(mut self, value: Spanned<ExprValue>) -> Self {
         if self.total.is_none() {
             self.total = Some(value);
         } else {

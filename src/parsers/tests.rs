@@ -63,10 +63,10 @@ fn test_transaction(
 }
 
 #[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]
-#[test_case("456.78", ScopedAmount::BareAmount(ScopedExpr::PerUnit(Expr::Value(dec!(456.78)))))]
-#[test_case("# 1456.98", ScopedAmount::BareAmount(ScopedExpr::Total(Expr::Value(dec!(1456.98)))))]
-#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExpr::PerUnit(Expr::Value(dec!(456.78))), &Currency::try_from("NZD").unwrap()))]
-#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExpr::Total(Expr::Value(dec!(1456.98))), &Currency::try_from("USD").unwrap()))]
+#[test_case("456.78", ScopedAmount::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
+#[test_case("# 1456.98", ScopedAmount::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
+#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), &Currency::try_from("NZD").unwrap()))]
+#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), &Currency::try_from("USD").unwrap()))]
 fn test_compound_amount(s: &str, expected: ScopedAmount) {
     let source_id = SourceId::default();
     let tokens = bare_lex(source_id, s);
@@ -77,10 +77,10 @@ fn test_compound_amount(s: &str, expected: ScopedAmount) {
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case("123.45", ScopedExpr::PerUnit(Expr::Value(dec!(123.45))))]
-#[test_case("789.45 #", ScopedExpr::PerUnit(Expr::Value(dec!(789.45))))]
-#[test_case("# 123.45", ScopedExpr::Total(Expr::Value(dec!(123.45))))]
-fn test_compound_expr(s: &str, expected: ScopedExpr) {
+#[test_case("123.45", ScopedExprValue::PerUnit(Expr::Value(dec!(123.45)).into()))]
+#[test_case("789.45 #", ScopedExprValue::PerUnit(Expr::Value(dec!(789.45)).into()))]
+#[test_case("# 123.45", ScopedExprValue::Total(Expr::Value(dec!(123.45)).into()))]
+fn test_compound_expr(s: &str, expected: ScopedExprValue) {
     let source_id = SourceId::default();
     let tokens = bare_lex(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));

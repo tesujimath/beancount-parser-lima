@@ -394,7 +394,7 @@ where
             group((
                 flag().map_with(spanned_extra).or_not(),
                 account.map_with(spanned_extra),
-                expr().map_with(spanned_extra).or_not(),
+                expr_value().map_with(spanned_extra).or_not(),
                 currency.map_with(spanned_extra).or_not(),
                 cost_spec().map_with(spanned_extra).or_not(),
                 price_annotation().map_with(spanned_extra).or_not(),
@@ -579,7 +579,7 @@ where
     let currency = select_ref!(Token::Currency(cur) => cur);
 
     group((
-        expr().map_with(spanned_extra).or_not(),
+        expr_value().map_with(spanned_extra).or_not(),
         currency.map_with(spanned_extra).or_not(),
     ))
     .map(LooseAmount::new)
@@ -601,16 +601,17 @@ where
     ))
 }
 
-pub fn compound_expr<'src, I>() -> impl Parser<'src, I, ScopedExpr, extra::Err<ParserError<'src>>>
+pub fn compound_expr<'src, I>(
+) -> impl Parser<'src, I, ScopedExprValue, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use ScopedExpr::*;
+    use ScopedExprValue::*;
 
     choice((
-        expr().then_ignore(just(Token::Hash)).map(PerUnit),
-        expr().map(PerUnit),
-        just(Token::Hash).ignore_then(expr()).map(Total),
+        expr_value().then_ignore(just(Token::Hash)).map(PerUnit),
+        expr_value().map(PerUnit),
+        just(Token::Hash).ignore_then(expr_value()).map(Total),
     ))
 }
 
@@ -622,8 +623,8 @@ where
     use ScopedAmount::*;
 
     let currency = select_ref!(Token::Currency(cur) => cur);
-    fn scope(amount: Expr, is_total: bool) -> ScopedExpr {
-        use ScopedExpr::*;
+    fn scope(amount: ExprValue, is_total: bool) -> ScopedExprValue {
+        use ScopedExprValue::*;
 
         if is_total {
             Total(amount)
@@ -634,7 +635,7 @@ where
 
     group((
         choice((just(Token::At).to(false), just(Token::AtAt).to(true))),
-        expr().or_not(),
+        expr_value().or_not(),
         currency.or_not(),
     ))
     .try_map(|(is_total, amount, cur), span| match (amount, cur) {
