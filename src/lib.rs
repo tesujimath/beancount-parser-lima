@@ -8,5 +8,4 @@ pub use types::*;
 
 pub mod parser;
 mod sort;
-mod store;
 mod types;
