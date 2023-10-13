@@ -1,12 +1,10 @@
 use std::{
-    collections::{hash_map, HashSet},
+    collections::{hash_map, HashMap, HashSet},
     ops::Deref,
 };
 
-use super::lexer::Token;
-use super::types::*;
-use crate::types::*;
-use chumsky::{input::BorrowInput, prelude::*};
+use super::{lexer::Token, types::*, ConcreteInput};
+use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
 use either::Either;
 use time::Date;
 
@@ -830,6 +828,120 @@ where
             |lhs, (op, rhs)| op(Box::new(lhs), Box::new(rhs)),
         )
     })
+}
+
+impl<'a> Metadata<'a> {
+    pub fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
+    where
+        E: Emit<ParserError<'a>>,
+    {
+        for tag in tags {
+            match self.tags.get(tag) {
+                None => {
+                    self.tags.insert(*tag);
+                }
+                Some(existing_tag) => {
+                    let mut error =
+                        Rich::custom(existing_tag.span, format!("duplicate tag {}", tag));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "tag", tag.span);
+                    emitter.emit(error);
+                }
+            }
+        }
+    }
+
+    pub fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
+    where
+        E: Emit<ParserError<'a>>,
+    {
+        for link in links {
+            match self.links.get(link) {
+                None => {
+                    self.links.insert(*link);
+                }
+                Some(existing_link) => {
+                    let mut error =
+                        Rich::custom(existing_link.span, format!("duplicate link {}", link));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "link", link.span);
+                    emitter.emit(error);
+                }
+            }
+        }
+    }
+
+    pub fn merge_key_values<E>(
+        &mut self,
+        key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+        emitter: &mut E,
+    ) where
+        E: Emit<ParserError<'a>>,
+    {
+        for (key, value) in key_values {
+            match self.key_values.get_key_value(key) {
+                None => {
+                    self.key_values.insert(
+                        *key,
+                        // Sadly we do have to clone the value here, so we can
+                        // merge in metadata key/values from the push/pop stack
+                        // without consuming it.
+                        value.clone(),
+                    );
+                }
+                Some((existing_key, _existing_value)) => {
+                    let mut error =
+                        Rich::custom(existing_key.span, format!("duplicate key {}", key));
+                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "key", key.span);
+                    emitter.emit(error);
+                }
+            }
+        }
+    }
+}
+
+type ParserError<'a> = Rich<'a, Token<'a>, Span>;
+
+impl<'a> From<ParserError<'a>> for Error {
+    fn from(error: ParserError) -> Self {
+        let error = error.map_token(|tok| tok.to_string());
+
+        Error {
+            span: *error.span(),
+            message: error.to_string(),
+            reason: Some(error.reason().to_string()),
+            contexts: error
+                .contexts()
+                .map(|(label, span)| (label.to_string(), *span))
+                .collect(),
+        }
+    }
+}
+
+/// `Emit` trait enables use of own functions which emit errors
+// TODO make this not piblic by thinking about where PragmaProcessor should be
+pub trait Emit<E> {
+    fn emit(&mut self, err: E);
+}
+
+impl<E> Emit<E> for chumsky::input::Emitter<E> {
+    fn emit(&mut self, err: E) {
+        self.emit(err)
+    }
+}
+
+// simple collection of errors in a Vec
+impl<E> Emit<E> for Vec<Error>
+where
+    E: Into<Error>,
+{
+    fn emit(&mut self, err: E) {
+        self.push(err.into())
+    }
+}
+// a degenerate error sink
+struct NullEmitter;
+
+impl<E> Emit<E> for NullEmitter {
+    fn emit(&mut self, _err: E) {}
 }
 
 mod tests;

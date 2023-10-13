@@ -9,7 +9,7 @@ use std::alloc::System;
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-use beancount_parser::{parser::Directive, BeancountParser, BeancountSources};
+use beancount_parser::{BeancountParser, BeancountSources, Directive};
 
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
