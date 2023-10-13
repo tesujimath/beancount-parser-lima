@@ -21,8 +21,8 @@
 
 pushtag #essential
 
-2023-05-29 * "New World Gardens North East Va ;"
-  Assets:Bank:Current                           -39.65 NZD
+2023-05-29 * "New World Gardens North East Va ;" ^newworld.co.nz
+  Assets:Bank:Current                        -30 -9.65 NZD
   ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
   Expenses:Groceries
 

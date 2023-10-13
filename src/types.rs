@@ -12,6 +12,7 @@ use std::{
     hash::{Hash, Hasher},
     iter::empty,
     mem::swap,
+    ops::Deref,
 };
 use strum_macros::{Display, EnumString};
 use time::Date;
@@ -170,6 +171,15 @@ pub type Span = chumsky::span::SimpleSpan<usize, SourceId>;
 pub struct Spanned<T> {
     pub(crate) item: T,
     pub(crate) span: Span,
+}
+
+/// Spanned item may deref as simple item for convenience.
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
 }
 
 pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
@@ -333,6 +343,22 @@ impl<'a> Transaction<'a> {
             Some(NEWLINE_INDENT),
         )?;
         Ok(())
+    }
+
+    pub fn flag(&self) -> &Spanned<Flag> {
+        &self.flag
+    }
+
+    pub fn payee(&self) -> Option<&Spanned<&str>> {
+        self.payee.as_ref()
+    }
+
+    pub fn narration(&self) -> Option<&Spanned<&str>> {
+        self.narration.as_ref()
+    }
+
+    pub fn postings(&self) -> impl Iterator<Item = &Spanned<Posting>> {
+        self.postings.iter()
     }
 }
 
@@ -594,13 +620,27 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Posting<'a> {
-    pub flag: Option<Spanned<Flag>>,
-    pub account: Spanned<&'a Account<'a>>,
-    pub amount: Option<Spanned<Expr>>,
-    pub currency: Option<Spanned<&'a Currency<'a>>>,
-    pub cost_spec: Option<Spanned<CostSpec<'a>>>,
-    pub price_annotation: Option<Spanned<ScopedAmount<'a>>>,
-    pub metadata: Metadata<'a>,
+    pub(crate) flag: Option<Spanned<Flag>>,
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) amount: Option<Spanned<Expr>>,
+    pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
+    pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
+    pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
+    pub(crate) metadata: Metadata<'a>,
+}
+
+impl<'a> Posting<'a> {
+    pub fn flag(&self) -> Option<&Spanned<Flag>> {
+        self.flag.as_ref()
+    }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    pub fn amount(&self) -> Option<&Spanned<Expr>> {
+        self.amount.as_ref()
+    }
 }
 
 impl<'a> Display for Posting<'a> {
@@ -625,18 +665,30 @@ impl<'a> Display for Posting<'a> {
 
 #[derive(Clone, Default, Debug)]
 pub struct Metadata<'a> {
-    pub key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
-    pub tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub links: HashSet<Spanned<&'a Link<'a>>>,
+    pub(crate) key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
+    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
 }
 
 impl<'a> Metadata<'a> {
-    pub fn fmt_tags_links_inline(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    pub fn key_values(&self) -> impl Iterator<Item = (&Spanned<&Key>, &Spanned<MetaValue>)> {
+        self.key_values.iter()
+    }
+
+    pub fn tags(&self) -> impl Iterator<Item = &Spanned<&Tag>> {
+        self.tags.iter()
+    }
+
+    pub fn links(&self) -> impl Iterator<Item = &Spanned<&Link>> {
+        self.links.iter()
+    }
+
+    pub(crate) fn fmt_tags_links_inline(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format(f, &self.tags, plain, SPACE, Some(SPACE))?;
         format(f, &self.links, plain, SPACE, Some(SPACE))
     }
 
-    pub fn fmt_keys_values(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    pub(crate) fn fmt_keys_values(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format(
             f,
             &self.key_values,
