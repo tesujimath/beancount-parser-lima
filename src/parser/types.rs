@@ -83,6 +83,14 @@ impl<'a> Directive<'a> {
     pub fn date(&self) -> Date {
         self.date.item
     }
+
+    pub fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
+
+    pub fn variant(&self) -> &DirectiveVariant {
+        &self.variant
+    }
 }
 
 impl<'a> Display for Directive<'a> {
