@@ -94,7 +94,11 @@ impl Display for Flag {
 pub struct FlagLetter(char);
 
 impl FlagLetter {
-    pub fn is_valid(c: &char) -> bool {
+    pub fn char(&self) -> char {
+        self.0
+    }
+
+    pub(crate) fn is_valid(c: &char) -> bool {
         c.is_ascii_uppercase()
     }
 }
@@ -651,6 +655,18 @@ impl<'a> Posting<'a> {
     pub fn amount(&self) -> Option<&Spanned<ExprValue>> {
         self.amount.as_ref()
     }
+
+    pub fn currency(&self) -> Option<&Spanned<&Currency>> {
+        self.currency.as_ref()
+    }
+
+    pub fn cost_spec(&self) -> Option<&Spanned<CostSpec>> {
+        self.cost_spec.as_ref()
+    }
+
+    pub fn price_annotation(&self) -> Option<&Spanned<ScopedAmount>> {
+        self.price_annotation.as_ref()
+    }
 }
 
 impl<'a> Display for Posting<'a> {
@@ -900,6 +916,12 @@ impl<'a> Key<'a> {
     }
 }
 
+impl<'a> AsRef<str> for Key<'a> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
 impl<'a> Display for Key<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -1097,12 +1119,6 @@ pub struct Amount<'a> {
     currency: Spanned<&'a Currency<'a>>,
 }
 
-impl<'a> Display for Amount<'a> {
-    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        write!(format, "{} {}", &self.number, &self.currency)
-    }
-}
-
 impl<'a> Amount<'a> {
     pub fn new(amount: (Spanned<ExprValue>, Spanned<&'a Currency<'a>>)) -> Self {
         Amount {
@@ -1117,6 +1133,12 @@ impl<'a> Amount<'a> {
 
     pub fn currency(&self) -> &Spanned<&Currency> {
         &self.currency
+    }
+}
+
+impl<'a> Display for Amount<'a> {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        write!(format, "{} {}", &self.number, &self.currency)
     }
 }
 
@@ -1168,6 +1190,32 @@ pub struct CostSpec<'a> {
     date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
+}
+
+impl<'a> CostSpec<'a> {
+    pub fn per_unit(&self) -> Option<&Spanned<ExprValue>> {
+        self.per_unit.as_ref()
+    }
+
+    pub fn total(&self) -> Option<&Spanned<ExprValue>> {
+        self.total.as_ref()
+    }
+
+    pub fn currency(&self) -> Option<&Spanned<&Currency<'_>>> {
+        self.currency.as_ref()
+    }
+
+    pub fn date(&self) -> Option<&Spanned<Date>> {
+        self.date.as_ref()
+    }
+
+    pub fn label(&self) -> Option<&Spanned<&str>> {
+        self.label.as_ref()
+    }
+
+    pub fn merge(&self) -> bool {
+        self.merge
+    }
 }
 
 impl<'a> Display for CostSpec<'a> {
