@@ -134,6 +134,8 @@ fn transaction<'a>(t: &'a Transaction, d: &'a Directive) -> impl Iterator<Item =
 }
 
 fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
+    let m = x.metadata();
+
     indent()
         .chain(
             x.flag()
@@ -155,6 +157,7 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
         // pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
         // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
         // pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
+        .chain(keys_values(m))
         .chain(newline())
     // pub(crate) metadata: Metadata<'a>,
 }
@@ -167,10 +170,11 @@ fn tags_links_inline<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>>
 
 fn keys_values<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>> {
     x.key_values().flat_map(|(k, v)| {
-        newline()
-            .chain(indent())
-            .chain(string_as_ref(k.item(), Decoration::ColonSuffix))
-            .chain(meta_value(v))
+        newline().chain(indent()).chain(
+            string_as_ref(k.item(), Decoration::ColonSuffix)
+                .chain(meta_value(v))
+                .spaced(),
+        )
     })
 }
 

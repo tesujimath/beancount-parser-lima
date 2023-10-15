@@ -667,6 +667,10 @@ impl<'a> Posting<'a> {
     pub fn price_annotation(&self) -> Option<&Spanned<ScopedAmount>> {
         self.price_annotation.as_ref()
     }
+
+    pub fn metadata(&self) -> &Metadata<'a> {
+        &self.metadata
+    }
 }
 
 impl<'a> Display for Posting<'a> {
