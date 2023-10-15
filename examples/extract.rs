@@ -105,30 +105,28 @@ impl<'a> Display for Primitive<'a> {
 fn transaction<'a>(t: &'a Transaction, d: &'a Directive) -> impl Iterator<Item = Primitive<'a>> {
     let m = d.metadata();
 
-    itertools::intersperse(
-        date(d.date())
-            .chain(flag(t.flag()))
-            .chain(
-                t.payee()
-                    .into_iter()
-                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
-            )
-            .chain(
-                t.narration()
-                    .into_iter()
-                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
-            )
-            .chain(tags_links_inline(m)),
-        SPACE,
-    )
-    .chain(keys_values(m))
-    .chain(newline())
-    .chain(t.postings().flat_map(|x| posting(x.item())))
+    date(d.date())
+        .chain(flag(t.flag()))
+        .chain(
+            t.payee()
+                .into_iter()
+                .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+        )
+        .chain(
+            t.narration()
+                .into_iter()
+                .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+        )
+        .chain(tags_links_inline(m))
+        .spaced()
+        .chain(keys_values(m))
+        .chain(newline())
+        .chain(t.postings().flat_map(|x| posting(x.item())))
 }
 
 fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
     indent()
-        .chain(itertools::intersperse(
+        .chain(
             x.flag()
                 .into_iter()
                 .flat_map(|x| flag(x.item()))
@@ -141,9 +139,9 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
                     x.price_annotation()
                         .into_iter()
                         .flat_map(|x| scoped_amount(x)),
-                ),
-            SPACE,
-        ))
+                )
+                .spaced(),
+        )
         // pub(crate) amount: Option<Spanned<ExprValue>>,
         // pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
         // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
@@ -304,3 +302,25 @@ where
 {
     iter.collect::<Vec<T>>()
 }
+
+// struct Spaced<'a> {
+//     primitives: Box<dyn Iterator<Item = Primitive<'a>> + 'a>,
+// }
+
+// impl<'a> Iterator<Item=Primitive<'a>> for Spaced<'a> {
+//     fn next(&mut self) -> Option<Primitive<'a>> {
+//         self.
+//     }
+// }
+
+trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
+    /// Iterator adapter for spacing primtives
+    fn spaced(self) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(itertools::intersperse(self, SPACE))
+    }
+}
+
+impl<'a, I: Iterator<Item = Primitive<'a>>> SpacedIteratorAdaptor<'a> for I {}
