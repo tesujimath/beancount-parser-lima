@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rust_decimal::Decimal;
 use std::fmt::{self, Display, Formatter};
-use std::iter::empty;
+use std::iter::{empty, Once};
 use std::path::PathBuf;
 use std::{io, iter::once};
 use time::Date;
@@ -57,6 +57,7 @@ enum Primitive<'a> {
     Decimal(Decimal),
     Date(Date),
     Bool(bool),
+    Spliced(Vec<Primitive<'a>>),
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +99,14 @@ impl<'a> Display for Primitive<'a> {
             Decimal(x) => write!(f, "{}", x),
             Date(x) => write!(f, "{}", x),
             Bool(x) => write!(f, "{}", x),
+
+            Spliced(xs) => {
+                for x in xs {
+                    write!(f, "{}", x)?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -201,10 +210,12 @@ fn currency<'a>(x: &'a Currency) -> impl Iterator<Item = Primitive<'a>> {
 }
 
 fn account<'a>(x: &'a Account) -> impl Iterator<Item = Primitive<'a>> {
-    account_type(x.account_type()).chain(
-        x.names()
-            .flat_map(|x| string_as_ref(x, Decoration::ColonPrefix)),
-    )
+    account_type(x.account_type())
+        .chain(
+            x.names()
+                .flat_map(|x| string_as_ref(x, Decoration::ColonPrefix)),
+        )
+        .spliced()
 }
 
 fn tag<'a>(x: &'a Tag) -> impl Iterator<Item = Primitive<'a>> {
@@ -303,16 +314,6 @@ where
     iter.collect::<Vec<T>>()
 }
 
-// struct Spaced<'a> {
-//     primitives: Box<dyn Iterator<Item = Primitive<'a>> + 'a>,
-// }
-
-// impl<'a> Iterator<Item=Primitive<'a>> for Spaced<'a> {
-//     fn next(&mut self) -> Option<Primitive<'a>> {
-//         self.
-//     }
-// }
-
 trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
     /// Iterator adapter for spacing primtives
     fn spaced(self) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a>
@@ -324,3 +325,15 @@ trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
 }
 
 impl<'a, I: Iterator<Item = Primitive<'a>>> SpacedIteratorAdaptor<'a> for I {}
+
+trait SplicedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
+    /// Iterator adapter for splicing primtives
+    fn spliced(self) -> Once<Primitive<'a>>
+    where
+        Self: 'a,
+    {
+        once(Primitive::Spliced(self.collect()))
+    }
+}
+
+impl<'a, I: Iterator<Item = Primitive<'a>>> SplicedIteratorAdaptor<'a> for I {}
