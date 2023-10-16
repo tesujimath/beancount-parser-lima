@@ -1,12 +1,21 @@
 use anyhow::Result;
 use rust_decimal::Decimal;
-use std::io;
 use std::path::PathBuf;
+use std::{collections::HashMap, io};
 
-use beancount_parser::{BeancountParser, BeancountSources, DirectiveVariant};
+use beancount_parser::{
+    BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, Posting, Spanned,
+};
 
-/// This example is really a test that there is sufficient public access to parser output types.
-/// We need to avoid leaning on the Display implementations to be sure we can extract a usable value in every case.
+/// This is a non-comprehensive example of reporting semantic errors in context.
+/// These are not parse errors per se, so not the business of the core parser to deletct and report.
+/// Yet reporting with specific source location remains essential.
+///
+/// Only these checks are made:
+///
+/// 1. A transaction with all postings specifying an amount must sum to zero. (It is good practice to let the last posting amount be inferred.)
+///
+/// 2. No posting must refer to an unknown or closed account.
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
         /// File to parse
@@ -19,50 +28,62 @@ fn main() -> Result<()> {
 
     match beancount_parser.parse() {
         Ok(directives) => {
+            let mut accounts = HashMap::new();
             let mut errors = Vec::new();
 
             for d in directives {
                 use DirectiveVariant::*;
 
-                if let Transaction(x) = d.variant() {
-                    let postings = x.postings();
-                    let n_postings = postings.len();
-                    let mut amounts_with_value =
-                        postings.filter_map(|p| p.amount()).collect::<Vec<_>>();
+                match d.variant() {
+                    Transaction(x) => {
+                        check_postings_amounts(&d, x.postings(), &mut errors);
+                        check_postings_accounts(&d, x.postings(), &accounts, &mut errors);
+                    }
 
-                    if n_postings > 0 && amounts_with_value.len() == n_postings {
-                        let total: Decimal = amounts_with_value.iter().map(|x| x.value()).sum();
-
-                        if total != Decimal::ZERO {
-                            let last_amount = amounts_with_value.pop().unwrap(); // can't fail as n_postings > 0
-
-                            errors.push(
-                                last_amount
-                                    .error(
-                                        "invalid amount",
-                                        format!("sum is {}, expected zero", total),
-                                    )
-                                    .with("amount", amounts_with_value.into_iter())
-                                    .in_transaction(&d),
-                            )
+                    Open(x) => {
+                        // using strings as keys is a bit crass, but that's not the point of this example
+                        let account_key = x.account().to_string();
+                        match accounts.get(&account_key) {
+                            None => {
+                                accounts.insert(account_key, AccountStatus::opened(d));
+                            }
+                            Some(AccountStatus {
+                                opened,
+                                closed: None,
+                            }) => {
+                                errors.push(d.error("duplicate open").related_to(opened));
+                            }
+                            Some(AccountStatus {
+                                closed: Some(closed),
+                                ..
+                            }) => {
+                                errors.push(d.error("account was closed").related_to(closed));
+                            }
                         }
                     }
-                    // let mut total = Decimal::ZERO;
 
-                    // for p in x.postings() {
-                    //     if let Some(amount) = p.amount() {
-                    //         // ignoring currency complications for now, this is just a quick example
-                    //         total += amount.value();
-                    //         // amount_spans.push(amount.span());
-                    //     } else {
-                    //         // can't fail, as an amount has been left blank
-                    //         continue 'directives;
-                    //     }
+                    Close(x) => {
+                        // using strings as keys is a bit crass, but that's not the point of this example
+                        let account = x.account();
+                        let account_key = account.to_string();
+                        match accounts.get(&account_key) {
+                            None => {
+                                errors.push(account.error("no such account").in_context(&d));
+                            }
+                            Some(AccountStatus { closed: None, .. }) => {
+                                let account_status = accounts.get_mut(&account_key).unwrap();
+                                account_status.closed = Some(d);
+                            }
+                            Some(AccountStatus {
+                                closed: Some(closed),
+                                ..
+                            }) => {
+                                errors.push(d.error("account already closed").related_to(closed));
+                            }
+                        }
+                    }
 
-                    //     if total != Decimal::ZERO {
-                    //         error.push(Error::new("invalid amount"))
-                    //     }
-                    // }
+                    _ => (),
                 }
             }
 
@@ -74,5 +95,79 @@ fn main() -> Result<()> {
         }
 
         Err(errors) => sources.write_errors(error_w, errors).map_err(|e| e.into()),
+    }
+}
+
+struct AccountStatus<'a> {
+    opened: Spanned<Directive<'a>>,
+    closed: Option<Spanned<Directive<'a>>>,
+}
+
+impl<'a> AccountStatus<'a> {
+    fn opened(d: Spanned<Directive<'a>>) -> Self {
+        AccountStatus {
+            opened: d,
+            closed: None,
+        }
+    }
+}
+
+fn check_postings_amounts<'a>(
+    d: &'a Spanned<Directive<'a>>,
+    postings: impl ExactSizeIterator<Item = &'a Spanned<Posting<'a>>>,
+    errors: &mut Vec<Error>,
+) {
+    let n_postings = postings.len();
+    let mut amounts_with_value = postings.filter_map(|p| p.amount()).collect::<Vec<_>>();
+
+    if n_postings > 0 && amounts_with_value.len() == n_postings {
+        let total: Decimal = amounts_with_value.iter().map(|x| x.value()).sum();
+
+        if total != Decimal::ZERO {
+            let last_amount = amounts_with_value.pop().unwrap(); // can't fail as n_postings > 0
+
+            errors.push(
+                last_amount
+                    .error(format!("sum is {}, expected zero", total))
+                    .related_to_all(amounts_with_value)
+                    .in_context(d),
+            )
+        }
+    }
+}
+
+fn check_postings_accounts<'a>(
+    d: &'a Spanned<Directive<'a>>,
+    postings: impl ExactSizeIterator<Item = &'a Spanned<Posting<'a>>>,
+    accounts: &HashMap<String, AccountStatus>,
+    errors: &mut Vec<Error>,
+) {
+    for posting in postings {
+        let account = posting.account();
+        let account_key = account.to_string();
+
+        match accounts.get(&account_key) {
+            None => {
+                errors.push(
+                    account
+                        .error("no such account")
+                        .in_context(posting)
+                        .in_context(d),
+                );
+            }
+            Some(AccountStatus {
+                closed: Some(closed),
+                ..
+            }) => {
+                errors.push(
+                    account
+                        .error("account is closed")
+                        .in_context(posting)
+                        .in_context(d)
+                        .related_to(closed),
+                );
+            }
+            _ => (),
+        }
     }
 }

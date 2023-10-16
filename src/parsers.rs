@@ -917,6 +917,7 @@ impl<'a> From<ParserError<'a>> for Error {
                 .contexts()
                 .map(|(label, span)| (label.to_string(), *span))
                 .collect(),
+            related: Vec::new(),
         }
     }
 }

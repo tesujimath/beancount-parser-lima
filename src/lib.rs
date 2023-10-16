@@ -86,45 +86,39 @@ impl BeancountSources {
         }
     }
 
-    fn write_error_message<W>(
-        &self,
-        w: W,
-        span: Span,
-        msg: String,
-        reason: String,
-        contexts: Vec<(String, Span)>,
-    ) -> io::Result<()>
-    where
-        W: Write + Copy,
-    {
-        use chumsky::span::Span;
-
-        let src_id = self.source_id_string(&span);
-        Report::build(ReportKind::Error, src_id.to_string(), span.start)
-            .with_message(msg)
-            .with_labels(Some(
-                Label::new((src_id.to_string(), span.start()..span.end()))
-                    .with_message(reason)
-                    .with_color(Color::Red),
-            ))
-            .with_labels(contexts.into_iter().map(|(label, span)| {
-                Label::new((
-                    self.source_id_string(&span).to_string(),
-                    span.start()..span.end(),
-                ))
-                .with_message(lazy_format!("while parsing this {}", label))
-                .with_color(Color::Yellow)
-            }))
-            .finish()
-            .write(ariadne::sources(self.sources()), w)
-    }
-
     pub fn write_errors<W>(&self, w: W, errors: Vec<Error>) -> io::Result<()>
     where
         W: Write + Copy,
     {
         for error in errors.into_iter() {
-            self.write_error_message(w, error.span, error.message, error.reason, error.contexts)?;
+            use chumsky::span::Span;
+
+            let src_id = self.source_id_string(&error.span);
+            Report::build(ReportKind::Error, src_id.to_string(), error.span.start)
+                .with_message(error.message)
+                .with_labels(Some(
+                    Label::new((src_id.to_string(), error.span.start()..error.span.end()))
+                        .with_message(error.reason)
+                        .with_color(Color::Red),
+                ))
+                .with_labels(error.contexts.into_iter().map(|(label, span)| {
+                    Label::new((
+                        self.source_id_string(&span).to_string(),
+                        span.start()..span.end(),
+                    ))
+                    .with_message(lazy_format!("in this {}", label))
+                    .with_color(Color::Yellow)
+                }))
+                .with_labels(error.related.into_iter().map(|(label, span)| {
+                    Label::new((
+                        self.source_id_string(&span).to_string(),
+                        span.start()..span.end(),
+                    ))
+                    .with_message(lazy_format!("{}", label))
+                    .with_color(Color::Cyan)
+                }))
+                .finish()
+                .write(ariadne::sources(self.sources()), w)?;
         }
         Ok(())
     }

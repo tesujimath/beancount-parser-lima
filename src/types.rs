@@ -24,6 +24,7 @@ pub struct Error {
     pub(crate) reason: String,
     pub(crate) span: Span,
     pub(crate) contexts: Vec<(String, Span)>,
+    pub(crate) related: Vec<(String, Span)>,
 }
 
 impl Error {
@@ -32,29 +33,41 @@ impl Error {
             message: message.into(),
             reason: reason.into(),
             span,
-            contexts: Vec::new(), // TODO
+            contexts: Vec::new(),
+            related: Vec::new(),
         }
     }
 
-    pub fn with<'a, T>(
-        self,
-        element_type: &str,
-        locations: impl Iterator<Item = &'a Spanned<T>>,
-    ) -> Self
+    pub fn related_to<'a, T>(self, element: &'a Spanned<T>) -> Self
     where
-        T: 'a,
+        T: ElementType + 'a,
     {
         let mut e = self;
-        let mut new_contexts = locations
-            .map(|element| (element_type.to_string(), element.span))
-            .collect::<Vec<_>>();
-        e.contexts.append(&mut new_contexts);
+        e.related
+            .push((element.element_type().to_string(), element.span));
         e
     }
 
-    pub fn in_transaction(self, t: &Spanned<Directive>) -> Self {
+    pub fn related_to_all<'a, T>(self, elements: impl IntoIterator<Item = &'a Spanned<T>>) -> Self
+    where
+        T: ElementType + 'a,
+    {
         let mut e = self;
-        e.contexts.push(("transaction".to_string(), t.span));
+        let mut new_related = elements
+            .into_iter()
+            .map(|element| (element.element_type().to_string(), element.span))
+            .collect::<Vec<_>>();
+        e.related.append(&mut new_related);
+        e
+    }
+
+    pub fn in_context<T>(self, element: &Spanned<T>) -> Self
+    where
+        T: ElementType,
+    {
+        let mut e = self;
+        e.contexts
+            .push((element.element_type().to_string(), element.span));
         e
     }
 }
@@ -98,6 +111,12 @@ pub enum Flag {
     Question,
     Percent,
     Letter(FlagLetter),
+}
+
+impl ElementType for Flag {
+    fn element_type(&self) -> &'static str {
+        "flag"
+    }
 }
 
 impl Display for Flag {
@@ -172,6 +191,12 @@ pub enum Booking {
     Fifo,
     Lifo,
     Hifo,
+}
+
+impl ElementType for Booking {
+    fn element_type(&self) -> &'static str {
+        "booking"
+    }
 }
 
 /// a `SourceId` identifies a source file.
@@ -257,9 +282,18 @@ impl<T> Spanned<T> {
             span: self.span,
         }
     }
+}
 
-    pub fn error<M: Into<String>, R: Into<String>>(&self, message: M, reason: R) -> Error {
-        Error::new(message, reason, self.span)
+impl<T> Spanned<T>
+where
+    T: ElementType,
+{
+    pub fn error<S: Into<String>>(&self, reason: S) -> Error {
+        Error::new(
+            format!("invalid {}", self.element_type()),
+            reason,
+            self.span,
+        )
     }
 }
 
@@ -294,6 +328,39 @@ where
     }
 }
 
+// for error reporting
+pub trait ElementType {
+    fn element_type(&self) -> &'static str;
+}
+
+// blanket implementation for references
+impl<T> ElementType for &T
+where
+    T: ElementType,
+{
+    fn element_type(&self) -> &'static str {
+        (**self).element_type()
+    }
+}
+
+impl<T> ElementType for &mut T
+where
+    T: ElementType,
+{
+    fn element_type(&self) -> &'static str {
+        (**self).element_type()
+    }
+}
+
+impl<T> ElementType for Box<T>
+where
+    T: ElementType,
+{
+    fn element_type(&self) -> &'static str {
+        (**self).element_type()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Declaration<'a> {
     Directive(Directive<'a>),
@@ -318,6 +385,19 @@ impl<'a> Directive<'a> {
 
     pub fn variant(&self) -> &DirectiveVariant {
         &self.variant
+    }
+}
+
+impl<'a> ElementType for Directive<'a> {
+    fn element_type(&self) -> &'static str {
+        use DirectiveVariant::*;
+
+        match &self.variant {
+            Transaction(_) => "transaction",
+            Open(_) => "open",
+            Close(_) => "close",
+            Commodity(_) => "commodity",
+        }
     }
 }
 
@@ -481,6 +561,12 @@ impl<'a> Account<'a> {
     }
 }
 
+impl<'a> ElementType for Account<'a> {
+    fn element_type(&self) -> &'static str {
+        "account"
+    }
+}
+
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.account_type)?;
@@ -499,6 +585,12 @@ impl<'a> AccountName<'a> {
 
     pub(crate) fn is_valid_subsequent(c: &char) -> bool {
         c.is_alphanumeric() || *c == '-'
+    }
+}
+
+impl<'a> ElementType for AccountName<'a> {
+    fn element_type(&self) -> &'static str {
+        "account name"
     }
 }
 
@@ -589,6 +681,12 @@ impl<'a> Currency<'a> {
 
     fn is_valid_final(c: &char) -> bool {
         c.is_ascii_uppercase() || c.is_ascii_digit()
+    }
+}
+
+impl<'a> ElementType for Currency<'a> {
+    fn element_type(&self) -> &'static str {
+        "currency"
     }
 }
 
@@ -726,6 +824,12 @@ impl<'a> Posting<'a> {
     }
 }
 
+impl<'a> ElementType for Posting<'a> {
+    fn element_type(&self) -> &'static str {
+        "posting"
+    }
+}
+
 impl<'a> Display for Posting<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         simple_format(f, self.flag, None)?;
@@ -834,6 +938,12 @@ pub enum SimpleValue<'a> {
     Expr(ExprValue),
 }
 
+impl<'a> ElementType for SimpleValue<'a> {
+    fn element_type(&self) -> &'static str {
+        "simple value"
+    }
+}
+
 impl<'a> Display for SimpleValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use SimpleValue::*;
@@ -869,6 +979,12 @@ impl<'a> TryFrom<&'a str> for Tag<'a> {
     }
 }
 
+impl<'a> ElementType for Tag<'a> {
+    fn element_type(&self) -> &'static str {
+        "tag"
+    }
+}
+
 impl<'a> AsRef<str> for Tag<'a> {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
@@ -895,6 +1011,12 @@ impl<'a> TryFrom<&'a str> for Link<'a> {
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         TagOrLinkIdentifier::try_from(s).map(Link)
+    }
+}
+
+impl<'a> ElementType for Link<'a> {
+    fn element_type(&self) -> &'static str {
+        "link"
     }
 }
 
@@ -978,6 +1100,12 @@ impl<'a> Key<'a> {
 impl<'a> AsRef<str> for Key<'a> {
     fn as_ref(&self) -> &str {
         self.0
+    }
+}
+
+impl<'a> ElementType for Key<'a> {
+    fn element_type(&self) -> &'static str {
+        "key"
     }
 }
 
@@ -1068,6 +1196,13 @@ impl From<Expr> for ExprValue {
         let (mut value, scale) = expr.evaluate();
         value.rescale(scale);
         Self { value, expr }
+    }
+}
+
+//
+impl ElementType for ExprValue {
+    fn element_type(&self) -> &'static str {
+        "amount" // is there a better user-facing name?
     }
 }
 
@@ -1274,6 +1409,12 @@ impl<'a> CostSpec<'a> {
 
     pub fn merge(&self) -> bool {
         self.merge
+    }
+}
+
+impl<'a> ElementType for CostSpec<'a> {
+    fn element_type(&self) -> &'static str {
+        "cost specification"
     }
 }
 
