@@ -91,7 +91,7 @@ impl BeancountSources {
         w: W,
         span: Span,
         msg: String,
-        reason: Option<String>,
+        reason: String,
         contexts: Vec<(String, Span)>,
     ) -> io::Result<()>
     where
@@ -102,11 +102,11 @@ impl BeancountSources {
         let src_id = self.source_id_string(&span);
         Report::build(ReportKind::Error, src_id.to_string(), span.start)
             .with_message(msg)
-            .with_labels(reason.into_iter().map(|reason| {
+            .with_labels(Some(
                 Label::new((src_id.to_string(), span.start()..span.end()))
                     .with_message(reason)
-                    .with_color(Color::Red)
-            }))
+                    .with_color(Color::Red),
+            ))
             .with_labels(contexts.into_iter().map(|(label, span)| {
                 Label::new((
                     self.source_id_string(&span).to_string(),

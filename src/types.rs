@@ -20,20 +20,50 @@ use time::Date;
 /// Our public error type
 #[derive(Debug)]
 pub struct Error {
-    pub(crate) span: Span,
     pub(crate) message: String,
-    pub(crate) reason: Option<String>,
+    pub(crate) reason: String,
+    pub(crate) span: Span,
     pub(crate) contexts: Vec<(String, Span)>,
+}
+
+impl Error {
+    fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
+        Error {
+            message: message.into(),
+            reason: reason.into(),
+            span,
+            contexts: Vec::new(), // TODO
+        }
+    }
+
+    pub fn with<'a, T>(
+        self,
+        element_type: &str,
+        locations: impl Iterator<Item = &'a Spanned<T>>,
+    ) -> Self
+    where
+        T: 'a,
+    {
+        let mut e = self;
+        let mut new_contexts = locations
+            .map(|element| (element_type.to_string(), element.span))
+            .collect::<Vec<_>>();
+        e.contexts.append(&mut new_contexts);
+        e
+    }
+
+    pub fn in_transaction(self, t: &Spanned<Directive>) -> Self {
+        let mut e = self;
+        e.contexts.push(("transaction".to_string(), t.span));
+        e
+    }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use chumsky::span::Span;
 
-        write!(f, "{} ", self.message)?;
-        if let Some(reason) = &self.reason {
-            write!(f, "({}) ", reason)?;
-        }
+        write!(f, "{} ({}) ", self.message, self.reason)?;
         write!(
             f,
             "at {}..{} of source {}",
@@ -227,6 +257,10 @@ impl<T> Spanned<T> {
             span: self.span,
         }
     }
+
+    pub fn error<M: Into<String>, R: Into<String>>(&self, message: M, reason: R) -> Error {
+        Error::new(message, reason, self.span)
+    }
 }
 
 impl<T> PartialEq for Spanned<T>
@@ -360,7 +394,7 @@ impl<'a> Transaction<'a> {
         self.narration.as_ref()
     }
 
-    pub fn postings(&self) -> impl Iterator<Item = &Spanned<Posting>> {
+    pub fn postings(&self) -> impl ExactSizeIterator<Item = &Spanned<Posting>> {
         self.postings.iter()
     }
 }
@@ -386,7 +420,7 @@ impl<'a> Open<'a> {
         &self.account
     }
 
-    pub fn currencies(&self) -> impl Iterator<Item = &Spanned<&Currency>> {
+    pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<&Currency>> {
         self.currencies.iter()
     }
 
@@ -442,7 +476,7 @@ impl<'a> Account<'a> {
         self.account_type
     }
 
-    pub fn names(&self) -> impl Iterator<Item = &AccountName> {
+    pub fn names(&self) -> impl ExactSizeIterator<Item = &AccountName> {
         self.names.iter()
     }
 }
@@ -720,15 +754,17 @@ pub struct Metadata<'a> {
 }
 
 impl<'a> Metadata<'a> {
-    pub fn key_values(&self) -> impl Iterator<Item = (&Spanned<&Key>, &Spanned<MetaValue>)> {
+    pub fn key_values(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&Spanned<&Key>, &Spanned<MetaValue>)> {
         self.key_values.iter()
     }
 
-    pub fn tags(&self) -> impl Iterator<Item = &Spanned<&Tag>> {
+    pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<&Tag>> {
         self.tags.iter()
     }
 
-    pub fn links(&self) -> impl Iterator<Item = &Spanned<&Link>> {
+    pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<&Link>> {
         self.links.iter()
     }
 

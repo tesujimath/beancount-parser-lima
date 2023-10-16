@@ -912,7 +912,7 @@ impl<'a> From<ParserError<'a>> for Error {
         Error {
             span: *error.span(),
             message: error.to_string(),
-            reason: Some(error.reason().to_string()),
+            reason: error.reason().to_string(),
             contexts: error
                 .contexts()
                 .map(|(label, span)| (label.to_string(), *span))
