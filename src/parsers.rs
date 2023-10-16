@@ -836,7 +836,7 @@ where
 }
 
 impl<'a> Metadata<'a> {
-    pub fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {
@@ -855,7 +855,7 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {
@@ -874,7 +874,7 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub fn merge_key_values<E>(
+    pub(crate) fn merge_key_values<E>(
         &mut self,
         key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
         emitter: &mut E,
@@ -922,8 +922,7 @@ impl<'a> From<ParserError<'a>> for Error {
 }
 
 /// `Emit` trait enables use of own functions which emit errors
-// TODO make this not piblic by thinking about where PragmaProcessor should be
-pub trait Emit<E> {
+pub(crate) trait Emit<E> {
     fn emit(&mut self, err: E);
 }
 

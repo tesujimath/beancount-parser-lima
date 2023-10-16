@@ -186,12 +186,12 @@ impl<T> Deref for Spanned<T> {
     }
 }
 
-pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
+pub(crate) fn spanned<T>(item: T, span: Span) -> Spanned<T> {
     Spanned { item, span }
 }
 
 /// for use with `map_with`
-pub fn spanned_extra<'a, 'b, T, I, E>(item: T, e: &mut MapExtra<'a, 'b, I, E>) -> Spanned<T>
+pub(crate) fn spanned_extra<'a, 'b, T, I, E>(item: T, e: &mut MapExtra<'a, 'b, I, E>) -> Spanned<T>
 where
     I: Input<'a, Span = Span>,
     E: ParserExtra<'a, I>,
@@ -416,7 +416,7 @@ impl<'a> Close<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Commodity<'a> {
-    pub currency: Spanned<&'a Currency<'a>>,
+    pub(crate) currency: Spanned<&'a Currency<'a>>,
 }
 
 impl<'a> Commodity<'a> {
@@ -460,11 +460,11 @@ impl<'a> Display for Account<'a> {
 pub struct AccountName<'a>(&'a str);
 
 impl<'a> AccountName<'a> {
-    pub fn is_valid_initial(c: &char) -> bool {
+    pub(crate) fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || c.is_ascii_digit()
     }
 
-    pub fn is_valid_subsequent(c: &char) -> bool {
+    pub(crate) fn is_valid_subsequent(c: &char) -> bool {
         c.is_alphanumeric() || *c == '-'
     }
 }
@@ -759,8 +759,8 @@ impl<'a> Display for Metadata<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct MetaKeyValue<'a> {
-    pub key: Spanned<&'a Key<'a>>,
-    pub value: Spanned<MetaValue<'a>>,
+    pub(crate) key: Spanned<&'a Key<'a>>,
+    pub(crate) value: Spanned<MetaValue<'a>>,
 }
 
 impl<'a> Display for MetaKeyValue<'a> {
@@ -882,7 +882,7 @@ pub struct TagOrLinkIdentifier<'a>(&'a str);
 const TAG_OR_LINK_EXTRA_CHARS: [char; 4] = ['-', '_', '/', '.'];
 
 impl<'a> TagOrLinkIdentifier<'a> {
-    pub fn is_valid_char(c: &char) -> bool {
+    pub(crate) fn is_valid_char(c: &char) -> bool {
         c.is_alphanumeric() || TAG_OR_LINK_EXTRA_CHARS.contains(c)
     }
 }
@@ -931,11 +931,11 @@ impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
 pub struct Key<'a>(&'a str);
 
 impl<'a> Key<'a> {
-    pub fn is_valid_initial(c: &char) -> bool {
+    pub(crate) fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_lowercase()
     }
 
-    pub fn is_valid_subsequent(c: &char) -> bool {
+    pub(crate) fn is_valid_subsequent(c: &char) -> bool {
         c.is_alphanumeric() || *c == '-'
     }
 }
