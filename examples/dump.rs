@@ -61,7 +61,7 @@ fn main() -> Result<()> {
 
             for directive in directives {
                 show_directive(
-                    directive.item(),
+                    &directive,
                     flags.show_allocations,
                     &mut directives_as_strings,
                 );

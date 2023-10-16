@@ -243,7 +243,10 @@ where
         let (all_declarations, mut errors) = self.parse_declarations();
         let mut p = PragmaProcessor::new(all_declarations);
 
-        let sorted_directives = p.by_ref().sort(|d| d.item().date()).collect::<Vec<_>>();
+        let sorted_directives = p
+            .by_ref()
+            .sort(|d| *d.item().date().item())
+            .collect::<Vec<_>>();
         errors.append(&mut p.errors);
 
         if errors.is_empty() {

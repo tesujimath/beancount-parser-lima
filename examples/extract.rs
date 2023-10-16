@@ -8,8 +8,8 @@ use time::Date;
 
 use beancount_parser::{
     Account, AccountType, Amount, BeancountParser, BeancountSources, Booking, Close, Commodity,
-    CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag, Link, MetaValue, Metadata,
-    Open, Posting, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
+    CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag, Key, Link, MetaValue,
+    Metadata, Open, Posting, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -128,18 +128,18 @@ fn transaction<'a>(
             .chain(
                 x.payee()
                     .into_iter()
-                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+                    .flat_map(|x| string(x, Decoration::DoubleQuote)),
             )
             .chain(
                 x.narration()
                     .into_iter()
-                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+                    .flat_map(|x| string(x, Decoration::DoubleQuote)),
             )
             .chain(tags_links_inline(m))
             .spaced()
             .chain(keys_values(m))
             .chain(newline())
-            .chain(x.postings().flat_map(|x| posting(x.item()))),
+            .chain(x.postings().flat_map(|x| posting(x))),
     )
 }
 
@@ -151,11 +151,7 @@ fn open<'a>(x: &'a Open, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<
             .chain(once(Primitive::Str("open", Decoration::None)))
             .chain(account(x.account()))
             .chain(x.currencies().flat_map(|x| currency(x)))
-            .chain(
-                x.booking()
-                    .into_iter()
-                    .flat_map(|x| once(Primitive::Booking(*x.item()))),
-            )
+            .chain(x.booking().into_iter().flat_map(|x| booking(x)))
             .chain(tags_links_inline(m))
             .spaced()
             .chain(keys_values(m))
@@ -201,7 +197,7 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
         .chain(
             x.flag()
                 .into_iter()
-                .flat_map(|x| flag(x.item()))
+                .flat_map(|x| flag(x))
                 .chain(account(x.account()))
                 // TODO
                 .chain(x.amount().into_iter().flat_map(|x| expr_value(x)))
@@ -225,17 +221,15 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
 
 fn tags_links_inline<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>> {
     x.tags()
-        .flat_map(|x| tag(x.item()))
-        .chain(x.links().flat_map(|x| link(x.item())))
+        .flat_map(|x| tag(x))
+        .chain(x.links().flat_map(|x| link(x)))
 }
 
 fn keys_values<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>> {
     x.key_values().flat_map(|(k, v)| {
-        newline().chain(indent()).chain(
-            string_as_ref(k.item(), Decoration::ColonSuffix)
-                .chain(meta_value(v))
-                .spaced(),
-        )
+        newline()
+            .chain(indent())
+            .chain(key(k).chain(meta_value(v)).spaced())
     })
 }
 
@@ -261,7 +255,7 @@ fn simple_value<'a>(x: &'a SimpleValue) -> Box<dyn Iterator<Item = Primitive<'a>
         Account(x) => Box::new(account(x)),
         Tag(x) => Box::new(tag(x)),
         Link(x) => Box::new(link(x)),
-        Date(x) => Box::new(date(*x)),
+        Date(x) => Box::new(date(x)),
         Bool(x) => Box::new(bool(*x)),
         None => Box::new(empty()),
         Expr(x) => Box::new(expr_value(x)),
@@ -289,13 +283,17 @@ fn link<'a>(x: &'a Link) -> impl Iterator<Item = Primitive<'a>> {
     string_as_ref(x, Decoration::CaretPrefix)
 }
 
+fn key<'a>(x: &'a Key) -> impl Iterator<Item = Primitive<'a>> {
+    string_as_ref(x, Decoration::ColonSuffix)
+}
+
 fn cost_spec<'a>(x: &'a CostSpec<'a>) -> impl Iterator<Item = Primitive<'a>> {
     x.per_unit()
         .into_iter()
         .flat_map(|x| expr_value(x))
         .chain(x.total().into_iter().flat_map(|x| expr_value(x)))
         .chain(x.currency().into_iter().flat_map(|x| currency(x)))
-        .chain(x.date().into_iter().flat_map(|x| date(*x.item())))
+        .chain(x.date().into_iter().flat_map(|x| date(x)))
         .chain(
             x.label()
                 .into_iter()
@@ -339,8 +337,12 @@ fn decimal<'a>(x: Decimal) -> impl Iterator<Item = Primitive<'a>> {
     once(Primitive::Decimal(x))
 }
 
-fn date<'a>(x: Date) -> impl Iterator<Item = Primitive<'a>> {
-    once(Primitive::Date(x))
+fn date<'a>(x: &Date) -> impl Iterator<Item = Primitive<'a>> {
+    once(Primitive::Date(*x))
+}
+
+fn booking<'a>(x: &Booking) -> impl Iterator<Item = Primitive<'a>> {
+    once(Primitive::Booking(*x))
 }
 
 fn bool<'a>(x: bool) -> impl Iterator<Item = Primitive<'a>> {

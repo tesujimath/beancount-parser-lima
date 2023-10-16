@@ -275,8 +275,8 @@ pub struct Directive<'a> {
 }
 
 impl<'a> Directive<'a> {
-    pub fn date(&self) -> Date {
-        self.date.item
+    pub fn date(&self) -> &Spanned<Date> {
+        &self.date
     }
 
     pub fn metadata(&self) -> &Metadata {
