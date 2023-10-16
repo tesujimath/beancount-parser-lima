@@ -394,6 +394,7 @@ impl<'a> ElementType for Directive<'a> {
 
         match &self.variant {
             Transaction(_) => "transaction",
+            Price(_) => "price",
             Open(_) => "open",
             Close(_) => "close",
             Commodity(_) => "commodity",
@@ -407,6 +408,7 @@ impl<'a> Display for Directive<'a> {
 
         match &self.variant {
             Transaction(x) => x.fmt(f, self.date.item, &self.metadata),
+            Price(x) => x.fmt(f, self.date.item, &self.metadata),
             Open(x) => x.fmt(f, self.date.item, &self.metadata),
             Close(x) => x.fmt(f, self.date.item, &self.metadata),
             Commodity(x) => x.fmt(f, self.date.item, &self.metadata),
@@ -420,6 +422,7 @@ pub enum DirectiveVariant<'a> {
     Open(Open<'a>),
     Close(Close<'a>),
     Commodity(Commodity<'a>),
+    Price(Price<'a>),
     // TODO other directives
 }
 
@@ -476,6 +479,38 @@ impl<'a> Transaction<'a> {
 
     pub fn postings(&self) -> impl ExactSizeIterator<Item = &Spanned<Posting>> {
         self.postings.iter()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Price<'a> {
+    pub(crate) currency: Spanned<&'a Currency<'a>>,
+    pub(crate) amount: Spanned<Amount<'a>>,
+}
+
+impl<'a> Price<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} price {} {}", date, &self.currency, &self.amount)?;
+
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)?;
+
+        Ok(())
+    }
+
+    pub fn currency(&self) -> &Spanned<&Currency> {
+        &self.currency
+    }
+
+    pub fn amount(&self) -> &Spanned<Amount> {
+        &self.amount
+    }
+}
+
+impl<'a> ElementType for Price<'a> {
+    fn element_type(&self) -> &'static str {
+        "price"
     }
 }
 

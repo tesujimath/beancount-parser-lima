@@ -9,7 +9,7 @@ use time::Date;
 use beancount_parser::{
     Account, AccountType, Amount, BeancountParser, BeancountSources, Booking, Close, Commodity,
     CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag, Key, Link, MetaValue,
-    Metadata, Open, Posting, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
+    Metadata, Open, Posting, Price, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -30,7 +30,9 @@ fn main() -> Result<()> {
                 use DirectiveVariant::*;
 
                 for p in match d.variant() {
-                    Transaction(x) => transaction(x, &d), // Close(x) => Box::new(account(x.account())),
+                    Transaction(x) => transaction(x, &d),
+
+                    Price(x) => price(x, &d),
 
                     Open(x) => open(x, &d),
 
@@ -140,6 +142,21 @@ fn transaction<'a>(
             .chain(keys_values(m))
             .chain(newline())
             .chain(x.postings().flat_map(|x| posting(x))),
+    )
+}
+
+fn price<'a>(x: &'a Price, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("price", Decoration::None)))
+            .chain(currency(x.currency()))
+            .chain(amount(x.amount()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
     )
 }
 

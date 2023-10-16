@@ -57,6 +57,7 @@ where
     choice((
         transaction().labelled("transaction").as_context(),
         choice((
+            price(),
             open(),
             close(),
             commodity(),
@@ -170,6 +171,31 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
+}
+
+/// Matches a price directive, including metadata, over several lines.
+pub fn price<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let currency = select_ref!(Token::Currency(cur) => cur);
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Price),
+        currency.map_with(spanned_extra),
+        amount().map_with(spanned_extra),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .map(|((date, _, currency, amount), metadata)| Directive {
+        date,
+        metadata,
+        variant: DirectiveVariant::Price(Price { currency, amount }),
+    })
+    .labelled("price")
+    .as_context()
 }
 
 /// Matches a open, including metadata, over several lines.
