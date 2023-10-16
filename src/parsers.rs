@@ -796,16 +796,20 @@ where
             .delimited_by(just(Lparen), just(Rparen))
             .map(|x| Expr::Paren(Box::new(x)));
 
-        // Match a negated expression
-        let negated = just(Minus)
-            .ignore_then(expr)
-            .map(|x| Expr::Neg(Box::new(x)));
-
         // Match a bare number
         let number = select_ref! { Number(x) => Expr::Value(*x) };
 
         // Match a factor of an expression
-        let factor = number.or(negated).or(parens.clone());
+        let factor = just(Minus)
+            .or_not()
+            .then(number.or(parens.clone()))
+            .map(|(negated, x)| {
+                if negated.is_some() {
+                    Expr::Neg(Box::new(x))
+                } else {
+                    x
+                }
+            });
 
         // Match a product of factors
         let product = factor.clone().foldl(
