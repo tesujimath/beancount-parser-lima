@@ -7,9 +7,9 @@ use std::{io, iter::once};
 use time::Date;
 
 use beancount_parser::{
-    Account, AccountType, Amount, BeancountParser, BeancountSources, CostSpec, Currency, Directive,
-    DirectiveVariant, ExprValue, Flag, Link, MetaValue, Metadata, Posting, ScopedAmount,
-    ScopedExprValue, SimpleValue, Tag, Transaction,
+    Account, AccountType, Amount, BeancountParser, BeancountSources, Booking, Close, Commodity,
+    CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag, Link, MetaValue, Metadata,
+    Open, Posting, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -29,15 +29,16 @@ fn main() -> Result<()> {
             for d in directives {
                 use DirectiveVariant::*;
 
-                match d.variant() {
-                    Transaction(t) => {
-                        for p in transaction(t, &d) {
-                            print!("{}", p);
-                        }
-                    }
-                    _ => {
-                        println!("{}", &d);
-                    }
+                for p in match d.variant() {
+                    Transaction(x) => transaction(x, &d), // Close(x) => Box::new(account(x.account())),
+
+                    Open(x) => open(x, &d),
+
+                    Close(x) => close(x, &d),
+
+                    Commodity(x) => commodity(x, &d),
+                } {
+                    print!("{}", p);
                 }
                 println!();
             }
@@ -56,6 +57,7 @@ enum Primitive<'a> {
     Flag(Flag),
     Decimal(Decimal),
     Date(Date),
+    Booking(Booking),
     Bool(bool),
     Spliced(Vec<Primitive<'a>>),
 }
@@ -98,6 +100,9 @@ impl<'a> Display for Primitive<'a> {
             }
             Decimal(x) => write!(f, "{}", x),
             Date(x) => write!(f, "{}", x),
+
+            Booking(x) => write!(f, "\"{}\"", x),
+
             Bool(x) => write!(f, "{}", x),
 
             Spliced(xs) => {
@@ -111,26 +116,82 @@ impl<'a> Display for Primitive<'a> {
     }
 }
 
-fn transaction<'a>(t: &'a Transaction, d: &'a Directive) -> impl Iterator<Item = Primitive<'a>> {
+fn transaction<'a>(
+    x: &'a Transaction,
+    d: &'a Directive,
+) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
     let m = d.metadata();
 
-    date(d.date())
-        .chain(flag(t.flag()))
-        .chain(
-            t.payee()
-                .into_iter()
-                .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
-        )
-        .chain(
-            t.narration()
-                .into_iter()
-                .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
-        )
-        .chain(tags_links_inline(m))
-        .spaced()
-        .chain(keys_values(m))
-        .chain(newline())
-        .chain(t.postings().flat_map(|x| posting(x.item())))
+    Box::new(
+        date(d.date())
+            .chain(flag(x.flag()))
+            .chain(
+                x.payee()
+                    .into_iter()
+                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+            )
+            .chain(
+                x.narration()
+                    .into_iter()
+                    .flat_map(|x| string(x.item(), Decoration::DoubleQuote)),
+            )
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline())
+            .chain(x.postings().flat_map(|x| posting(x.item()))),
+    )
+}
+
+fn open<'a>(x: &'a Open, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("open", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(x.currencies().flat_map(|x| currency(x)))
+            .chain(
+                x.booking()
+                    .into_iter()
+                    .flat_map(|x| once(Primitive::Booking(*x.item()))),
+            )
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn close<'a>(x: &'a Close, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("close", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn commodity<'a>(
+    x: &'a Commodity,
+    d: &'a Directive,
+) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("commodity", Decoration::None)))
+            .chain(currency(x.currency()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
 }
 
 fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
@@ -178,35 +239,33 @@ fn keys_values<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>> {
     })
 }
 
-fn meta_value<'a>(x: &'a MetaValue) -> impl Iterator<Item = Primitive<'a>> {
+fn meta_value<'a>(x: &'a MetaValue) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
     use MetaValue::*;
 
     match x {
-        Simple(x) => v(simple_value(x)),
-        Amount(x) => v(amount(x)),
+        Simple(x) => Box::new(simple_value(x)),
+        Amount(x) => Box::new(amount(x)),
     }
-    .into_iter()
 }
 
 fn amount<'a>(x: &'a Amount) -> impl Iterator<Item = Primitive<'a>> {
     decimal(x.number().value()).chain(currency(x.currency()))
 }
 
-fn simple_value<'a>(x: &'a SimpleValue) -> impl Iterator<Item = Primitive<'a>> {
+fn simple_value<'a>(x: &'a SimpleValue) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
     use SimpleValue::*;
 
     match x {
-        String(x) => v(string(x, Decoration::DoubleQuote)),
-        Currency(x) => v(currency(x)),
-        Account(x) => v(account(x)),
-        Tag(x) => v(tag(x)),
-        Link(x) => v(link(x)),
-        Date(x) => v(date(*x)),
-        Bool(x) => v(bool(*x)),
-        None => v(empty()),
-        Expr(x) => v(expr_value(x)),
+        String(x) => Box::new(string(x, Decoration::DoubleQuote)),
+        Currency(x) => Box::new(currency(x)),
+        Account(x) => Box::new(account(x)),
+        Tag(x) => Box::new(tag(x)),
+        Link(x) => Box::new(link(x)),
+        Date(x) => Box::new(date(*x)),
+        Bool(x) => Box::new(bool(*x)),
+        None => Box::new(empty()),
+        Expr(x) => Box::new(expr_value(x)),
     }
-    .into_iter()
 }
 
 fn currency<'a>(x: &'a Currency) -> impl Iterator<Item = Primitive<'a>> {
@@ -245,25 +304,23 @@ fn cost_spec<'a>(x: &'a CostSpec<'a>) -> impl Iterator<Item = Primitive<'a>> {
         .chain(bool(x.merge()))
 }
 
-fn scoped_amount<'a>(x: &'a ScopedAmount<'a>) -> impl Iterator<Item = Primitive<'a>> {
+fn scoped_amount<'a>(x: &'a ScopedAmount<'a>) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
     use ScopedAmount::*;
 
     match x {
-        BareCurrency(c) => v(currency(c)),
-        BareAmount(x) => v(scoped_expr_value(x)),
-        CurrencyAmount(x, c) => v(scoped_expr_value(x).chain(currency(c))),
+        BareCurrency(c) => Box::new(currency(c)),
+        BareAmount(x) => Box::new(scoped_expr_value(x)),
+        CurrencyAmount(x, c) => Box::new(scoped_expr_value(x).chain(currency(c))),
     }
-    .into_iter()
 }
 
 fn scoped_expr_value(x: &ScopedExprValue) -> impl Iterator<Item = Primitive<'_>> {
     use ScopedExprValue::*;
 
     match x {
-        PerUnit(x) => v(expr_value(x)),
-        Total(x) => v(expr_value(x)),
+        PerUnit(x) => Box::new(expr_value(x)),
+        Total(x) => Box::new(expr_value(x)),
     }
-    .into_iter()
 }
 
 fn expr_value(x: &ExprValue) -> impl Iterator<Item = Primitive<'_>> {
@@ -301,8 +358,8 @@ fn string(x: &str, d: Decoration) -> impl Iterator<Item = Primitive<'_>> {
     once(Primitive::Str(x, d))
 }
 
-fn newline<'a>() -> impl Iterator<Item = Primitive<'a>> {
-    string("\n", Decoration::None)
+fn newline<'a>() -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    Box::new(string("\n", Decoration::None))
 }
 
 fn indent<'a>() -> impl Iterator<Item = Primitive<'a>> {
@@ -310,13 +367,6 @@ fn indent<'a>() -> impl Iterator<Item = Primitive<'a>> {
 }
 
 const SPACE: Primitive = Primitive::Str(" ", Decoration::None);
-
-fn v<I, T>(iter: I) -> Vec<T>
-where
-    I: Iterator<Item = T>,
-{
-    iter.collect::<Vec<T>>()
-}
 
 trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
     /// Iterator adapter for spacing primtives

@@ -382,6 +382,18 @@ impl<'a> Open<'a> {
         metadata.fmt_tags_links_inline(f)?;
         metadata.fmt_keys_values(f)
     }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    pub fn currencies(&self) -> impl Iterator<Item = &Spanned<&Currency>> {
+        self.currencies.iter()
+    }
+
+    pub fn booking(&self) -> Option<&Spanned<Booking>> {
+        self.booking.as_ref()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -396,6 +408,10 @@ impl<'a> Close<'a> {
         metadata.fmt_tags_links_inline(f)?;
         metadata.fmt_keys_values(f)
     }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -409,6 +425,10 @@ impl<'a> Commodity<'a> {
         // we prefer to show tags and links inline rather then line by line in metadata
         metadata.fmt_tags_links_inline(f)?;
         metadata.fmt_keys_values(f)
+    }
+
+    pub fn currency(&self) -> &Spanned<&Currency> {
+        &self.currency
     }
 }
 
