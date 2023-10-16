@@ -53,7 +53,6 @@ impl BeancountSources {
                         .with_context(source_id);
 
                     // ignore any errors in parsing, we'll pick them up in the next pass
-                    // TODO can we do this with &str for includes?
                     if let Some(includes) = includes().parse(spanned_tokens).into_output() {
                         for include in includes {
                             let included_path =
@@ -371,7 +370,8 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                 }
                             }
                         }
-                        // TODO
+
+                        // having silently consumed a pragma, go on to the next declaration
                         self.next()
                     }
                 }

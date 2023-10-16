@@ -263,7 +263,6 @@ where
 #[derive(Clone, Debug)]
 pub enum Declaration<'a> {
     Directive(Directive<'a>),
-    // TODO actually support Pragma
     Pragma(Pragma<'a>),
 }
 
