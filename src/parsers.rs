@@ -337,8 +337,19 @@ pub(crate) fn close<'src, I>(
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    group((close_header_line(), metadata())).validate(
-        |((date, account, (tags, links)), mut metadata), _span, emitter| {
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Close),
+        account.map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, account, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
             metadata.merge_links(&links, emitter);
 
@@ -351,70 +362,9 @@ where
     )
 }
 
-/// Matches the first line of a close.
-fn close_header_line<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Spanned<Date>,
-        Spanned<&'src Account<'src>>,
-        (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
-        ),
-    ),
-    extra::Err<ParserError<'src>>,
->
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
-{
-    let date = select_ref!(Token::Date(date) => *date);
-    let account = select_ref!(Token::Account(acc) => acc);
-
-    group((
-        date.map_with(spanned_extra),
-        just(Token::Close),
-        account.map_with(spanned_extra),
-        tags_links(),
-    ))
-    .then_ignore(just(Token::Eol))
-    .map(|(date, _, account, tags_links)| (date, account, tags_links))
-}
-
 /// Matches a commodity, including metadata, over several lines.
 pub(crate) fn commodity<'src, I>(
 ) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
-where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
-{
-    group((commodity_header_line(), metadata())).validate(
-        |((date, currency, (tags, links)), mut metadata), _span, emitter| {
-            metadata.merge_tags(&tags, emitter);
-            metadata.merge_links(&links, emitter);
-
-            Directive {
-                date,
-                metadata,
-                variant: DirectiveVariant::Commodity(Commodity { currency }),
-            }
-        },
-    )
-}
-
-/// Matches the first line of a commodity.
-fn commodity_header_line<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        Spanned<Date>,
-        Spanned<&'src Currency<'src>>,
-        (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
-        ),
-    ),
-    extra::Err<ParserError<'src>>,
->
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -428,7 +378,19 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .map(|(date, _, currency, tags_link)| (date, currency, tags_link))
+    .then(metadata())
+    .validate(
+        |((date, _, currency, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Commodity(Commodity { currency }),
+            }
+        },
+    )
 }
 
 /// Matches the `txn` keyword or a flag.
