@@ -58,6 +58,7 @@ where
         transaction().labelled("transaction").as_context(),
         choice((
             price(),
+            balance(),
             open(),
             close(),
             commodity(),
@@ -186,15 +187,54 @@ where
         just(Token::Price),
         currency.map_with(spanned_extra),
         amount().map_with(spanned_extra),
+        tags_links(),
     ))
     .then_ignore(just(Token::Eol))
     .then(metadata())
-    .map(|((date, _, currency, amount), metadata)| Directive {
-        date,
-        metadata,
-        variant: DirectiveVariant::Price(Price { currency, amount }),
-    })
+    .validate(
+        |((date, _, currency, amount, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Price(Price { currency, amount }),
+            }
+        },
+    )
     .labelled("price")
+    .as_context()
+}
+
+/// Matches a balance directive, including metadata, over several lines.
+pub fn balance<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Balance),
+        account.map_with(spanned_extra),
+        amount_with_tolerance().map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, account, atol, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Balance(Balance { account, atol }),
+            }
+        },
+    )
+    .labelled("balance")
     .as_context()
 }
 
@@ -595,6 +635,22 @@ where
         currency.map_with(spanned_extra),
     ))
     .map(Amount::new)
+}
+
+pub fn amount_with_tolerance<'src, I>(
+) -> impl Parser<'src, I, AmountWithTolerance<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let number = select_ref! {Token::Number(x) => *x };
+
+    group((
+        amount().map_with(spanned_extra),
+        just(Token::Tilde)
+            .ignore_then(number.map_with(spanned_extra))
+            .or_not(),
+    ))
+    .map(AmountWithTolerance::new)
 }
 
 pub fn loose_amount<'src, I>(

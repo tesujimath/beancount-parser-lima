@@ -7,9 +7,10 @@ use std::{io, iter::once};
 use time::Date;
 
 use beancount_parser::{
-    Account, AccountType, Amount, BeancountParser, BeancountSources, Booking, Close, Commodity,
-    CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag, Key, Link, MetaValue,
-    Metadata, Open, Posting, Price, ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
+    Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
+    Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag,
+    Key, Link, MetaValue, Metadata, Open, Posting, Price, ScopedAmount, ScopedExprValue,
+    SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -33,6 +34,8 @@ fn main() -> Result<()> {
                     Transaction(x) => transaction(x, &d),
 
                     Price(x) => price(x, &d),
+
+                    Balance(x) => balance(x, &d),
 
                     Open(x) => open(x, &d),
 
@@ -160,6 +163,21 @@ fn price<'a>(x: &'a Price, d: &'a Directive) -> Box<dyn Iterator<Item = Primitiv
     )
 }
 
+fn balance<'a>(x: &'a Balance, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("balance", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(amount_with_tolerance(x.atol()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
 fn open<'a>(x: &'a Open, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
     let m = d.metadata();
 
@@ -261,6 +279,14 @@ fn meta_value<'a>(x: &'a MetaValue) -> Box<dyn Iterator<Item = Primitive<'a>> + 
 
 fn amount<'a>(x: &'a Amount) -> impl Iterator<Item = Primitive<'a>> {
     decimal(x.number().value()).chain(currency(x.currency()))
+}
+
+fn amount_with_tolerance<'a>(x: &'a AmountWithTolerance) -> impl Iterator<Item = Primitive<'a>> {
+    amount(x.amount()).chain(
+        x.tolerance()
+            .into_iter()
+            .flat_map(|x| string("~", Decoration::None).chain(decimal(*x.item()))),
+    )
 }
 
 fn simple_value<'a>(x: &'a SimpleValue) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {

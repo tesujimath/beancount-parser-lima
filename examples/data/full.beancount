@@ -3,8 +3,9 @@
 1970-01-01 commodity NZD #downunder ^money.co.nz
 ;   ; New Zealand Dollar
 
-; taken from Beancount docs
-2014-07-09 price HOOL 579.18 USD
+; taken from Beancount docs, with added tag/link/metadata
+2014-07-09 price HOOL 579.18 USD #watcha ^cool.co
+  heat: "on"
 
 2016-03-01 open Assets:Bank:Current NZD #money ^www.bank.com
 ;   check commodity == "NZD"
@@ -30,6 +31,11 @@ pushtag #essential
   Expenses:Groceries
 
 poptag #essential
+
+2023-05-30 balance Assets:Bank:Current 1000 NZD ~ 0.01 #richman
+
+2023-05-30 balance Expenses:Groceries             55 NZD
+  meals: "cheap"
 
 pushmeta drink: "alcoholic"
 

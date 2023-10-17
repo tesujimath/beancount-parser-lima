@@ -395,6 +395,7 @@ impl<'a> ElementType for Directive<'a> {
         match &self.variant {
             Transaction(_) => "transaction",
             Price(_) => "price",
+            Balance(_) => "balance",
             Open(_) => "open",
             Close(_) => "close",
             Commodity(_) => "commodity",
@@ -409,6 +410,7 @@ impl<'a> Display for Directive<'a> {
         match &self.variant {
             Transaction(x) => x.fmt(f, self.date.item, &self.metadata),
             Price(x) => x.fmt(f, self.date.item, &self.metadata),
+            Balance(x) => x.fmt(f, self.date.item, &self.metadata),
             Open(x) => x.fmt(f, self.date.item, &self.metadata),
             Close(x) => x.fmt(f, self.date.item, &self.metadata),
             Commodity(x) => x.fmt(f, self.date.item, &self.metadata),
@@ -419,10 +421,11 @@ impl<'a> Display for Directive<'a> {
 #[derive(Clone, Debug)]
 pub enum DirectiveVariant<'a> {
     Transaction(Transaction<'a>),
+    Price(Price<'a>),
+    Balance(Balance<'a>),
     Open(Open<'a>),
     Close(Close<'a>),
     Commodity(Commodity<'a>),
-    Price(Price<'a>),
     // TODO other directives
 }
 
@@ -511,6 +514,38 @@ impl<'a> Price<'a> {
 impl<'a> ElementType for Price<'a> {
     fn element_type(&self) -> &'static str {
         "price"
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Balance<'a> {
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) atol: Spanned<AmountWithTolerance<'a>>,
+}
+
+impl<'a> Balance<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} balance {} {}", date, &self.account, &self.atol)?;
+
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)?;
+
+        Ok(())
+    }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    pub fn atol(&self) -> &Spanned<AmountWithTolerance> {
+        &self.atol
+    }
+}
+
+impl<'a> ElementType for Balance<'a> {
+    fn element_type(&self) -> &'static str {
+        "balance"
     }
 }
 
@@ -1368,6 +1403,39 @@ impl<'a> Amount<'a> {
 impl<'a> Display for Amount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         write!(format, "{} {}", &self.number, &self.currency)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct AmountWithTolerance<'a> {
+    amount: Spanned<Amount<'a>>,
+    tolerance: Option<Spanned<Decimal>>,
+}
+
+impl<'a> AmountWithTolerance<'a> {
+    pub fn new(awt: (Spanned<Amount<'a>>, Option<Spanned<Decimal>>)) -> Self {
+        AmountWithTolerance {
+            amount: awt.0,
+            tolerance: awt.1,
+        }
+    }
+
+    pub fn amount(&self) -> &Spanned<Amount> {
+        &self.amount
+    }
+
+    pub fn tolerance(&self) -> Option<&Spanned<Decimal>> {
+        self.tolerance.as_ref()
+    }
+}
+
+impl<'a> Display for AmountWithTolerance<'a> {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(tolerance) = self.tolerance {
+            write!(format, "{} ~ {}", &self.amount, tolerance)
+        } else {
+            write!(format, "{}", &self.amount)
+        }
     }
 }
 
