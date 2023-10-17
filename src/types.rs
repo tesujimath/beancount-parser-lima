@@ -400,6 +400,9 @@ impl<'a> ElementType for Directive<'a> {
             Close(_) => "close",
             Commodity(_) => "commodity",
             Pad(_) => "pad",
+            Document(_) => "document",
+            Note(_) => "note",
+            Event(_) => "event",
         }
     }
 }
@@ -416,6 +419,9 @@ impl<'a> Display for Directive<'a> {
             Close(x) => x.fmt(f, self.date.item, &self.metadata),
             Commodity(x) => x.fmt(f, self.date.item, &self.metadata),
             Pad(x) => x.fmt(f, self.date.item, &self.metadata),
+            Document(x) => x.fmt(f, self.date.item, &self.metadata),
+            Note(x) => x.fmt(f, self.date.item, &self.metadata),
+            Event(x) => x.fmt(f, self.date.item, &self.metadata),
         }
     }
 }
@@ -429,7 +435,11 @@ pub enum DirectiveVariant<'a> {
     Close(Close<'a>),
     Commodity(Commodity<'a>),
     Pad(Pad<'a>),
-    // TODO other directives
+    Document(Document<'a>),
+    Note(Note<'a>),
+    Event(Event<'a>),
+    // TODO Query
+    // TODO Custom
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -441,7 +451,8 @@ pub(crate) enum Pragma<'a> {
     Pushmeta(MetaKeyValue<'a>),
     Popmeta(Spanned<&'a Key<'a>>),
     Include(&'a str),
-    // TODO option, and probably not plugin
+    // TODO option
+    // TODO (probably not) plugin
 }
 
 #[derive(Clone, Debug)]
@@ -638,6 +649,81 @@ impl<'a> Pad<'a> {
 
     pub fn source(&self) -> &Spanned<&Account> {
         &self.source
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Document<'a> {
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) path: Spanned<&'a str>,
+}
+
+impl<'a> Document<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} document {} \"{}\"", date, self.account, self.path)?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    /// The path to the document, possibly relative to a directory given by options.
+    /// No check is made as to validity of the path or existence of the file.
+    pub fn path(&self) -> &Spanned<&str> {
+        &self.path
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Note<'a> {
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) comment: Spanned<&'a str>,
+}
+
+impl<'a> Note<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} note {} \"{}\"", date, self.account, self.comment)?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    pub fn comment(&self) -> &Spanned<&str> {
+        &self.comment
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Event<'a> {
+    pub(crate) event_type: Spanned<&'a str>,
+    pub(crate) description: Spanned<&'a str>,
+}
+
+impl<'a> Event<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(
+            f,
+            "{} event \"{}\" \"{}\"",
+            date, self.event_type, self.description
+        )?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    pub fn event_type(&self) -> &Spanned<&str> {
+        &self.event_type
+    }
+
+    pub fn description(&self) -> &Spanned<&str> {
+        &self.description
     }
 }
 

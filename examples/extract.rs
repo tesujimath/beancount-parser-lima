@@ -8,9 +8,9 @@ use time::Date;
 
 use beancount_parser::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
-    Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag,
-    Key, Link, MetaValue, Metadata, Open, Pad, Posting, Price, ScopedAmount, ScopedExprValue,
-    SimpleValue, Tag, Transaction,
+    Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
+    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Pad, Posting, Price, ScopedAmount,
+    ScopedExprValue, SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -44,6 +44,12 @@ fn main() -> Result<()> {
                     Commodity(x) => commodity(x, &d),
 
                     Pad(x) => pad(x, &d),
+
+                    Document(x) => document(x, &d),
+
+                    Note(x) => note(x, &d),
+
+                    Event(x) => event(x, &d),
                 } {
                     print!("{}", p);
                 }
@@ -235,6 +241,51 @@ fn pad<'a>(x: &'a Pad, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a
             .chain(once(Primitive::Str("pad", Decoration::None)))
             .chain(account(x.account()))
             .chain(account(x.source()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn document<'a>(x: &'a Document, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("document", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(string(x.path(), Decoration::DoubleQuote))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn note<'a>(x: &'a Note, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("note", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(string(x.comment(), Decoration::DoubleQuote))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn event<'a>(x: &'a Event, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("event", Decoration::None)))
+            .chain(string(x.event_type(), Decoration::DoubleQuote))
+            .chain(string(x.description(), Decoration::DoubleQuote))
             .chain(tags_links_inline(m))
             .spaced()
             .chain(keys_values(m))

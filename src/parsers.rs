@@ -64,7 +64,11 @@ where
             close(),
             commodity(),
             pad(),
-            // TODO other directives
+            document(),
+            note(),
+            event(),
+            // TODO query
+            // TODO custom
         ))
         .labelled("directive")
         .as_context(),
@@ -420,6 +424,106 @@ where
                 date,
                 metadata,
                 variant: DirectiveVariant::Pad(Pad { account, source }),
+            }
+        },
+    )
+}
+
+/// Matches a document, including metadata, over several lines.
+pub(crate) fn document<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Document),
+        account.map_with(spanned_extra),
+        string.map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, account, path, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Document(Document { account, path }),
+            }
+        },
+    )
+}
+
+/// Matches a note, including metadata, over several lines.
+pub(crate) fn note<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Note),
+        account.map_with(spanned_extra),
+        string.map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, account, comment, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Note(Note { account, comment }),
+            }
+        },
+    )
+}
+
+/// Matches a event, including metadata, over several lines.
+pub(crate) fn event<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Event),
+        string.map_with(spanned_extra),
+        string.map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, event_type, description, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Event(Event {
+                    event_type,
+                    description,
+                }),
             }
         },
     )

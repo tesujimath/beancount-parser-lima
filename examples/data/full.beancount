@@ -48,6 +48,17 @@ pushmeta drink: "alcoholic"
   ofxid: "0.12-3456-1234567-01.31May2023.3"
   Expenses:Entertainment:Drinks-and-snacks
 
+2023-05-31 document Expenses:Entertainment:Drinks-and-snacks "2023-05-31-emersons-receipt.png" #beer
+  assessment: "worth-it"
+
+2023-05-31 note Expenses:Entertainment:Drinks-and-snacks "met with Mickey and Minnie
+  Pluto couldn't come,
+  which made me sad.
+"
+
+2023-05-28 event "planning" "Plan beers" #exciting
+  state: "anticipation"
+
 popmeta drink:
 
 2022-01-30 * "Z Energy ;" #petrol
