@@ -9,7 +9,7 @@ use either::Either;
 use time::Date;
 
 /// Matches all the includes in the file, ignoring everything else.
-pub fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>
+pub(crate) fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -28,7 +28,7 @@ where
 }
 
 /// Matches the whole file.
-pub fn file<'src, I>(
+pub(crate) fn file<'src, I>(
 ) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -37,7 +37,7 @@ where
 }
 
 /// Matches a `Declaration`, and returns with Span.
-pub fn declaration<'src, I>(
+pub(crate) fn declaration<'src, I>(
 ) -> impl Parser<'src, I, Spanned<Declaration<'src>>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -50,7 +50,8 @@ where
 }
 
 /// Matches a `Directive`.
-pub fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn directive<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -70,7 +71,7 @@ where
 }
 
 /// Matches a `Pragma`.
-pub fn pragma<'src, I>() -> impl Parser<'src, I, Pragma<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn pragma<'src, I>() -> impl Parser<'src, I, Pragma<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -102,7 +103,8 @@ where
 }
 
 /// Matches a transaction, including metadata and postings, over several lines.
-pub fn transaction<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn transaction<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -175,7 +177,8 @@ where
 }
 
 /// Matches a price directive, including metadata, over several lines.
-pub fn price<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn price<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -207,7 +210,8 @@ where
 }
 
 /// Matches a balance directive, including metadata, over several lines.
-pub fn balance<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn balance<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -239,7 +243,7 @@ where
 }
 
 /// Matches a open, including metadata, over several lines.
-pub fn open<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn open<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -328,7 +332,8 @@ where
 }
 
 /// Matches a close, including metadata, over several lines.
-pub fn close<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn close<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -377,7 +382,8 @@ where
 }
 
 /// Matches a commodity, including metadata, over several lines.
-pub fn commodity<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn commodity<'src, I>(
+) -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -426,7 +432,7 @@ where
 }
 
 /// Matches the `txn` keyword or a flag.
-pub fn txn<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
+pub(crate) fn txn<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -434,7 +440,7 @@ where
 }
 
 /// Matches any flag, dedicated or overloaded
-pub fn flag<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
+pub(crate) fn flag<'src, I>() -> impl Parser<'src, I, Flag, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -585,7 +591,8 @@ where
 }
 
 /// Matches a `MetaValue`.
-pub fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn meta_value<'src, I>(
+) -> impl Parser<'src, I, MetaValue<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -597,7 +604,7 @@ where
 /// Matches a `SimpleValue`.
 /// TODO: the original parser allowed for the SimpleValue to be empty, which we don't support here,
 /// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
-pub fn simple_value<'src, I>(
+pub(crate) fn simple_value<'src, I>(
 ) -> impl Parser<'src, I, SimpleValue<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -624,7 +631,7 @@ where
     ))
 }
 
-pub fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, extra::Err<ParserError<'src>>>
+pub(crate) fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -637,7 +644,7 @@ where
     .map(Amount::new)
 }
 
-pub fn amount_with_tolerance<'src, I>(
+pub(crate) fn amount_with_tolerance<'src, I>(
 ) -> impl Parser<'src, I, AmountWithTolerance<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -653,7 +660,7 @@ where
     .map(AmountWithTolerance::new)
 }
 
-pub fn loose_amount<'src, I>(
+pub(crate) fn loose_amount<'src, I>(
 ) -> impl Parser<'src, I, LooseAmount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -667,7 +674,7 @@ where
     .map(LooseAmount::new)
 }
 
-pub fn compound_amount<'src, I>(
+pub(crate) fn compound_amount<'src, I>(
 ) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -683,7 +690,7 @@ where
     ))
 }
 
-pub fn compound_expr<'src, I>(
+pub(crate) fn compound_expr<'src, I>(
 ) -> impl Parser<'src, I, ScopedExprValue, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -697,7 +704,7 @@ where
     ))
 }
 
-pub fn price_annotation<'src, I>(
+pub(crate) fn price_annotation<'src, I>(
 ) -> impl Parser<'src, I, ScopedAmount<'src>, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -800,7 +807,7 @@ where
 
 /// Matches zero or more tags or links.
 /// Duplicates are errors.
-pub fn tags_links<'src, I>() -> impl Parser<
+pub(crate) fn tags_links<'src, I>() -> impl Parser<
     'src,
     I,
     (
@@ -849,7 +856,7 @@ where
 }
 
 /// Matches a bool
-pub fn bool<'src, I>() -> impl Parser<'src, I, bool, extra::Err<ParserError<'src>>>
+pub(crate) fn bool<'src, I>() -> impl Parser<'src, I, bool, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -857,7 +864,7 @@ where
 }
 
 /// Match and evaluate an expression
-pub fn expr_value<'src, I>() -> impl Parser<'src, I, ExprValue, extra::Err<ParserError<'src>>>
+pub(crate) fn expr_value<'src, I>() -> impl Parser<'src, I, ExprValue, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -865,7 +872,7 @@ where
 }
 
 /// Match an expression
-pub fn expr<'src, I>() -> impl Parser<'src, I, Expr, extra::Err<ParserError<'src>>>
+pub(crate) fn expr<'src, I>() -> impl Parser<'src, I, Expr, extra::Err<ParserError<'src>>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {

@@ -362,7 +362,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub enum Declaration<'a> {
+pub(crate) enum Declaration<'a> {
     Directive(Directive<'a>),
     Pragma(Pragma<'a>),
 }
@@ -430,7 +430,7 @@ pub enum DirectiveVariant<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum Pragma<'a> {
+pub(crate) enum Pragma<'a> {
     // we keep pushed tags with their span
     // since it may be useful downstream to know where these came from
     Pushtag(Spanned<&'a Tag<'a>>),
@@ -967,7 +967,7 @@ impl<'a> Display for Metadata<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct MetaKeyValue<'a> {
+pub(crate) struct MetaKeyValue<'a> {
     pub(crate) key: Spanned<&'a Key<'a>>,
     pub(crate) value: Spanned<MetaValue<'a>>,
 }
@@ -1384,7 +1384,7 @@ pub struct Amount<'a> {
 }
 
 impl<'a> Amount<'a> {
-    pub fn new(amount: (Spanned<ExprValue>, Spanned<&'a Currency<'a>>)) -> Self {
+    pub(crate) fn new(amount: (Spanned<ExprValue>, Spanned<&'a Currency<'a>>)) -> Self {
         Amount {
             number: amount.0,
             currency: amount.1,
@@ -1413,7 +1413,7 @@ pub struct AmountWithTolerance<'a> {
 }
 
 impl<'a> AmountWithTolerance<'a> {
-    pub fn new(awt: (Spanned<Amount<'a>>, Option<Spanned<Decimal>>)) -> Self {
+    pub(crate) fn new(awt: (Spanned<Amount<'a>>, Option<Spanned<Decimal>>)) -> Self {
         AmountWithTolerance {
             amount: awt.0,
             tolerance: awt.1,
@@ -1447,7 +1447,7 @@ pub struct LooseAmount<'a> {
 }
 
 impl<'a> LooseAmount<'a> {
-    pub fn new(
+    pub(crate) fn new(
         amount: (
             Option<Spanned<ExprValue>>,
             Option<Spanned<&'a Currency<'a>>>,
@@ -1457,6 +1457,14 @@ impl<'a> LooseAmount<'a> {
             number: amount.0,
             currency: amount.1,
         }
+    }
+
+    pub fn number(&self) -> Option<&Spanned<ExprValue>> {
+        self.number.as_ref()
+    }
+
+    pub fn currency(&self) -> Option<&Spanned<&Currency>> {
+        self.currency.as_ref()
     }
 }
 
@@ -1553,7 +1561,7 @@ impl<'a> Display for CostSpec<'a> {
 
 #[derive(Default, Debug)]
 /// Only allows setting each field once, and requires at least one field to be set before building.
-pub struct CostSpecBuilder<'a> {
+pub(crate) struct CostSpecBuilder<'a> {
     per_unit: Option<Spanned<ExprValue>>,
     total: Option<Spanned<ExprValue>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
@@ -1564,7 +1572,7 @@ pub struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub fn compound_expr(self, value: ScopedExprValue, span: Span) -> Self {
+    pub(crate) fn compound_expr(self, value: ScopedExprValue, span: Span) -> Self {
         use ScopedExprValue::*;
 
         match value {
@@ -1591,7 +1599,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
+    pub(crate) fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
         if self.currency.is_none() {
             self.currency = Some(spanned(value, span));
         } else {
@@ -1600,7 +1608,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn date(mut self, value: Date, span: Span) -> Self {
+    pub(crate) fn date(mut self, value: Date, span: Span) -> Self {
         if self.date.is_none() {
             self.date = Some(spanned(value, span));
         } else {
@@ -1609,7 +1617,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn label(mut self, value: &'a str, span: Span) -> Self {
+    pub(crate) fn label(mut self, value: &'a str, span: Span) -> Self {
         if self.label.is_none() {
             self.label = Some(spanned(value, span));
         } else {
@@ -1618,7 +1626,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub fn merge(mut self, _span: Span) -> Self {
+    pub(crate) fn merge(mut self, _span: Span) -> Self {
         if !self.merge {
             // TODO find a way to keep a span iff merge is true
             self.merge = true;
@@ -1630,7 +1638,7 @@ impl<'a> CostSpecBuilder<'a> {
     }
 
     // the lifetime `'a` of the CostSpec returned outlives the builder lifetime `'b`
-    pub fn build<'b>(&'b mut self) -> Result<CostSpec<'a>, CostSpecErrors>
+    pub(crate) fn build<'b>(&'b mut self) -> Result<CostSpec<'a>, CostSpecErrors>
     where
         'a: 'b,
     {
