@@ -9,7 +9,7 @@ use time::Date;
 use beancount_parser::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, ExprValue, Flag,
-    Key, Link, MetaValue, Metadata, Open, Posting, Price, ScopedAmount, ScopedExprValue,
+    Key, Link, MetaValue, Metadata, Open, Pad, Posting, Price, ScopedAmount, ScopedExprValue,
     SimpleValue, Tag, Transaction,
 };
 
@@ -42,6 +42,8 @@ fn main() -> Result<()> {
                     Close(x) => close(x, &d),
 
                     Commodity(x) => commodity(x, &d),
+
+                    Pad(x) => pad(x, &d),
                 } {
                     print!("{}", p);
                 }
@@ -218,6 +220,21 @@ fn commodity<'a>(
         date(d.date())
             .chain(once(Primitive::Str("commodity", Decoration::None)))
             .chain(currency(x.currency()))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn pad<'a>(x: &'a Pad, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str("pad", Decoration::None)))
+            .chain(account(x.account()))
+            .chain(account(x.source()))
             .chain(tags_links_inline(m))
             .spaced()
             .chain(keys_values(m))

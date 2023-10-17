@@ -63,6 +63,7 @@ where
             open(),
             close(),
             commodity(),
+            pad(),
             // TODO other directives
         ))
         .labelled("directive")
@@ -388,6 +389,37 @@ where
                 date,
                 metadata,
                 variant: DirectiveVariant::Commodity(Commodity { currency }),
+            }
+        },
+    )
+}
+
+/// Matches a pad, including metadata, over several lines.
+pub(crate) fn pad<'src, I>() -> impl Parser<'src, I, Directive<'src>, extra::Err<ParserError<'src>>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let date = select_ref!(Token::Date(date) => *date);
+    let account = select_ref!(Token::Account(acc) => acc);
+
+    group((
+        date.map_with(spanned_extra),
+        just(Token::Pad),
+        account.map_with(spanned_extra),
+        account.map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, account, source, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Pad(Pad { account, source }),
             }
         },
     )

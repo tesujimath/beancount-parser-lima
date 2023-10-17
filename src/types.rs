@@ -399,6 +399,7 @@ impl<'a> ElementType for Directive<'a> {
             Open(_) => "open",
             Close(_) => "close",
             Commodity(_) => "commodity",
+            Pad(_) => "pad",
         }
     }
 }
@@ -414,6 +415,7 @@ impl<'a> Display for Directive<'a> {
             Open(x) => x.fmt(f, self.date.item, &self.metadata),
             Close(x) => x.fmt(f, self.date.item, &self.metadata),
             Commodity(x) => x.fmt(f, self.date.item, &self.metadata),
+            Pad(x) => x.fmt(f, self.date.item, &self.metadata),
         }
     }
 }
@@ -426,6 +428,7 @@ pub enum DirectiveVariant<'a> {
     Open(Open<'a>),
     Close(Close<'a>),
     Commodity(Commodity<'a>),
+    Pad(Pad<'a>),
     // TODO other directives
 }
 
@@ -612,6 +615,29 @@ impl<'a> Commodity<'a> {
 
     pub fn currency(&self) -> &Spanned<&Currency> {
         &self.currency
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Pad<'a> {
+    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) source: Spanned<&'a Account<'a>>,
+}
+
+impl<'a> Pad<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} pad {} {}", date, self.account, self.source)?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    pub fn account(&self) -> &Spanned<&Account> {
+        &self.account
+    }
+
+    pub fn source(&self) -> &Spanned<&Account> {
+        &self.source
     }
 }
 

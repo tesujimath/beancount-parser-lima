@@ -32,7 +32,10 @@ pushtag #essential
 
 poptag #essential
 
-2023-05-30 balance Assets:Bank:Current 1000 NZD ~ 0.01 #richman
+2023-05-30 pad Assets:Bank:Current Equity:Opening-Balances #fudge
+  evil: "unseen"
+
+2023-05-30 balance Assets:Bank:Current          1000 NZD ~ 0.01 #richman
 
 2023-05-30 balance Expenses:Groceries             55 NZD
   meals: "cheap"
