@@ -1,8 +1,8 @@
+use crate::format::*;
 use chumsky::{
     extra::ParserExtra,
     input::{Input, MapExtra},
 };
-use lazy_format::lazy_format;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
@@ -14,7 +14,7 @@ use std::{
     mem::swap,
     ops::Deref,
 };
-use strum_macros::{Display, EnumString};
+use strum_macros::{Display, EnumIter, EnumString};
 use time::Date;
 
 /// Our public error type
@@ -93,7 +93,7 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, Display, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, Display, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -451,7 +451,7 @@ pub(crate) enum Pragma<'a> {
     Pushmeta(MetaKeyValue<'a>),
     Popmeta(Spanned<&'a Key<'a>>),
     Include(&'a str),
-    // TODO option
+    Option(Spanned<BeancountOption<'a>>),
     // TODO (probably not) plugin
 }
 
@@ -478,8 +478,7 @@ impl<'a> Transaction<'a> {
             plain,
             NEWLINE_INDENT,
             Some(NEWLINE_INDENT),
-        )?;
-        Ok(())
+        )
     }
 
     pub fn flag(&self) -> &Spanned<Flag> {
@@ -533,7 +532,7 @@ impl<'a> ElementType for Price<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Balance<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
     pub(crate) atol: Spanned<AmountWithTolerance<'a>>,
 }
 
@@ -548,7 +547,7 @@ impl<'a> Balance<'a> {
         Ok(())
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
@@ -565,7 +564,7 @@ impl<'a> ElementType for Balance<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Open<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
     pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
     pub(crate) booking: Option<Spanned<Booking>>,
 }
@@ -580,7 +579,7 @@ impl<'a> Open<'a> {
         metadata.fmt_keys_values(f)
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
@@ -595,7 +594,7 @@ impl<'a> Open<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Close<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
 }
 
 impl<'a> Close<'a> {
@@ -606,7 +605,7 @@ impl<'a> Close<'a> {
         metadata.fmt_keys_values(f)
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 }
@@ -631,8 +630,8 @@ impl<'a> Commodity<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Pad<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
-    pub(crate) source: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
+    pub(crate) source: Spanned<Account<'a>>,
 }
 
 impl<'a> Pad<'a> {
@@ -643,18 +642,18 @@ impl<'a> Pad<'a> {
         metadata.fmt_keys_values(f)
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
-    pub fn source(&self) -> &Spanned<&Account> {
+    pub fn source(&self) -> &Spanned<Account> {
         &self.source
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Document<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
     pub(crate) path: Spanned<&'a str>,
 }
 
@@ -666,7 +665,7 @@ impl<'a> Document<'a> {
         metadata.fmt_keys_values(f)
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
@@ -679,7 +678,7 @@ impl<'a> Document<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Note<'a> {
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
     pub(crate) comment: Spanned<&'a str>,
 }
 
@@ -691,7 +690,7 @@ impl<'a> Note<'a> {
         metadata.fmt_keys_values(f)
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
@@ -730,7 +729,7 @@ impl<'a> Event<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account<'a> {
     pub(crate) account_type: AccountType,
-    pub(crate) names: NonEmpty<AccountName<'a>>,
+    pub(crate) candidate: &'a CandidateAccount<'a>,
 }
 
 impl<'a> Account<'a> {
@@ -739,7 +738,7 @@ impl<'a> Account<'a> {
     }
 
     pub fn names(&self) -> impl ExactSizeIterator<Item = &AccountName> {
-        self.names.iter()
+        self.candidate.names.iter()
     }
 }
 
@@ -752,8 +751,114 @@ impl<'a> ElementType for Account<'a> {
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.account_type)?;
-        format(f, &self.names, plain, ":", Some(":"))?;
-        Ok(())
+        format(f, self.names(), plain, ":", Some(":"))
+    }
+}
+
+/// A CandidateAccount is one where the account_type_name has not yet been resolved against current options.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct CandidateAccount<'a> {
+    pub(crate) account_type_name: AccountTypeName<'a>,
+    pub(crate) names: NonEmpty<AccountName<'a>>,
+}
+
+impl<'a> Display for CandidateAccount<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.account_type_name)?;
+        format(f, &self.names, plain, ":", Some(":"))
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+pub struct AccountTypeName<'a>(&'a str);
+
+impl<'a> AccountTypeName<'a> {
+    pub(crate) fn is_valid_initial(c: &char) -> bool {
+        c.is_ascii_uppercase()
+    }
+
+    pub(crate) fn is_valid_subsequent(c: &char) -> bool {
+        c.is_alphanumeric() || *c == '-'
+    }
+}
+
+impl<'a> ElementType for AccountTypeName<'a> {
+    fn element_type(&self) -> &'static str {
+        "account type name"
+    }
+}
+
+impl<'a> AsRef<str> for AccountTypeName<'a> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
+impl<'a> Display for AccountTypeName<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct AccountTypeNameError(AccountTypeNameErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum AccountTypeNameErrorKind {
+    Empty,
+    Initial(char),
+    Subsequent(Vec<char>),
+}
+
+impl Display for AccountTypeNameError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use AccountTypeNameErrorKind::*;
+        match &self.0 {
+            Empty => write!(f, "empty account name"),
+            Initial(bad_char) => write!(
+                f,
+                "invalid character '{}' for account name initial - must be uppercase ASCII letter",
+                bad_char
+            ),
+            Subsequent(bad_chars) => {
+                format(
+                    f,
+                    bad_chars,
+                    single_quoted,
+                    ", ",
+                    Some("invalid characters "),
+                )?;
+                f.write_str(" - must be alphanumeric or '-'")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AccountTypeNameError {}
+
+impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
+    type Error = AccountTypeNameError;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        use AccountTypeNameErrorKind::*;
+        if s.is_empty() {
+            Err(AccountTypeNameError(Empty))
+        } else {
+            let mut chars = s.chars();
+            let initial = chars.next().unwrap();
+            if !AccountTypeName::is_valid_initial(&initial) {
+                Err(AccountTypeNameError(Initial(initial)))
+            } else {
+                let bad_chars = chars
+                    .filter(|c| (!AccountTypeName::is_valid_subsequent(c)))
+                    .collect::<Vec<char>>();
+                if bad_chars.is_empty() {
+                    Ok(AccountTypeName(s))
+                } else {
+                    Err(AccountTypeNameError(Subsequent(bad_chars)))
+                }
+            }
+        }
     }
 }
 
@@ -968,7 +1073,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
 #[derive(Clone, Debug)]
 pub struct Posting<'a> {
     pub(crate) flag: Option<Spanned<Flag>>,
-    pub(crate) account: Spanned<&'a Account<'a>>,
+    pub(crate) account: Spanned<Account<'a>>,
     pub(crate) amount: Option<Spanned<ExprValue>>,
     pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
     pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
@@ -981,7 +1086,7 @@ impl<'a> Posting<'a> {
         self.flag.as_ref()
     }
 
-    pub fn account(&self) -> &Spanned<&Account> {
+    pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
@@ -1111,7 +1216,7 @@ impl<'a> Display for MetaValue<'a> {
 pub enum SimpleValue<'a> {
     String(&'a str),
     Currency(&'a Currency<'a>),
-    Account(&'a Account<'a>),
+    Account(Account<'a>),
     Tag(&'a Tag<'a>),
     Link(&'a Link<'a>),
     Date(Date),
@@ -1838,94 +1943,10 @@ impl Display for CostSpecErrors {
 
 impl std::error::Error for CostSpecErrors {}
 
-// TODO move this formatting stuff somewhere else, like format submodule
-
-fn format<C, T, M, D>(
-    f: &mut Formatter<'_>,
-    container: C,
-    mapper: M,
-    separator: &'static str,
-    prefix: Option<&'static str>,
-) -> fmt::Result
-where
-    C: IntoIterator<Item = T>,
-    M: Fn(T) -> D,
-    D: Display,
-{
-    let mut container = container.into_iter();
-    if let Some(item) = container.by_ref().next() {
-        if let Some(prefix) = prefix {
-            f.write_str(prefix)?;
-        }
-
-        mapper(item).fmt(f)?;
-    }
-
-    for item in container {
-        f.write_str(separator)?;
-        mapper(item).fmt(f)?;
-    }
-
-    Ok(())
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct BeancountOption<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) value: &'a str,
 }
-
-/// Simple format with no mapper or separator
-fn simple_format<C, T>(
-    f: &mut Formatter<'_>,
-    container: C,
-    prefix: Option<&'static str>,
-) -> fmt::Result
-where
-    C: IntoIterator<Item = T>,
-    T: Display,
-{
-    format(f, container, plain, "", prefix)
-}
-
-/// Format plain.
-fn plain<S>(s: S) -> impl Display
-where
-    S: Display,
-{
-    lazy_format!("{s}")
-}
-
-/// Format in single quotes.
-fn single_quoted<S>(s: S) -> impl Display
-where
-    S: Display,
-{
-    lazy_format!("'{s}'")
-}
-
-/// Format in double quotes.
-fn double_quoted<S>(s: S) -> impl Display
-where
-    S: Display,
-{
-    lazy_format!("\"{s}\"")
-}
-
-/// Format plain.
-fn key_value<K, V>(kv: (K, V)) -> impl Display
-where
-    K: Display,
-    V: Display,
-{
-    lazy_format!("{}: {}", kv.0, kv.1)
-}
-
-fn pad_if(condition: bool) -> &'static str {
-    if condition {
-        " "
-    } else {
-        ""
-    }
-}
-
-const SPACE: &str = " ";
-const NEWLINE: &str = "\n";
-const INDENT: &str = "  ";
-const NEWLINE_INDENT: &str = "\n  ";
 
 mod tests;

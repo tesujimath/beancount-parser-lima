@@ -6,6 +6,7 @@ use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
+use options::Options;
 use parsers::{file, includes};
 use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
@@ -267,7 +268,11 @@ where
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
 
-            let (output, errors) = file().parse(spanned_tokens).into_output_errors();
+            let mut options = Options::default();
+
+            let (output, errors) = file()
+                .parse_with_state(spanned_tokens, &mut options)
+                .into_output_errors();
 
             all_outputs.push(output.unwrap_or(Vec::new()));
             all_errors.extend(errors);
@@ -363,6 +368,11 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                     }
                                 }
                             }
+
+                            Option(_) => {
+                                // options get processed during primary parse phase,
+                                // as some alter the behaviour of the parser
+                            }
                         }
 
                         // having silently consumed a pragma, go on to the next declaration
@@ -388,7 +398,9 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span {
 #[cfg(test)]
 pub use lexer::bare_lex;
 pub use lexer::dump_tokens;
+mod format;
 mod lexer;
+mod options;
 mod parsers;
 mod sort;
 pub mod types;

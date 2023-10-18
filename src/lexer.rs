@@ -122,8 +122,8 @@ pub enum Token<'a> {
     #[regex(r"(?&time)", |lex| parse_time(lex.slice()))]
     Time(Time),
 
-    #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_account(lex.slice()))]
-    Account(super::Account<'a>),
+    #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_candidate_account(lex.slice()))]
+    Account(super::CandidateAccount<'a>),
 
     #[regex(r"(?&string_literal)", |lex| {
         let len = lex.slice().len();
@@ -360,15 +360,15 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
     Time::from_hms(hour, min, sec).or(Err(LexerError::new("time out of range")))
 }
 
-fn parse_account(s: &str) -> Result<Account, LexerError> {
+fn parse_candidate_account(s: &str) -> Result<CandidateAccount, LexerError> {
     let mut account = s.split(':');
-    let account_type = account.by_ref().next().unwrap().parse::<AccountType>()?;
+    let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())?;
     let account_names = account
         .by_ref()
         .map(AccountName::try_from)
         .collect::<Result<Vec<AccountName>, _>>()?;
-    Ok(Account {
-        account_type,
+    Ok(CandidateAccount {
+        account_type_name,
         names: NonEmpty::collect(account_names).unwrap(),
     })
 }
@@ -440,6 +440,12 @@ impl From<FlagLetterError> for LexerError {
 
 impl From<AccountNameError> for LexerError {
     fn from(e: AccountNameError) -> Self {
+        Self::new(e.to_string())
+    }
+}
+
+impl From<AccountTypeNameError> for LexerError {
+    fn from(e: AccountTypeNameError) -> Self {
         Self::new(e.to_string())
     }
 }
