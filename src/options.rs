@@ -103,11 +103,14 @@ impl<'a> AccountTypeNames<'a> {
                 Ok(())
             }
             Occupied(o) => {
-                if o.get() == &account_type {
+                let existing_account_type = *o.get();
+                if existing_account_type == account_type {
                     // updating as same, harmless
                     Ok(())
                 } else {
-                    Err(AccountTypeNamesError(AccountTypeNamesErrorKind::NameInUse))
+                    Err(AccountTypeNamesError(AccountTypeNamesErrorKind::NameInUse(
+                        existing_account_type,
+                    )))
                 }
             }
         }
@@ -161,14 +164,14 @@ pub struct AccountTypeNamesError(AccountTypeNamesErrorKind);
 
 #[derive(PartialEq, Eq, Debug)]
 enum AccountTypeNamesErrorKind {
-    NameInUse,
+    NameInUse(AccountType),
 }
 
 impl Display for AccountTypeNamesError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use AccountTypeNamesErrorKind::*;
         match &self.0 {
-            NameInUse => write!(f, "account type name in use"),
+            NameInUse(t) => write!(f, "account type name in use for {}", t),
         }
     }
 }
