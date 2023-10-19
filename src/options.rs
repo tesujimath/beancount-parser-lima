@@ -1,29 +1,108 @@
 use super::format::{format, plain};
 use super::types::*;
+use nonempty::NonEmpty;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Options<'a> {
     pub(crate) account_type_names: AccountTypeNames<'a>,
+    title: &'a str,
+    account_previous_balances: NonEmpty<AccountName<'a>>,
+    account_previous_earnings: NonEmpty<AccountName<'a>>,
+    account_previous_conversions: NonEmpty<AccountName<'a>>,
+    account_current_earnings: NonEmpty<AccountName<'a>>,
+    account_current_conversions: NonEmpty<AccountName<'a>>,
+    account_unrealized_gains: NonEmpty<AccountName<'a>>,
+}
+
+impl<'a> Default for Options<'a> {
+    fn default() -> Self {
+        Options {
+            account_type_names: AccountTypeNames::default(),
+            title: "Beancount",
+            account_previous_balances: Self::parse_account_name("Opening-Balances").unwrap(),
+            account_previous_earnings: Self::parse_account_name("Earnings:Previous").unwrap(),
+            account_previous_conversions: Self::parse_account_name("Conversions:Previous").unwrap(),
+            account_current_earnings: Self::parse_account_name("Earnings:Current").unwrap(),
+            account_current_conversions: Self::parse_account_name("Conversions:Current").unwrap(),
+            account_unrealized_gains: Self::parse_account_name("Earnings:Unrealized").unwrap(),
+        }
+    }
 }
 
 impl<'a> Options<'a> {
-    pub(crate) fn set(&mut self, opt: &BeancountOption<'a>) -> Result<(), OptionsError> {
+    pub(crate) fn set(&mut self, name: &'a str, value: &'a str) -> Result<(), OptionsError> {
         use AccountType::*;
         use OptionsErrorKind::*;
 
-        match opt.name {
-            "name_assets" => self.update_account_name_type(Assets, opt.value),
-            "name_liabilities" => self.update_account_name_type(Liabilities, opt.value),
-            "name_equity" => self.update_account_name_type(Equity, opt.value),
-            "name_income" => self.update_account_name_type(Income, opt.value),
-            "name_expenses" => self.update_account_name_type(Expenses, opt.value),
+        match name {
+            "title" => Self::update_string(&mut self.title, value),
+
+            "name_assets" => self.update_account_name_type(Assets, value),
+            "name_liabilities" => self.update_account_name_type(Liabilities, value),
+            "name_equity" => self.update_account_name_type(Equity, value),
+            "name_income" => self.update_account_name_type(Income, value),
+            "name_expenses" => self.update_account_name_type(Expenses, value),
+
+            "account_previous_balances" => {
+                Self::update_account_name(&mut self.account_previous_balances, value)
+            }
+
+            "account_previous_earnings" => {
+                Self::update_account_name(&mut self.account_previous_earnings, value)
+            }
+
+            "account_previous_conversions" => {
+                Self::update_account_name(&mut self.account_previous_conversions, value)
+            }
+
+            "account_current_earnings" => {
+                Self::update_account_name(&mut self.account_current_earnings, value)
+            }
+
+            "account_current_conversions" => {
+                Self::update_account_name(&mut self.account_current_conversions, value)
+            }
+
+            "account_unrealized_gains" => {
+                Self::update_account_name(&mut self.account_unrealized_gains, value)
+            }
 
             _ => Err(OptionsError(UnknownOption)),
         }
+    }
+
+    fn update_string(field: &mut &'a str, value: &'a str) -> Result<(), OptionsError> {
+        *field = value;
+        Ok(())
+    }
+
+    // a colon-separated account name not including the account type
+    fn update_account_name(
+        field: &mut NonEmpty<AccountName<'a>>,
+        value: &'a str,
+    ) -> Result<(), OptionsError> {
+        let account_name = Self::parse_account_name(value)
+            .map_err(|e| OptionsError(OptionsErrorKind::AccountName(e)))?;
+
+        *field = account_name;
+
+        Ok(())
+    }
+
+    fn parse_account_name(
+        colon_separated: &str,
+    ) -> Result<NonEmpty<AccountName>, AccountNameError> {
+        let mut account = colon_separated.split(':');
+        let account_name_components = account
+            .by_ref()
+            .map(AccountName::try_from)
+            .collect::<Result<Vec<AccountName>, _>>()?;
+
+        Ok(NonEmpty::collect(account_name_components).unwrap())
     }
 
     fn update_account_name_type(
@@ -42,6 +121,10 @@ impl<'a> Options<'a> {
             })
     }
 
+    pub fn title(&self) -> &str {
+        self.title
+    }
+
     pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
         self.account_type_names.name_by_type[account_type as usize]
     }
@@ -55,6 +138,7 @@ enum OptionsErrorKind {
     UnknownOption,
     AccountTypeName(AccountTypeNameError),
     AccountTypeNames(AccountTypeNamesError),
+    AccountName(AccountNameError),
 }
 
 impl Display for OptionsError {
@@ -65,6 +149,7 @@ impl Display for OptionsError {
             UnknownOption => f.write_str("unknown option"),
             AccountTypeName(e) => write!(f, "{}", e),
             AccountTypeNames(e) => write!(f, "{}", e),
+            AccountName(e) => write!(f, "{}", e),
         }
     }
 }

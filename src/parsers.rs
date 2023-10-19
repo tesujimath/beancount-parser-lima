@@ -119,7 +119,7 @@ where
             let options: &mut Options = e.state();
             let opt = BeancountOption { name, value };
 
-            match options.set(&opt) {
+            match options.set(opt.name, opt.value) {
                 Ok(()) => Ok(opt),
                 Err(e) => Err(Rich::custom(span, e.to_string())),
             }
