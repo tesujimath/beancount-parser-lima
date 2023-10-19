@@ -6,134 +6,135 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Debug)]
-pub struct Options<'a> {
-    pub(crate) account_type_names: AccountTypeNames<'a>,
-    title: &'a str,
-    account_previous_balances: NonEmpty<AccountName<'a>>,
-    account_previous_earnings: NonEmpty<AccountName<'a>>,
-    account_previous_conversions: NonEmpty<AccountName<'a>>,
-    account_current_earnings: NonEmpty<AccountName<'a>>,
-    account_current_conversions: NonEmpty<AccountName<'a>>,
-    account_unrealized_gains: NonEmpty<AccountName<'a>>,
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct BeancountOption<'a> {
+    source: Source,
+    variant: BeancountOptionVariant<'a>,
 }
 
-impl<'a> Default for Options<'a> {
-    fn default() -> Self {
-        Options {
-            account_type_names: AccountTypeNames::default(),
-            title: "Beancount",
-            account_previous_balances: Self::parse_account_name("Opening-Balances").unwrap(),
-            account_previous_earnings: Self::parse_account_name("Earnings:Previous").unwrap(),
-            account_previous_conversions: Self::parse_account_name("Conversions:Previous").unwrap(),
-            account_current_earnings: Self::parse_account_name("Earnings:Current").unwrap(),
-            account_current_conversions: Self::parse_account_name("Conversions:Current").unwrap(),
-            account_unrealized_gains: Self::parse_account_name("Earnings:Unrealized").unwrap(),
-        }
-    }
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum BeancountOptionVariant<'a> {
+    Title(&'a str),
+    AccountTypeName(AccountType, AccountTypeName<'a>),
+    AccountPreviousBalances(NonEmpty<AccountName<'a>>),
+    AccountPreviousEarnings(NonEmpty<AccountName<'a>>),
+    AccountPreviousConversions(NonEmpty<AccountName<'a>>),
+    AccountCurrentEarnings(NonEmpty<AccountName<'a>>),
+    AccountCurrentConversions(NonEmpty<AccountName<'a>>),
+    AccountUnrealizedGains(NonEmpty<AccountName<'a>>),
+    AccountRounding(NonEmpty<AccountName<'a>>),
+    ConversionCurrency(Currency<'a>),
+    Assimilated,
 }
 
-impl<'a> Options<'a> {
-    pub(crate) fn set(&mut self, name: &'a str, value: &'a str) -> Result<(), OptionError> {
-        use AccountType::*;
-        use OptionError::*;
+impl<'a> BeancountOption<'a> {
+    pub(crate) fn parse(
+        name: Spanned<&'a str>,
+        value: Spanned<&'a str>,
+    ) -> Result<BeancountOption<'a>, BeancountOptionError> {
+        use BeancountOptionError::*;
+        use BeancountOptionVariant::*;
 
-        match name {
-            "title" => Self::update_string(&mut self.title, value),
+        match name.item {
+            "title" => Ok(Title(value.item)),
 
-            "name_assets" => self.update_account_name_type(Assets, value),
-            "name_liabilities" => self.update_account_name_type(Liabilities, value),
-            "name_equity" => self.update_account_name_type(Equity, value),
-            "name_income" => self.update_account_name_type(Income, value),
-            "name_expenses" => self.update_account_name_type(Expenses, value),
+            "name_assets" => {
+                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Assets, n))
+            }
+
+            "name_liabilities" => parse_account_type_name(value.item)
+                .map(|n| AccountTypeName(AccountType::Liabilities, n)),
+
+            "name_equity" => {
+                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Equity, n))
+            }
+
+            "name_income" => {
+                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Income, n))
+            }
+
+            "name_expenses" => parse_account_type_name(value.item)
+                .map(|n| AccountTypeName(AccountType::Expenses, n)),
 
             "account_previous_balances" => {
-                Self::update_account_name(&mut self.account_previous_balances, value)
+                parse_account_name(value.item).map(AccountPreviousBalances)
             }
 
             "account_previous_earnings" => {
-                Self::update_account_name(&mut self.account_previous_earnings, value)
+                parse_account_name(value.item).map(AccountPreviousEarnings)
             }
 
             "account_previous_conversions" => {
-                Self::update_account_name(&mut self.account_previous_conversions, value)
+                parse_account_name(value.item).map(AccountPreviousConversions)
             }
 
             "account_current_earnings" => {
-                Self::update_account_name(&mut self.account_current_earnings, value)
+                parse_account_name(value.item).map(AccountCurrentEarnings)
             }
 
             "account_current_conversions" => {
-                Self::update_account_name(&mut self.account_current_conversions, value)
+                parse_account_name(value.item).map(AccountCurrentConversions)
             }
 
             "account_unrealized_gains" => {
-                Self::update_account_name(&mut self.account_unrealized_gains, value)
+                parse_account_name(value.item).map(AccountUnrealizedGains)
             }
+
+            "account_rounding" => parse_account_name(value.item).map(AccountRounding),
+
+            "conversion_currency" => parse_currency(value.item).map(ConversionCurrency),
 
             _ => Err(UnknownOption),
         }
+        .map(|variant| BeancountOption {
+            source: Source {
+                name: name.span,
+                value: value.span,
+            },
+            variant,
+        })
     }
+}
 
-    fn update_string(field: &mut &'a str, value: &'a str) -> Result<(), OptionError> {
-        *field = value;
-        Ok(())
-    }
+fn parse_account_name(
+    colon_separated: &str,
+) -> Result<NonEmpty<AccountName>, BeancountOptionError> {
+    let mut account = colon_separated.split(':');
+    let account_name_components = account
+        .by_ref()
+        .map(AccountName::try_from)
+        .collect::<Result<Vec<AccountName>, _>>()
+        .map_err(|e| BadValueErrorKind::AccountName(e).wrap())?;
 
-    // a colon-separated account name not including the account type
-    fn update_account_name(
-        field: &mut NonEmpty<AccountName<'a>>,
-        value: &'a str,
-    ) -> Result<(), OptionError> {
-        let account_name = Self::parse_account_name(value)
-            .map_err(|e| OptionError::BadValue(BadValueError(BadValueErrorKind::AccountName(e))))?;
+    Ok(NonEmpty::collect(account_name_components).unwrap())
+}
 
-        *field = account_name;
+fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {
+    AccountTypeName::try_from(value).map_err(|e| BadValueErrorKind::AccountTypeName(e).wrap())
+}
 
-        Ok(())
-    }
-
-    fn parse_account_name(
-        colon_separated: &str,
-    ) -> Result<NonEmpty<AccountName>, AccountNameError> {
-        let mut account = colon_separated.split(':');
-        let account_name_components = account
-            .by_ref()
-            .map(AccountName::try_from)
-            .collect::<Result<Vec<AccountName>, _>>()?;
-
-        Ok(NonEmpty::collect(account_name_components).unwrap())
-    }
-
-    fn update_account_name_type(
-        &mut self,
-        account_type: AccountType,
-        account_type_name: &'a str,
-    ) -> Result<(), OptionError> {
-        AccountTypeName::try_from(account_type_name)
-            .map_err(BadValueErrorKind::AccountTypeName)
-            .and_then(|account_type_name| {
-                self.account_type_names
-                    .update(account_type, account_type_name)
-                    .map_err(BadValueErrorKind::AccountTypeNames)
-            })
-            .map_err(BadValueErrorKind::wrap)
-    }
-
-    pub fn title(&self) -> &str {
-        self.title
-    }
-
-    pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
-        self.account_type_names.name_by_type[account_type as usize]
-    }
+fn parse_currency(value: &str) -> Result<Currency, BeancountOptionError> {
+    Currency::try_from(value).map_err(|e| BadValueErrorKind::Currency(e).wrap())
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum OptionError {
+pub(crate) enum BeancountOptionError {
     UnknownOption,
     BadValue(BadValueError),
 }
+
+impl Display for BeancountOptionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use BeancountOptionError::*;
+
+        match &self {
+            UnknownOption => f.write_str("unknown option"),
+            BadValue(BadValueError(e)) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl std::error::Error for BeancountOptionError {}
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct BadValueError(BadValueErrorKind);
@@ -143,26 +144,287 @@ enum BadValueErrorKind {
     AccountTypeName(AccountTypeNameError),
     AccountTypeNames(AccountTypeNamesError),
     AccountName(AccountNameError),
+    Currency(CurrencyError),
+}
+
+impl Display for BadValueErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use BadValueErrorKind::*;
+
+        match &self {
+            AccountTypeName(e) => write!(f, "{}", e),
+            AccountTypeNames(e) => write!(f, "{}", e),
+            AccountName(e) => write!(f, "{}", e),
+            Currency(e) => write!(f, "{}", e),
+        }
+    }
 }
 
 impl BadValueErrorKind {
-    fn wrap(self) -> OptionError {
-        OptionError::BadValue(BadValueError(self))
+    fn wrap(self) -> BeancountOptionError {
+        BeancountOptionError::BadValue(BadValueError(self))
+    }
+}
+
+#[derive(Default, Debug)]
+/// ParserOptions are only those which affect the core parsing.
+pub(crate) struct ParserOptions<'a> {
+    pub(crate) account_type_names: AccountTypeNames<'a>,
+}
+
+impl<'a> ParserOptions<'a> {
+    pub(crate) fn assimilate(
+        &mut self,
+        opt: BeancountOption<'a>,
+    ) -> Result<BeancountOption<'a>, ParserOptionsError> {
+        use BeancountOptionVariant::*;
+
+        // let mut variant = Assimilated;
+        // swap(&mut opt.variant, &mut variant);
+
+        match opt {
+            BeancountOption {
+                source,
+                variant: AccountTypeName(account_type, account_type_name),
+            } => self
+                .account_type_names
+                .update(account_type, account_type_name)
+                .map_err(ParserOptionsError)
+                .map(|_| BeancountOption {
+                    source,
+                    variant: Assimilated,
+                }),
+            _ => Ok(opt),
+        }
+    }
+
+    pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
+        self.account_type_names.name_by_type[account_type as usize]
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct ParserOptionsError(AccountTypeNamesError);
+
+impl Display for ParserOptionsError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ParserOptionsError {}
+
+#[derive(Debug)]
+pub struct Options<'a> {
+    title: Sourced<&'a str>,
+    account_previous_balances: Sourced<NonEmpty<AccountName<'a>>>,
+    account_previous_earnings: Sourced<NonEmpty<AccountName<'a>>>,
+    account_previous_conversions: Sourced<NonEmpty<AccountName<'a>>>,
+    account_current_earnings: Sourced<NonEmpty<AccountName<'a>>>,
+    account_current_conversions: Sourced<NonEmpty<AccountName<'a>>>,
+    account_unrealized_gains: Sourced<NonEmpty<AccountName<'a>>>,
+    account_rounding: Option<Sourced<NonEmpty<AccountName<'a>>>>,
+    conversion_currency: Sourced<Currency<'a>>,
+    parser_options: ParserOptions<'a>,
+}
+
+impl<'a> Options<'a> {
+    pub(crate) fn new(parser_options: ParserOptions<'a>) -> Self {
+        Options {
+            title: unsourced("Beancount"),
+            account_previous_balances: unsourced(parse_account_name("Opening-Balances").unwrap()),
+            account_previous_earnings: unsourced(parse_account_name("Earnings:Previous").unwrap()),
+            account_previous_conversions: unsourced(
+                parse_account_name("Conversions:Previous").unwrap(),
+            ),
+            account_current_earnings: unsourced(parse_account_name("Earnings:Current").unwrap()),
+            account_current_conversions: unsourced(
+                parse_account_name("Conversions:Current").unwrap(),
+            ),
+            account_unrealized_gains: unsourced(parse_account_name("Earnings:Unrealized").unwrap()),
+            account_rounding: None,
+            conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
+            parser_options,
+        }
+    }
+
+    pub(crate) fn assimilate(&mut self, opt: BeancountOption<'a>) -> Result<(), Error> {
+        use BeancountOptionVariant::*;
+        use OptionError::*;
+
+        let BeancountOption { source, variant } = opt;
+        match variant {
+            Title(value) => Self::update_string(&mut self.title, value, source),
+
+            // this one was already assimilated into ParserOptions
+            AccountTypeName(_, _) => Ok(()),
+
+            AccountPreviousBalances(value) => {
+                Self::update_account_name(&mut self.account_previous_balances, value, source)
+            }
+            AccountPreviousEarnings(value) => {
+                Self::update_account_name(&mut self.account_previous_earnings, value, source)
+            }
+            AccountPreviousConversions(value) => {
+                Self::update_account_name(&mut self.account_previous_conversions, value, source)
+            }
+
+            AccountCurrentEarnings(value) => {
+                Self::update_account_name(&mut self.account_current_earnings, value, source)
+            }
+
+            AccountCurrentConversions(value) => {
+                Self::update_account_name(&mut self.account_current_conversions, value, source)
+            }
+
+            AccountUnrealizedGains(value) => {
+                Self::update_account_name(&mut self.account_unrealized_gains, value, source)
+            }
+
+            AccountRounding(value) => {
+                Self::update_optional_account_name(&mut self.account_rounding, value, source)
+            }
+
+            ConversionCurrency(value) => {
+                Self::update_currency(&mut self.conversion_currency, value, source)
+            }
+
+            // this value contains nothing
+            Assimilated => Ok(()),
+        }
+        .map_err(|ref e| match e {
+            DuplicateOption(span) => Error::new("invalid option", "duplicate", source.name)
+                .related_to_named_span("option", *span),
+            DuplicateValue(span) => Error::new("invalid option", "duplicate value", source.value)
+                .related_to_named_span("option", *span),
+        })
+    }
+
+    fn update_string(
+        field: &mut Sourced<&'a str>,
+        value: &'a str,
+        source: Source,
+    ) -> Result<(), OptionError> {
+        *field = sourced(value, source);
+        Ok(())
+    }
+
+    // a colon-separated account name not including the account type
+    fn update_account_name(
+        field: &mut Sourced<NonEmpty<AccountName<'a>>>,
+        value: NonEmpty<AccountName<'a>>,
+        source: Source,
+    ) -> Result<(), OptionError> {
+        use OptionError::*;
+
+        match &field.source {
+            None => {
+                *field = sourced(value, source);
+                Ok(())
+            }
+            Some(source) => Err(DuplicateOption(source.name)),
+        }
+    }
+
+    // a colon-separated account name not including the account type
+    fn update_optional_account_name(
+        field: &mut Option<Sourced<NonEmpty<AccountName<'a>>>>,
+        value: NonEmpty<AccountName<'a>>,
+        source: Source,
+    ) -> Result<(), OptionError> {
+        use OptionError::*;
+
+        match field {
+            None => {
+                *field = Some(sourced(value, source));
+                Ok(())
+            }
+            Some(Sourced {
+                source: Some(source),
+                ..
+            }) => Err(DuplicateOption(source.name)),
+            Some(Sourced {
+                source: None, // TODO this one is not possible, bah!
+                ..
+            }) => Err(DuplicateOption(source.name)),
+        }
+    }
+
+    fn update_currency(
+        field: &mut Sourced<Currency<'a>>,
+        value: Currency<'a>,
+        source: Source,
+    ) -> Result<(), OptionError> {
+        use OptionError::*;
+
+        match &field.source {
+            None => {
+                *field = sourced(value, source);
+                Ok(())
+            }
+            Some(source) => Err(DuplicateOption(source.name)),
+        }
+    }
+
+    // pub fn title(&self) -> &str {
+    //     self.title.value
+    // }
+
+    pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
+        self.parser_options.account_type_name(account_type)
+    }
+}
+
+#[derive(Debug)]
+struct Sourced<T> {
+    value: T,
+    source: Option<Source>,
+}
+
+fn unsourced<T>(value: T) -> Sourced<T> {
+    Sourced {
+        value,
+        source: None,
+    }
+}
+
+fn sourced<T>(value: T, source: Source) -> Sourced<T> {
+    Sourced {
+        value,
+        source: Some(source),
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Source {
+    name: Span,
+    value: Span,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum OptionError {
+    DuplicateOption(Span),
+    DuplicateValue(Span),
+}
+
+impl OptionError {
+    pub(crate) fn span(&self) -> Span {
+        use OptionError::*;
+
+        match self {
+            DuplicateOption(span) => *span,
+            DuplicateValue(span) => *span,
+        }
     }
 }
 
 impl Display for OptionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use BadValueErrorKind::*;
         use OptionError::*;
 
         match &self {
-            UnknownOption => f.write_str("unknown option"),
-            BadValue(BadValueError(bve)) => match bve {
-                AccountTypeName(e) => write!(f, "{}", e),
-                AccountTypeNames(e) => write!(f, "{}", e),
-                AccountName(e) => write!(f, "{}", e),
-            },
+            DuplicateOption(_) => f.write_str("duplicate option"),
+            DuplicateValue(_) => f.write_str("duplicate value"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::format::*;
+use crate::{format::*, options::BeancountOption};
 use chumsky::{
     extra::ParserExtra,
     input::{Input, MapExtra},
@@ -28,7 +28,7 @@ pub struct Error {
 }
 
 impl Error {
-    fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
+    pub fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
         Error {
             message: message.into(),
             reason: reason.into(),
@@ -58,6 +58,15 @@ impl Error {
             .map(|element| (element.element_type().to_string(), element.span))
             .collect::<Vec<_>>();
         e.related.append(&mut new_related);
+        e
+    }
+
+    pub(crate) fn related_to_named_span<S>(self, name: S, span: Span) -> Self
+    where
+        S: ToString,
+    {
+        let mut e = self;
+        e.related.push((name.to_string(), span));
         e
     }
 
@@ -451,7 +460,7 @@ pub(crate) enum Pragma<'a> {
     Pushmeta(MetaKeyValue<'a>),
     Popmeta(Spanned<&'a Key<'a>>),
     Include(&'a str),
-    Option(Spanned<BeancountOption<'a>>),
+    Option(BeancountOption<'a>),
     // TODO (probably not) plugin
 }
 
@@ -782,6 +791,32 @@ impl<'a> AccountTypeName<'a> {
     }
 }
 
+impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
+    type Error = AccountTypeNameError;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        use AccountTypeNameErrorKind::*;
+        if s.is_empty() {
+            Err(AccountTypeNameError(Empty))
+        } else {
+            let mut chars = s.chars();
+            let initial = chars.next().unwrap();
+            if !AccountTypeName::is_valid_initial(&initial) {
+                Err(AccountTypeNameError(Initial(initial)))
+            } else {
+                let bad_chars = chars
+                    .filter(|c| (!AccountTypeName::is_valid_subsequent(c)))
+                    .collect::<Vec<char>>();
+                if bad_chars.is_empty() {
+                    Ok(AccountTypeName(s))
+                } else {
+                    Err(AccountTypeNameError(Subsequent(bad_chars)))
+                }
+            }
+        }
+    }
+}
+
 impl<'a> ElementType for AccountTypeName<'a> {
     fn element_type(&self) -> &'static str {
         "account type name"
@@ -835,32 +870,6 @@ impl Display for AccountTypeNameError {
 }
 
 impl std::error::Error for AccountTypeNameError {}
-
-impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
-    type Error = AccountTypeNameError;
-
-    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        use AccountTypeNameErrorKind::*;
-        if s.is_empty() {
-            Err(AccountTypeNameError(Empty))
-        } else {
-            let mut chars = s.chars();
-            let initial = chars.next().unwrap();
-            if !AccountTypeName::is_valid_initial(&initial) {
-                Err(AccountTypeNameError(Initial(initial)))
-            } else {
-                let bad_chars = chars
-                    .filter(|c| (!AccountTypeName::is_valid_subsequent(c)))
-                    .collect::<Vec<char>>();
-                if bad_chars.is_empty() {
-                    Ok(AccountTypeName(s))
-                } else {
-                    Err(AccountTypeNameError(Subsequent(bad_chars)))
-                }
-            }
-        }
-    }
-}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct AccountName<'a>(&'a str);
@@ -1942,11 +1951,5 @@ impl Display for CostSpecErrors {
 }
 
 impl std::error::Error for CostSpecErrors {}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct BeancountOption<'a> {
-    pub(crate) name: Spanned<&'a str>,
-    pub(crate) value: Spanned<&'a str>,
-}
 
 mod tests;

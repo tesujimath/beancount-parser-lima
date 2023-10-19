@@ -1,6 +1,6 @@
 use crate::{
     lexer::Token,
-    options::{OptionError, Options},
+    options::{BeancountOption, BeancountOptionError, ParserOptions},
     types::*,
     ConcreteInput,
 };
@@ -102,7 +102,7 @@ where
             .then_ignore(just(Token::Colon))
             .map_with(|key, e| Popmeta(spanned(key, e.span()))),
         just(Token::Include).ignore_then(string).map(Include),
-        option().map_with(|opt, e| Pragma::Option(spanned(opt, e.span()))),
+        option().map(Pragma::Option),
     ))
     .then_ignore(just(Token::Eol))
     .labelled("directive") // yeah, pragma is not a user-facing concept
@@ -120,16 +120,36 @@ where
         .ignore_then(string.map_with(|name, e| spanned(name, e.span())))
         .then(string.map_with(|value, e| spanned(value, e.span())))
         .try_map_with(|(name, value), e| {
-            use OptionError::*;
+            use BeancountOptionError::*;
 
-            let options: &mut Options = e.state();
-            let opt = BeancountOption { name, value };
+            let opt = BeancountOption::parse(name, value).map_err(|e| match e {
+                UnknownOption => Rich::custom(name.span, e.to_string()),
+                BadValue(_) => Rich::custom(value.span, e.to_string()),
+            });
 
-            match options.set(&opt.name, &opt.value) {
-                Ok(()) => Ok(opt),
-                Err(e @ UnknownOption) => Err(Rich::custom(name.span, e.to_string())),
-                Err(e @ BadValue(_)) => Err(Rich::custom(value.span, e.to_string())),
+            if let Ok(opt) = opt {
+                let parser_options: &mut ParserOptions = e.state();
+                parser_options
+                    .assimilate(opt)
+                    .map_err(|e| Rich::custom(value.span, e.to_string()))
+            } else {
+                opt
             }
+
+            // TODO
+            // match parser_options.assimilate(&opt.name, &opt.value) {
+            //     Ok(()) => Ok(opt),
+            //     // TODO report location of duplicate option
+            //     Err(ref e @ DuplicateOption(ref _span)) => {
+            //         Err(Rich::custom(name.span, e.to_string()))
+            //     }
+            //     Err(ref e @ UnknownOption) => Err(Rich::custom(name.span, e.to_string())),
+            //     Err(ref e @ BadValue(_)) => Err(Rich::custom(value.span, e.to_string())),
+            //     // TODO report location of duplicate value
+            //     Err(ref e @ DuplicateValue(ref _span)) => {
+            //         Err(Rich::custom(value.span, e.to_string()))
+            //     }
+            // }
         })
 }
 
@@ -356,8 +376,8 @@ where
 
     account.try_map_with(|candidate, e| {
         let span = e.span();
-        let options: &Options = e.state();
-        let account_type_names = &options.account_type_names;
+        let parser_options: &ParserOptions = e.state();
+        let account_type_names = &parser_options.account_type_names;
         account_type_names
             .get(&candidate.account_type_name)
             .map(|account_type| Account {
@@ -1141,7 +1161,7 @@ impl<'a> From<ParserError<'a>> for Error {
 }
 
 // our ParserExtra with our error and state types
-pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, Options<'a>, ()>;
+pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, ParserOptions<'a>, ()>;
 
 /// `Emit` trait enables use of own functions which emit errors
 pub(crate) trait Emit<E> {

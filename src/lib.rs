@@ -6,6 +6,7 @@ use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
+use options::ParserOptions;
 use parsers::{file, includes};
 use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
@@ -234,7 +235,7 @@ where
         's: 't,
     {
         let (all_declarations, options, mut errors) = self.parse_declarations();
-        let mut p = PragmaProcessor::new(all_declarations);
+        let mut p = PragmaProcessor::new(all_declarations, options);
 
         let sorted_directives = p
             .by_ref()
@@ -243,7 +244,7 @@ where
         errors.append(&mut p.errors);
 
         if errors.is_empty() {
-            Ok((sorted_directives, options))
+            Ok((sorted_directives, p.options().unwrap()))
         } else {
             Err(errors)
         }
@@ -257,7 +258,7 @@ where
     {
         let mut all_outputs = Vec::new();
         let mut all_errors = Vec::new();
-        let mut options = Options::default();
+        let mut parser_options = ParserOptions::default();
 
         for (source_id, content) in self.sources.content_iter() {
             let i_source: usize = source_id.into();
@@ -269,7 +270,7 @@ where
                 .with_context(source_id);
 
             let (output, errors) = file()
-                .parse_with_state(spanned_tokens, &mut options)
+                .parse_with_state(spanned_tokens, &mut parser_options)
                 .into_output_errors();
 
             all_outputs.push(output.unwrap_or(Vec::new()));
@@ -278,7 +279,7 @@ where
 
         (
             all_outputs,
-            options,
+            Options::new(parser_options),
             all_errors.into_iter().map(Error::from).collect(),
         )
     }
@@ -296,12 +297,13 @@ struct PragmaProcessor<'s, 't> {
     // tags and meta key/values for pragma push/pop
     tags: HashSet<Spanned<&'t Tag<'t>>>,
     meta_key_values: HashMap<Spanned<&'t Key<'t>>, Spanned<MetaValue<'t>>>,
+    options: Option<Options<'t>>,
     // errors, for collection when the iterator is exhausted
     errors: Vec<Error>,
 }
 
 impl<'s, 't> PragmaProcessor<'s, 't> {
-    fn new(all_declarations: Vec<Vec<Spanned<Declaration<'t>>>>) -> Self {
+    fn new(all_declarations: Vec<Vec<Spanned<Declaration<'t>>>>, options: Options<'t>) -> Self {
         let mut remaining = all_declarations
             .into_iter()
             .map(VecDeque::from)
@@ -316,8 +318,14 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
             remaining,
             tags: HashSet::new(),
             meta_key_values: HashMap::new(),
+            options: Some(options),
             errors: Vec::new(),
         }
+    }
+
+    // can only be taken once, so returns Some the first time and subsequently None
+    fn options(&mut self) -> Option<Options<'t>> {
+        self.options.take()
     }
 }
 
@@ -368,9 +376,12 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                 }
                             }
 
-                            Option(_) => {
-                                // options get processed during primary parse phase,
-                                // as some alter the behaviour of the parser
+                            Option(opt) => {
+                                if let Some(Err(e)) =
+                                    self.options.as_mut().map(|options| options.assimilate(opt))
+                                {
+                                    self.errors.push(e);
+                                }
                             }
                         }
 
