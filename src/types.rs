@@ -1945,8 +1945,8 @@ impl std::error::Error for CostSpecErrors {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct BeancountOption<'a> {
-    pub(crate) name: &'a str,
-    pub(crate) value: &'a str,
+    pub(crate) name: Spanned<&'a str>,
+    pub(crate) value: Spanned<&'a str>,
 }
 
 mod tests;

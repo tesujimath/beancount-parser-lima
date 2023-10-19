@@ -34,9 +34,9 @@ impl<'a> Default for Options<'a> {
 }
 
 impl<'a> Options<'a> {
-    pub(crate) fn set(&mut self, name: &'a str, value: &'a str) -> Result<(), OptionsError> {
+    pub(crate) fn set(&mut self, name: &'a str, value: &'a str) -> Result<(), OptionError> {
         use AccountType::*;
-        use OptionsErrorKind::*;
+        use OptionError::*;
 
         match name {
             "title" => Self::update_string(&mut self.title, value),
@@ -71,11 +71,11 @@ impl<'a> Options<'a> {
                 Self::update_account_name(&mut self.account_unrealized_gains, value)
             }
 
-            _ => Err(OptionsError(UnknownOption)),
+            _ => Err(UnknownOption),
         }
     }
 
-    fn update_string(field: &mut &'a str, value: &'a str) -> Result<(), OptionsError> {
+    fn update_string(field: &mut &'a str, value: &'a str) -> Result<(), OptionError> {
         *field = value;
         Ok(())
     }
@@ -84,9 +84,9 @@ impl<'a> Options<'a> {
     fn update_account_name(
         field: &mut NonEmpty<AccountName<'a>>,
         value: &'a str,
-    ) -> Result<(), OptionsError> {
+    ) -> Result<(), OptionError> {
         let account_name = Self::parse_account_name(value)
-            .map_err(|e| OptionsError(OptionsErrorKind::AccountName(e)))?;
+            .map_err(|e| OptionError::BadValue(BadValueError(BadValueErrorKind::AccountName(e))))?;
 
         *field = account_name;
 
@@ -109,16 +109,15 @@ impl<'a> Options<'a> {
         &mut self,
         account_type: AccountType,
         account_type_name: &'a str,
-    ) -> Result<(), OptionsError> {
-        use OptionsErrorKind as Kind;
-
+    ) -> Result<(), OptionError> {
         AccountTypeName::try_from(account_type_name)
-            .map_err(|e| OptionsError(Kind::AccountTypeName(e)))
+            .map_err(BadValueErrorKind::AccountTypeName)
             .and_then(|account_type_name| {
                 self.account_type_names
                     .update(account_type, account_type_name)
-                    .map_err(|e| OptionsError(Kind::AccountTypeNames(e)))
+                    .map_err(BadValueErrorKind::AccountTypeNames)
             })
+            .map_err(BadValueErrorKind::wrap)
     }
 
     pub fn title(&self) -> &str {
@@ -131,30 +130,44 @@ impl<'a> Options<'a> {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct OptionsError(OptionsErrorKind);
+pub enum OptionError {
+    UnknownOption,
+    BadValue(BadValueError),
+}
 
 #[derive(PartialEq, Eq, Debug)]
-enum OptionsErrorKind {
-    UnknownOption,
+pub struct BadValueError(BadValueErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum BadValueErrorKind {
     AccountTypeName(AccountTypeNameError),
     AccountTypeNames(AccountTypeNamesError),
     AccountName(AccountNameError),
 }
 
-impl Display for OptionsError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use OptionsErrorKind::*;
+impl BadValueErrorKind {
+    fn wrap(self) -> OptionError {
+        OptionError::BadValue(BadValueError(self))
+    }
+}
 
-        match &self.0 {
+impl Display for OptionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use BadValueErrorKind::*;
+        use OptionError::*;
+
+        match &self {
             UnknownOption => f.write_str("unknown option"),
-            AccountTypeName(e) => write!(f, "{}", e),
-            AccountTypeNames(e) => write!(f, "{}", e),
-            AccountName(e) => write!(f, "{}", e),
+            BadValue(BadValueError(bve)) => match bve {
+                AccountTypeName(e) => write!(f, "{}", e),
+                AccountTypeNames(e) => write!(f, "{}", e),
+                AccountName(e) => write!(f, "{}", e),
+            },
         }
     }
 }
 
-impl std::error::Error for OptionsError {}
+impl std::error::Error for OptionError {}
 
 #[derive(Debug)]
 pub(crate) struct AccountTypeNames<'a> {

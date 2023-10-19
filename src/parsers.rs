@@ -1,4 +1,9 @@
-use crate::{lexer::Token, options::Options, types::*, ConcreteInput};
+use crate::{
+    lexer::Token,
+    options::{OptionError, Options},
+    types::*,
+    ConcreteInput,
+};
 use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
 use either::Either;
 use std::{
@@ -100,7 +105,7 @@ where
         option().map_with(|opt, e| Pragma::Option(spanned(opt, e.span()))),
     ))
     .then_ignore(just(Token::Eol))
-    .labelled("pragma")
+    .labelled("directive") // yeah, pragma is not a user-facing concept
     .as_context()
 }
 
@@ -112,16 +117,18 @@ where
     let string = select_ref!(Token::StringLiteral(s) => s.deref());
 
     just(Token::Option)
-        .ignore_then(string)
-        .then(string)
+        .ignore_then(string.map_with(|name, e| spanned(name, e.span())))
+        .then(string.map_with(|value, e| spanned(value, e.span())))
         .try_map_with(|(name, value), e| {
-            let span = e.span();
+            use OptionError::*;
+
             let options: &mut Options = e.state();
             let opt = BeancountOption { name, value };
 
-            match options.set(opt.name, opt.value) {
+            match options.set(&opt.name, &opt.value) {
                 Ok(()) => Ok(opt),
-                Err(e) => Err(Rich::custom(span, e.to_string())),
+                Err(e @ UnknownOption) => Err(Rich::custom(name.span, e.to_string())),
+                Err(e @ BadValue(_)) => Err(Rich::custom(value.span, e.to_string())),
             }
         })
 }
