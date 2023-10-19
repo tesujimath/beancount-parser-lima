@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok(directives) => {
+        Ok((directives, _options)) => {
             let mut accounts = HashMap::new();
             let mut errors = Vec::new();
 

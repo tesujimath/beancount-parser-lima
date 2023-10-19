@@ -34,7 +34,7 @@ fn main() -> Result<()> {
 
     let beancount_parser = BeancountParser::new(&sources);
     match beancount_parser.parse() {
-        Ok(directives) => {
+        Ok((directives, _options)) => {
             let mut directives_as_strings = Vec::new();
 
             if flags.show_allocations {

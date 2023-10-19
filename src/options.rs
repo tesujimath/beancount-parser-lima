@@ -92,12 +92,24 @@ impl<'a> AccountTypeNames<'a> {
         account_type: AccountType,
         name: AccountTypeName<'a>,
     ) -> Result<(), AccountTypeNamesError> {
-        if let std::collections::hash_map::Entry::Vacant(e) = self.type_by_name.entry(name) {
-            e.insert(account_type);
-            self.name_by_type[account_type as usize] = name;
-            Ok(())
-        } else {
-            Err(AccountTypeNamesError(AccountTypeNamesErrorKind::NameInUse))
+        use std::collections::hash_map::Entry::*;
+
+        match self.type_by_name.entry(name) {
+            Vacant(e) => {
+                e.insert(account_type);
+                let old_name = self.name_by_type[account_type as usize];
+                self.name_by_type[account_type as usize] = name;
+                self.type_by_name.remove(&old_name);
+                Ok(())
+            }
+            Occupied(o) => {
+                if o.get() == &account_type {
+                    // updating as same, harmless
+                    Ok(())
+                } else {
+                    Err(AccountTypeNamesError(AccountTypeNamesErrorKind::NameInUse))
+                }
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rust_decimal::Decimal;
-use std::fmt::{self, Display, Formatter};
 use std::iter::{empty, Once};
 use std::path::PathBuf;
 use std::{io, iter::once};
@@ -9,8 +8,8 @@ use time::Date;
 use beancount_parser::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
-    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Pad, Posting, Price, ScopedAmount,
-    ScopedExprValue, SimpleValue, Tag, Transaction,
+    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, Posting, Price,
+    ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -26,7 +25,9 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok(directives) => {
+        Ok((directives, options)) => {
+            println!("options are {:?}", &options);
+
             for d in directives {
                 use DirectiveVariant::*;
 
@@ -51,7 +52,11 @@ fn main() -> Result<()> {
 
                     Event(x) => event(x, &d),
                 } {
-                    print!("{}", p);
+                    // if let Primitive::AccountType(t) = p {
+                    // print!("{}", options.account_type_name(t));
+                    // } else {
+                    p.write(&io::stdout(), &options)?;
+                    // }
                 }
                 println!();
             }
@@ -85,42 +90,45 @@ enum Decoration {
     CaretPrefix,
 }
 
-impl<'a> Display for Primitive<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl<'a> Primitive<'a> {
+    fn write<W>(&self, mut w: W, options: &Options) -> io::Result<()>
+    where
+        W: io::Write + Copy,
+    {
         use Primitive::*;
 
         match self {
             Str(x, d) => {
                 use Decoration::*;
                 match d {
-                    None => write!(f, "{}", x),
-                    DoubleQuote => write!(f, "\"{}\"", x),
-                    ColonPrefix => write!(f, ":{}", x),
-                    ColonSuffix => write!(f, "{}:", x),
-                    HashPrefix => write!(f, "#{}", x),
-                    CaretPrefix => write!(f, "^{}", x),
+                    None => write!(w, "{}", x),
+                    DoubleQuote => write!(w, "\"{}\"", x),
+                    ColonPrefix => write!(w, ":{}", x),
+                    ColonSuffix => write!(w, "{}:", x),
+                    HashPrefix => write!(w, "#{}", x),
+                    CaretPrefix => write!(w, "^{}", x),
                 }
             }
 
-            AccountType(x) => write!(f, "{}", x),
+            AccountType(x) => write!(w, "{}", options.account_type_name(*x)),
             Flag(x) => {
                 if let beancount_parser::Flag::Letter(flag_letter) = x {
                     let c = flag_letter.char();
-                    write!(f, "'{}", c)
+                    write!(w, "'{}", c)
                 } else {
-                    write!(f, "{}", x)
+                    write!(w, "{}", x)
                 }
             }
-            Decimal(x) => write!(f, "{}", x),
-            Date(x) => write!(f, "{}", x),
+            Decimal(x) => write!(w, "{}", x),
+            Date(x) => write!(w, "{}", x),
 
-            Booking(x) => write!(f, "\"{}\"", x),
+            Booking(x) => write!(w, "\"{}\"", x),
 
-            Bool(x) => write!(f, "{}", x),
+            Bool(x) => write!(w, "{}", x),
 
             Spliced(xs) => {
                 for x in xs {
-                    write!(f, "{}", x)?;
+                    x.write(w, options)?;
                 }
 
                 Ok(())
@@ -494,7 +502,7 @@ trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
 impl<'a, I: Iterator<Item = Primitive<'a>>> SpacedIteratorAdaptor<'a> for I {}
 
 trait SplicedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
-    /// Iterator adapter for splicing primtives
+    /// Iterator adapter for splicing primitives
     fn spliced(self) -> Once<Primitive<'a>>
     where
         Self: 'a,

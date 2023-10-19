@@ -6,7 +6,6 @@ use ariadne::{Color, Label, Report, ReportKind};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
-use options::Options;
 use parsers::{file, includes};
 use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
@@ -229,12 +228,12 @@ where
         }
     }
 
-    /// Parse the sources, returning directives sorted by date or errors.
-    pub fn parse(&'t self) -> Result<Vec<Spanned<Directive<'t>>>, Vec<Error>>
+    /// Parse the sources, returning date-sorted directives and options, or errors.
+    pub fn parse(&'t self) -> Result<(Vec<Spanned<Directive<'t>>>, Options<'t>), Vec<Error>>
     where
         's: 't,
     {
-        let (all_declarations, mut errors) = self.parse_declarations();
+        let (all_declarations, options, mut errors) = self.parse_declarations();
         let mut p = PragmaProcessor::new(all_declarations);
 
         let sorted_directives = p
@@ -244,7 +243,7 @@ where
         errors.append(&mut p.errors);
 
         if errors.is_empty() {
-            Ok(sorted_directives)
+            Ok((sorted_directives, options))
         } else {
             Err(errors)
         }
@@ -252,12 +251,13 @@ where
 
     /// Parse the sources, returning declarations and any errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> (Vec<Vec<Spanned<Declaration<'t>>>>, Vec<Error>)
+    fn parse_declarations(&'t self) -> (Vec<Vec<Spanned<Declaration<'t>>>>, Options<'t>, Vec<Error>)
     where
         's: 't,
     {
         let mut all_outputs = Vec::new();
         let mut all_errors = Vec::new();
+        let mut options = Options::default();
 
         for (source_id, content) in self.sources.content_iter() {
             let i_source: usize = source_id.into();
@@ -267,8 +267,6 @@ where
             let spanned_tokens: ConcreteInput = tokens
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
-
-            let mut options = Options::default();
 
             let (output, errors) = file()
                 .parse_with_state(spanned_tokens, &mut options)
@@ -280,6 +278,7 @@ where
 
         (
             all_outputs,
+            options,
             all_errors.into_iter().map(Error::from).collect(),
         )
     }
@@ -400,6 +399,7 @@ pub use lexer::bare_lex;
 pub use lexer::dump_tokens;
 mod format;
 mod lexer;
+pub use options::Options;
 mod options;
 mod parsers;
 mod sort;
