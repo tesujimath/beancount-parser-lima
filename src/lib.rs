@@ -241,10 +241,11 @@ where
             .by_ref()
             .sort(|d| *d.item().date().item())
             .collect::<Vec<_>>();
-        errors.append(&mut p.errors);
+        let (options, mut pragma_errors) = p.result();
+        errors.append(&mut pragma_errors);
 
         if errors.is_empty() {
-            Ok((sorted_directives, p.options().unwrap()))
+            Ok((sorted_directives, options))
         } else {
             Err(errors)
         }
@@ -297,7 +298,7 @@ struct PragmaProcessor<'s, 't> {
     // tags and meta key/values for pragma push/pop
     tags: HashSet<Spanned<&'t Tag<'t>>>,
     meta_key_values: HashMap<Spanned<&'t Key<'t>>, Spanned<MetaValue<'t>>>,
-    options: Option<Options<'t>>,
+    options: Options<'t>,
     // errors, for collection when the iterator is exhausted
     errors: Vec<Error>,
 }
@@ -318,14 +319,13 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
             remaining,
             tags: HashSet::new(),
             meta_key_values: HashMap::new(),
-            options: Some(options),
+            options,
             errors: Vec::new(),
         }
     }
 
-    // can only be taken once, so returns Some the first time and subsequently None
-    fn options(&mut self) -> Option<Options<'t>> {
-        self.options.take()
+    fn result(self) -> (Options<'t>, Vec<Error>) {
+        (self.options, self.errors)
     }
 }
 
@@ -377,9 +377,7 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                             }
 
                             Option(opt) => {
-                                if let Some(Err(e)) =
-                                    self.options.as_mut().map(|options| options.assimilate(opt))
-                                {
+                                if let Err(e) = self.options.assimilate(opt) {
                                     self.errors.push(e);
                                 }
                             }
