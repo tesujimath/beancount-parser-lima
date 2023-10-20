@@ -16,13 +16,13 @@ pub struct BeancountOption<'a> {
 pub enum BeancountOptionVariant<'a> {
     Title(&'a str),
     AccountTypeName(AccountType, AccountTypeName<'a>),
-    AccountPreviousBalances(NonEmpty<AccountName<'a>>),
-    AccountPreviousEarnings(NonEmpty<AccountName<'a>>),
-    AccountPreviousConversions(NonEmpty<AccountName<'a>>),
-    AccountCurrentEarnings(NonEmpty<AccountName<'a>>),
-    AccountCurrentConversions(NonEmpty<AccountName<'a>>),
-    AccountUnrealizedGains(NonEmpty<AccountName<'a>>),
-    AccountRounding(NonEmpty<AccountName<'a>>),
+    AccountPreviousBalances(Subaccount<'a>),
+    AccountPreviousEarnings(Subaccount<'a>),
+    AccountPreviousConversions(Subaccount<'a>),
+    AccountCurrentEarnings(Subaccount<'a>),
+    AccountCurrentConversions(Subaccount<'a>),
+    AccountUnrealizedGains(Subaccount<'a>),
+    AccountRounding(Subaccount<'a>),
     ConversionCurrency(Currency<'a>),
     Assimilated,
 }
@@ -57,30 +57,26 @@ impl<'a> BeancountOption<'a> {
                 .map(|n| AccountTypeName(AccountType::Expenses, n)),
 
             "account_previous_balances" => {
-                parse_account_name(value.item).map(AccountPreviousBalances)
+                parse_subaccount(value.item).map(AccountPreviousBalances)
             }
 
             "account_previous_earnings" => {
-                parse_account_name(value.item).map(AccountPreviousEarnings)
+                parse_subaccount(value.item).map(AccountPreviousEarnings)
             }
 
             "account_previous_conversions" => {
-                parse_account_name(value.item).map(AccountPreviousConversions)
+                parse_subaccount(value.item).map(AccountPreviousConversions)
             }
 
-            "account_current_earnings" => {
-                parse_account_name(value.item).map(AccountCurrentEarnings)
-            }
+            "account_current_earnings" => parse_subaccount(value.item).map(AccountCurrentEarnings),
 
             "account_current_conversions" => {
-                parse_account_name(value.item).map(AccountCurrentConversions)
+                parse_subaccount(value.item).map(AccountCurrentConversions)
             }
 
-            "account_unrealized_gains" => {
-                parse_account_name(value.item).map(AccountUnrealizedGains)
-            }
+            "account_unrealized_gains" => parse_subaccount(value.item).map(AccountUnrealizedGains),
 
-            "account_rounding" => parse_account_name(value.item).map(AccountRounding),
+            "account_rounding" => parse_subaccount(value.item).map(AccountRounding),
 
             "conversion_currency" => parse_currency(value.item).map(ConversionCurrency),
 
@@ -96,17 +92,15 @@ impl<'a> BeancountOption<'a> {
     }
 }
 
-fn parse_account_name(
-    colon_separated: &str,
-) -> Result<NonEmpty<AccountName>, BeancountOptionError> {
-    let mut account = colon_separated.split(':');
-    let account_name_components = account
+fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOptionError> {
+    let subaccount_names = colon_separated
+        .split(':')
         .by_ref()
         .map(AccountName::try_from)
         .collect::<Result<Vec<AccountName>, _>>()
         .map_err(|e| BadValueErrorKind::AccountName(e).wrap())?;
 
-    Ok(NonEmpty::collect(account_name_components).unwrap())
+    Ok(NonEmpty::collect(subaccount_names).unwrap())
 }
 
 fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {
@@ -216,15 +210,15 @@ impl std::error::Error for ParserOptionsError {}
 
 #[derive(Debug)]
 pub struct Options<'a> {
-    title: Sourced<&'a str>,
-    account_previous_balances: Sourced<NonEmpty<AccountName<'a>>>,
-    account_previous_earnings: Sourced<NonEmpty<AccountName<'a>>>,
-    account_previous_conversions: Sourced<NonEmpty<AccountName<'a>>>,
-    account_current_earnings: Sourced<NonEmpty<AccountName<'a>>>,
-    account_current_conversions: Sourced<NonEmpty<AccountName<'a>>>,
-    account_unrealized_gains: Sourced<NonEmpty<AccountName<'a>>>,
-    account_rounding: Option<Sourced<NonEmpty<AccountName<'a>>>>,
-    conversion_currency: Sourced<Currency<'a>>,
+    title: OptionallySourced<&'a str>,
+    account_previous_balances: OptionallySourced<Subaccount<'a>>,
+    account_previous_earnings: OptionallySourced<Subaccount<'a>>,
+    account_previous_conversions: OptionallySourced<Subaccount<'a>>,
+    account_current_earnings: OptionallySourced<Subaccount<'a>>,
+    account_current_conversions: OptionallySourced<Subaccount<'a>>,
+    account_unrealized_gains: OptionallySourced<Subaccount<'a>>,
+    account_rounding: Option<Sourced<Subaccount<'a>>>,
+    conversion_currency: OptionallySourced<Currency<'a>>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -232,16 +226,16 @@ impl<'a> Options<'a> {
     pub(crate) fn new(parser_options: ParserOptions<'a>) -> Self {
         Options {
             title: unsourced("Beancount"),
-            account_previous_balances: unsourced(parse_account_name("Opening-Balances").unwrap()),
-            account_previous_earnings: unsourced(parse_account_name("Earnings:Previous").unwrap()),
+            account_previous_balances: unsourced(parse_subaccount("Opening-Balances").unwrap()),
+            account_previous_earnings: unsourced(parse_subaccount("Earnings:Previous").unwrap()),
             account_previous_conversions: unsourced(
-                parse_account_name("Conversions:Previous").unwrap(),
+                parse_subaccount("Conversions:Previous").unwrap(),
             ),
-            account_current_earnings: unsourced(parse_account_name("Earnings:Current").unwrap()),
+            account_current_earnings: unsourced(parse_subaccount("Earnings:Current").unwrap()),
             account_current_conversions: unsourced(
-                parse_account_name("Conversions:Current").unwrap(),
+                parse_subaccount("Conversions:Current").unwrap(),
             ),
-            account_unrealized_gains: unsourced(parse_account_name("Earnings:Unrealized").unwrap()),
+            account_unrealized_gains: unsourced(parse_subaccount("Earnings:Unrealized").unwrap()),
             account_rounding: None,
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
             parser_options,
@@ -260,29 +254,29 @@ impl<'a> Options<'a> {
             AccountTypeName(_, _) => Ok(()),
 
             AccountPreviousBalances(value) => {
-                Self::update_account_name(&mut self.account_previous_balances, value, source)
+                Self::update_subaccount(&mut self.account_previous_balances, value, source)
             }
             AccountPreviousEarnings(value) => {
-                Self::update_account_name(&mut self.account_previous_earnings, value, source)
+                Self::update_subaccount(&mut self.account_previous_earnings, value, source)
             }
             AccountPreviousConversions(value) => {
-                Self::update_account_name(&mut self.account_previous_conversions, value, source)
+                Self::update_subaccount(&mut self.account_previous_conversions, value, source)
             }
 
             AccountCurrentEarnings(value) => {
-                Self::update_account_name(&mut self.account_current_earnings, value, source)
+                Self::update_subaccount(&mut self.account_current_earnings, value, source)
             }
 
             AccountCurrentConversions(value) => {
-                Self::update_account_name(&mut self.account_current_conversions, value, source)
+                Self::update_subaccount(&mut self.account_current_conversions, value, source)
             }
 
             AccountUnrealizedGains(value) => {
-                Self::update_account_name(&mut self.account_unrealized_gains, value, source)
+                Self::update_subaccount(&mut self.account_unrealized_gains, value, source)
             }
 
             AccountRounding(value) => {
-                Self::update_optional_account_name(&mut self.account_rounding, value, source)
+                Self::update_optional_subaccount(&mut self.account_rounding, value, source)
             }
 
             ConversionCurrency(value) => {
@@ -301,7 +295,7 @@ impl<'a> Options<'a> {
     }
 
     fn update_string(
-        field: &mut Sourced<&'a str>,
+        field: &mut OptionallySourced<&'a str>,
         value: &'a str,
         source: Source,
     ) -> Result<(), OptionError> {
@@ -309,10 +303,9 @@ impl<'a> Options<'a> {
         Ok(())
     }
 
-    // a colon-separated account name not including the account type
-    fn update_account_name(
-        field: &mut Sourced<NonEmpty<AccountName<'a>>>,
-        value: NonEmpty<AccountName<'a>>,
+    fn update_subaccount(
+        field: &mut OptionallySourced<Subaccount<'a>>,
+        value: Subaccount<'a>,
         source: Source,
     ) -> Result<(), OptionError> {
         use OptionError::*;
@@ -326,32 +319,24 @@ impl<'a> Options<'a> {
         }
     }
 
-    // a colon-separated account name not including the account type
-    fn update_optional_account_name(
-        field: &mut Option<Sourced<NonEmpty<AccountName<'a>>>>,
-        value: NonEmpty<AccountName<'a>>,
+    fn update_optional_subaccount(
+        field: &mut Option<Sourced<Subaccount<'a>>>,
+        value: Subaccount<'a>,
         source: Source,
     ) -> Result<(), OptionError> {
         use OptionError::*;
 
         match field {
             None => {
-                *field = Some(sourced(value, source));
+                *field = Some(Sourced { value, source });
                 Ok(())
             }
-            Some(Sourced {
-                source: Some(source),
-                ..
-            }) => Err(DuplicateOption(source.name)),
-            Some(Sourced {
-                source: None, // TODO this one is not possible, bah!
-                ..
-            }) => Err(DuplicateOption(source.name)),
+            Some(Sourced { source, .. }) => Err(DuplicateOption(source.name)),
         }
     }
 
     fn update_currency(
-        field: &mut Sourced<Currency<'a>>,
+        field: &mut OptionallySourced<Currency<'a>>,
         value: Currency<'a>,
         source: Source,
     ) -> Result<(), OptionError> {
@@ -378,18 +363,24 @@ impl<'a> Options<'a> {
 #[derive(Debug)]
 struct Sourced<T> {
     value: T,
+    source: Source,
+}
+
+#[derive(Debug)]
+struct OptionallySourced<T> {
+    value: T,
     source: Option<Source>,
 }
 
-fn unsourced<T>(value: T) -> Sourced<T> {
-    Sourced {
+fn unsourced<T>(value: T) -> OptionallySourced<T> {
+    OptionallySourced {
         value,
         source: None,
     }
 }
 
-fn sourced<T>(value: T, source: Source) -> Sourced<T> {
-    Sourced {
+fn sourced<T>(value: T, source: Source) -> OptionallySourced<T> {
+    OptionallySourced {
         value,
         source: Some(source),
     }

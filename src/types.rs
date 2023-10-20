@@ -747,7 +747,7 @@ impl<'a> Account<'a> {
     }
 
     pub fn names(&self) -> impl ExactSizeIterator<Item = &AccountName> {
-        self.candidate.names.iter()
+        self.candidate.subaccount.iter()
     }
 }
 
@@ -764,17 +764,20 @@ impl<'a> Display for Account<'a> {
     }
 }
 
+/// `Subaccount` comprises the colon-separated components of an account, without the account type prefix.
+pub type Subaccount<'a> = NonEmpty<AccountName<'a>>;
+
 /// A CandidateAccount is one where the account_type_name has not yet been resolved against current options.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CandidateAccount<'a> {
     pub(crate) account_type_name: AccountTypeName<'a>,
-    pub(crate) names: NonEmpty<AccountName<'a>>,
+    pub(crate) subaccount: Subaccount<'a>,
 }
 
 impl<'a> Display for CandidateAccount<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.account_type_name)?;
-        format(f, &self.names, plain, ":", Some(":"))
+        format(f, &self.subaccount, plain, ":", Some(":"))
     }
 }
 

@@ -363,13 +363,13 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
 fn parse_candidate_account(s: &str) -> Result<CandidateAccount, LexerError> {
     let mut account = s.split(':');
     let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())?;
-    let account_names = account
+    let subaccount_names = account
         .by_ref()
         .map(AccountName::try_from)
         .collect::<Result<Vec<AccountName>, _>>()?;
     Ok(CandidateAccount {
         account_type_name,
-        names: NonEmpty::collect(account_names).unwrap(),
+        subaccount: NonEmpty::collect(subaccount_names).unwrap(),
     })
 }
 
