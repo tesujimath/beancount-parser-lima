@@ -1,0 +1,5 @@
+option "conversion_currency" "WOOHOO"
+option "inferred_tolerance_default" "*:0.01"
+option "inferred_tolerance_default" "NZD:0.02"
+option "inferred_tolerance_default" "GBP:0.03"
+option "inferred_tolerance_default" "*:0.02"

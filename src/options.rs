@@ -1,9 +1,12 @@
 use super::format::{format, plain};
 use super::types::*;
 use nonempty::NonEmpty;
+use rust_decimal::Decimal;
+use std::collections::hash_map;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
+    hash::{Hash, Hasher},
 };
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -24,7 +27,26 @@ pub enum BeancountOptionVariant<'a> {
     AccountUnrealizedGains(Subaccount<'a>),
     AccountRounding(Subaccount<'a>),
     ConversionCurrency(Currency<'a>),
+    InferredToleranceDefault(CurrencyOrAny<'a>, Decimal),
     Assimilated,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum CurrencyOrAny<'a> {
+    Currency(Currency<'a>),
+    Any,
+}
+
+impl<'a> TryFrom<&'a str> for CurrencyOrAny<'a> {
+    type Error = CurrencyError;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        if s == "*" {
+            Ok(CurrencyOrAny::Any)
+        } else {
+            Currency::try_from(s).map(CurrencyOrAny::Currency)
+        }
+    }
 }
 
 impl<'a> BeancountOption<'a> {
@@ -80,6 +102,12 @@ impl<'a> BeancountOption<'a> {
 
             "conversion_currency" => parse_currency(value.item).map(ConversionCurrency),
 
+            "inferred_tolerance_default" => {
+                parse_inferred_tolerance_default(value.item).map(|(currency_or_any, tolerance)| {
+                    InferredToleranceDefault(currency_or_any, tolerance)
+                })
+            }
+
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
@@ -111,7 +139,29 @@ fn parse_currency(value: &str) -> Result<Currency, BeancountOptionError> {
     Currency::try_from(value).map_err(|e| BadValueErrorKind::Currency(e).wrap())
 }
 
-#[derive(PartialEq, Eq, Debug)]
+fn parse_inferred_tolerance_default(
+    value: &str,
+) -> Result<(CurrencyOrAny, Decimal), BeancountOptionError> {
+    use BadValueErrorKind as Bad;
+
+    let mut fields = value.split(':');
+    let currency_or_any = CurrencyOrAny::try_from(fields.by_ref().next().unwrap())
+        .map_err(|e| Bad::Currency(e).wrap())?;
+    let tolerance = fields
+        .by_ref()
+        .next()
+        .ok_or(Bad::MissingColon)
+        .and_then(|s| Decimal::try_from(s).map_err(Bad::Decimal))
+        .map_err(Bad::wrap)?;
+
+    if fields.next().is_none() {
+        Ok((currency_or_any, tolerance))
+    } else {
+        Err(Bad::TooManyColons.wrap())
+    }
+}
+
+#[derive(Debug)]
 pub(crate) enum BeancountOptionError {
     UnknownOption,
     BadValue(BadValueError),
@@ -130,15 +180,20 @@ impl Display for BeancountOptionError {
 
 impl std::error::Error for BeancountOptionError {}
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct BadValueError(BadValueErrorKind);
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 enum BadValueErrorKind {
     AccountTypeName(AccountTypeNameError),
     AccountTypeNames(AccountTypeNamesError),
     AccountName(AccountNameError),
     Currency(CurrencyError),
+    Decimal(rust_decimal::Error),
+    MissingColon,
+    TooManyColons,
+    // TODO remove this:
+    IncorrectFormat(String),
 }
 
 impl Display for BadValueErrorKind {
@@ -150,6 +205,10 @@ impl Display for BadValueErrorKind {
             AccountTypeNames(e) => write!(f, "{}", e),
             AccountName(e) => write!(f, "{}", e),
             Currency(e) => write!(f, "{}", e),
+            Decimal(e) => write!(f, "{}", e),
+            MissingColon => f.write_str("missing colon"),
+            TooManyColons => f.write_str("too many colons"),
+            IncorrectFormat(s) => write!(f, "{}", s),
         }
     }
 }
@@ -219,6 +278,7 @@ pub struct Options<'a> {
     account_unrealized_gains: OptionallySourced<Subaccount<'a>>,
     account_rounding: Option<Sourced<Subaccount<'a>>>,
     conversion_currency: OptionallySourced<Currency<'a>>,
+    inferred_tolerance_default: HashMap<Sourced<CurrencyOrAny<'a>>, Decimal>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -238,6 +298,7 @@ impl<'a> Options<'a> {
             account_unrealized_gains: unsourced(parse_subaccount("Earnings:Unrealized").unwrap()),
             account_rounding: None,
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
+            inferred_tolerance_default: HashMap::new(),
             parser_options,
         }
     }
@@ -283,6 +344,13 @@ impl<'a> Options<'a> {
                 Self::update_currency(&mut self.conversion_currency, value, source)
             }
 
+            InferredToleranceDefault(currency_or_any, tolerance) => Self::update_hashmap(
+                &mut self.inferred_tolerance_default,
+                currency_or_any,
+                tolerance,
+                source,
+            ),
+
             // this value contains nothing
             Assimilated => Ok(()),
         }
@@ -290,7 +358,7 @@ impl<'a> Options<'a> {
             DuplicateOption(span) => Error::new("invalid option", "duplicate", source.name)
                 .related_to_named_span("option", *span),
             DuplicateValue(span) => Error::new("invalid option", "duplicate value", source.value)
-                .related_to_named_span("option", *span),
+                .related_to_named_span("option value", *span),
         })
     }
 
@@ -299,7 +367,7 @@ impl<'a> Options<'a> {
         value: &'a str,
         source: Source,
     ) -> Result<(), OptionError> {
-        *field = sourced(value, source);
+        *field = optionally_sourced(value, source);
         Ok(())
     }
 
@@ -312,7 +380,7 @@ impl<'a> Options<'a> {
 
         match &field.source {
             None => {
-                *field = sourced(value, source);
+                *field = optionally_sourced(value, source);
                 Ok(())
             }
             Some(source) => Err(DuplicateOption(source.name)),
@@ -328,7 +396,7 @@ impl<'a> Options<'a> {
 
         match field {
             None => {
-                *field = Some(Sourced { value, source });
+                *field = Some(sourced(value, source));
                 Ok(())
             }
             Some(Sourced { source, .. }) => Err(DuplicateOption(source.name)),
@@ -344,10 +412,31 @@ impl<'a> Options<'a> {
 
         match &field.source {
             None => {
-                *field = sourced(value, source);
+                *field = optionally_sourced(value, source);
                 Ok(())
             }
             Some(source) => Err(DuplicateOption(source.name)),
+        }
+    }
+    fn update_hashmap<K, V>(
+        field: &mut HashMap<Sourced<K>, V>,
+        key: K,
+        value: V,
+        source: Source,
+    ) -> Result<(), OptionError>
+    where
+        K: Eq + Hash,
+    {
+        use hash_map::Entry::*;
+        use OptionError::*;
+
+        match field.entry(sourced(key, source)) {
+            Vacant(entry) => {
+                entry.insert(value);
+
+                Ok(())
+            }
+            Occupied(entry) => Err(DuplicateValue(entry.key().source.value)),
         }
     }
 
@@ -362,26 +451,47 @@ impl<'a> Options<'a> {
 
 #[derive(Debug)]
 struct Sourced<T> {
-    value: T,
+    item: T,
     source: Source,
+}
+
+impl<T> PartialEq for Sourced<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.item.eq(&other.item)
+    }
+}
+
+impl<T> Eq for Sourced<T> where T: Eq {}
+
+impl<T> Hash for Sourced<T>
+where
+    T: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.item.hash(state)
+    }
+}
+
+fn sourced<T>(item: T, source: Source) -> Sourced<T> {
+    Sourced { item, source }
 }
 
 #[derive(Debug)]
 struct OptionallySourced<T> {
-    value: T,
+    item: T,
     source: Option<Source>,
 }
 
-fn unsourced<T>(value: T) -> OptionallySourced<T> {
-    OptionallySourced {
-        value,
-        source: None,
-    }
+fn unsourced<T>(item: T) -> OptionallySourced<T> {
+    OptionallySourced { item, source: None }
 }
 
-fn sourced<T>(value: T, source: Source) -> OptionallySourced<T> {
+fn optionally_sourced<T>(item: T, source: Source) -> OptionallySourced<T> {
     OptionallySourced {
-        value,
+        item,
         source: Some(source),
     }
 }
@@ -443,7 +553,7 @@ impl<'a> AccountTypeNames<'a> {
         account_type: AccountType,
         name: AccountTypeName<'a>,
     ) -> Result<(), AccountTypeNamesError> {
-        use std::collections::hash_map::Entry::*;
+        use hash_map::Entry::*;
 
         match self.type_by_name.entry(name) {
             Vacant(e) => {
