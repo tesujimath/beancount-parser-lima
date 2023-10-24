@@ -10,7 +10,6 @@ use std::{
     collections::{hash_map, HashMap},
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
-    str::{FromStr, ParseBoolError},
 };
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -36,6 +35,7 @@ pub enum BeancountOptionVariant<'a> {
     InferToleranceFromCost(bool),
     Documents(PathBuf),
     OperatingCurrency(Currency<'a>),
+    RenderCommas(bool),
     Assimilated,
 }
 
@@ -121,9 +121,7 @@ impl<'a> BeancountOption<'a> {
                 .map(InferredToleranceMultiplier)
                 .map_err(|e| BadValueErrorKind::Decimal(e).wrap()),
 
-            "infer_tolerance_from_cost" => bool::from_str(value.item)
-                .map(InferToleranceFromCost)
-                .map_err(|e| BadValueErrorKind::Bool(e).wrap()),
+            "infer_tolerance_from_cost" => parse_bool(value.item).map(InferToleranceFromCost),
 
             "documents" => Ok(source_path
                 .parent()
@@ -133,6 +131,8 @@ impl<'a> BeancountOption<'a> {
             .map(Documents),
 
             "operating_currency" => parse_currency(value.item).map(OperatingCurrency),
+
+            "render_commas" => parse_bool(value.item).map(RenderCommas),
 
             _ => Err(UnknownOption),
         }
@@ -187,6 +187,17 @@ fn parse_inferred_tolerance_default(
     }
 }
 
+// case insenstive parsing
+fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
+    if value.eq_ignore_ascii_case("true") {
+        Ok(true)
+    } else if value.eq_ignore_ascii_case("false") {
+        Ok(false)
+    } else {
+        Err(BadValueErrorKind::Bool.wrap())
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum BeancountOptionError {
     UnknownOption,
@@ -216,7 +227,7 @@ enum BadValueErrorKind {
     AccountName(AccountNameError),
     Currency(CurrencyError),
     Decimal(rust_decimal::Error),
-    Bool(ParseBoolError),
+    Bool,
     MissingColon,
     TooManyColons,
 }
@@ -231,7 +242,7 @@ impl Display for BadValueErrorKind {
             AccountName(e) => write!(f, "{}", e),
             Currency(e) => write!(f, "{}", e),
             Decimal(e) => write!(f, "{}", e),
-            Bool(e) => write!(f, "{}", e),
+            Bool => f.write_str("must be true or false or case-insensitive equivalent"),
             MissingColon => f.write_str("missing colon"),
             TooManyColons => f.write_str("too many colons"),
         }
@@ -308,6 +319,7 @@ pub struct Options<'a> {
     infer_tolerance_from_cost: OptionallySourced<bool>,
     documents: HashSet<Sourced<PathBuf>>,
     operating_currency: HashSet<Sourced<Currency<'a>>>,
+    render_commas: OptionallySourced<bool>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -332,6 +344,7 @@ impl<'a> Options<'a> {
             infer_tolerance_from_cost: unsourced(false),
             documents: HashSet::new(),
             operating_currency: HashSet::new(),
+            render_commas: unsourced(false),
             parser_options,
         }
     }
@@ -395,6 +408,8 @@ impl<'a> Options<'a> {
             OperatingCurrency(value) => {
                 Self::update_hashset(&mut self.operating_currency, value, source)
             }
+
+            RenderCommas(value) => Self::update(&mut self.render_commas, value, source),
 
             // this value contains nothing
             Assimilated => Ok(()),
