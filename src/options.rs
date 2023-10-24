@@ -309,40 +309,38 @@ impl<'a> Options<'a> {
 
         let BeancountOption { source, variant } = opt;
         match variant {
-            Title(value) => Self::update_string(&mut self.title, value, source),
+            Title(value) => Self::update(&mut self.title, value, source),
 
             // this one was already assimilated into ParserOptions
             AccountTypeName(_, _) => Ok(()),
 
             AccountPreviousBalances(value) => {
-                Self::update_subaccount(&mut self.account_previous_balances, value, source)
+                Self::update(&mut self.account_previous_balances, value, source)
             }
             AccountPreviousEarnings(value) => {
-                Self::update_subaccount(&mut self.account_previous_earnings, value, source)
+                Self::update(&mut self.account_previous_earnings, value, source)
             }
             AccountPreviousConversions(value) => {
-                Self::update_subaccount(&mut self.account_previous_conversions, value, source)
+                Self::update(&mut self.account_previous_conversions, value, source)
             }
 
             AccountCurrentEarnings(value) => {
-                Self::update_subaccount(&mut self.account_current_earnings, value, source)
+                Self::update(&mut self.account_current_earnings, value, source)
             }
 
             AccountCurrentConversions(value) => {
-                Self::update_subaccount(&mut self.account_current_conversions, value, source)
+                Self::update(&mut self.account_current_conversions, value, source)
             }
 
             AccountUnrealizedGains(value) => {
-                Self::update_subaccount(&mut self.account_unrealized_gains, value, source)
+                Self::update(&mut self.account_unrealized_gains, value, source)
             }
 
             AccountRounding(value) => {
-                Self::update_optional_subaccount(&mut self.account_rounding, value, source)
+                Self::update_optional(&mut self.account_rounding, value, source)
             }
 
-            ConversionCurrency(value) => {
-                Self::update_currency(&mut self.conversion_currency, value, source)
-            }
+            ConversionCurrency(value) => Self::update(&mut self.conversion_currency, value, source),
 
             InferredToleranceDefault(currency_or_any, tolerance) => Self::update_hashmap(
                 &mut self.inferred_tolerance_default,
@@ -362,18 +360,9 @@ impl<'a> Options<'a> {
         })
     }
 
-    fn update_string(
-        field: &mut OptionallySourced<&'a str>,
-        value: &'a str,
-        source: Source,
-    ) -> Result<(), OptionError> {
-        *field = optionally_sourced(value, source);
-        Ok(())
-    }
-
-    fn update_subaccount(
-        field: &mut OptionallySourced<Subaccount<'a>>,
-        value: Subaccount<'a>,
+    fn update<T>(
+        field: &mut OptionallySourced<T>,
+        value: T,
         source: Source,
     ) -> Result<(), OptionError> {
         use OptionError::*;
@@ -387,9 +376,9 @@ impl<'a> Options<'a> {
         }
     }
 
-    fn update_optional_subaccount(
-        field: &mut Option<Sourced<Subaccount<'a>>>,
-        value: Subaccount<'a>,
+    fn update_optional<T>(
+        field: &mut Option<Sourced<T>>,
+        value: T,
         source: Source,
     ) -> Result<(), OptionError> {
         use OptionError::*;
@@ -403,21 +392,6 @@ impl<'a> Options<'a> {
         }
     }
 
-    fn update_currency(
-        field: &mut OptionallySourced<Currency<'a>>,
-        value: Currency<'a>,
-        source: Source,
-    ) -> Result<(), OptionError> {
-        use OptionError::*;
-
-        match &field.source {
-            None => {
-                *field = optionally_sourced(value, source);
-                Ok(())
-            }
-            Some(source) => Err(DuplicateOption(source.name)),
-        }
-    }
     fn update_hashmap<K, V>(
         field: &mut HashMap<Sourced<K>, V>,
         key: K,
