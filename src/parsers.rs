@@ -9,6 +9,7 @@ use either::Either;
 use std::{
     collections::{hash_map, HashMap, HashSet},
     ops::Deref,
+    path::Path,
 };
 use time::Date;
 
@@ -32,21 +33,25 @@ where
 }
 
 /// Matches the whole file.
-pub(crate) fn file<'src, I>() -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, Extra<'src>>
+pub(crate) fn file<'src, I>(
+    source_path: &'src Path,
+) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    declaration().repeated().collect::<Vec<_>>()
+    declaration(source_path).repeated().collect::<Vec<_>>()
 }
 
 /// Matches a `Declaration`, and returns with Span.
-pub(crate) fn declaration<'src, I>() -> impl Parser<'src, I, Spanned<Declaration<'src>>, Extra<'src>>
+pub(crate) fn declaration<'src, I>(
+    source_path: &'src Path,
+) -> impl Parser<'src, I, Spanned<Declaration<'src>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Declaration::*;
 
-    choice((directive().map(Directive), pragma().map(Pragma)))
+    choice((directive().map(Directive), pragma(source_path).map(Pragma)))
         .map_with(spanned_extra)
         .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
 }
@@ -77,7 +82,9 @@ where
 }
 
 /// Matches a `Pragma`.
-pub(crate) fn pragma<'src, I>() -> impl Parser<'src, I, Pragma<'src>, Extra<'src>>
+pub(crate) fn pragma<'src, I>(
+    source_path: &'src Path,
+) -> impl Parser<'src, I, Pragma<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -102,7 +109,7 @@ where
             .then_ignore(just(Token::Colon))
             .map_with(|key, e| Popmeta(spanned(key, e.span()))),
         just(Token::Include).ignore_then(string).map(Include),
-        option().map(Pragma::Option),
+        option(source_path).map(Pragma::Option),
     ))
     .then_ignore(just(Token::Eol))
     .labelled("directive") // yeah, pragma is not a user-facing concept
@@ -110,7 +117,9 @@ where
 }
 
 /// Matches a `BeancountOption`, failing if the option cannot be processed.
-pub(crate) fn option<'src, I>() -> impl Parser<'src, I, BeancountOption<'src>, Extra<'src>>
+pub(crate) fn option<'src, I>(
+    source_path: &'src Path,
+) -> impl Parser<'src, I, BeancountOption<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -122,7 +131,7 @@ where
         .try_map_with(|(name, value), e| {
             use BeancountOptionError::*;
 
-            let opt = BeancountOption::parse(name, value).map_err(|e| match e {
+            let opt = BeancountOption::parse(name, value, source_path).map_err(|e| match e {
                 UnknownOption => Rich::custom(name.span, e.to_string()),
                 BadValue(_) => Rich::custom(value.span, e.to_string()),
             });

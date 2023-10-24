@@ -144,11 +144,13 @@ impl BeancountSources {
             .collect()
     }
 
-    fn content_iter(&self) -> impl Iterator<Item = (SourceId, &str)> {
+    fn content_iter(&self) -> impl Iterator<Item = (SourceId, &Path, &str)> {
         self.path_content
             .iter()
             .enumerate()
-            .map(|(i, (_, _, content))| (SourceId::from(i), content.as_str()))
+            .map(|(i, (pathbuf, _, content))| {
+                (SourceId::from(i), pathbuf.as_path(), content.as_str())
+            })
     }
 
     /// Build a source_id lookup from path
@@ -219,7 +221,7 @@ where
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = Vec::new();
 
-        for (source_id, content) in sources.content_iter() {
+        for (source_id, _source_path, content) in sources.content_iter() {
             tokenized_sources.push(lex(source_id, content));
         }
 
@@ -261,7 +263,7 @@ where
         let mut all_errors = Vec::new();
         let mut parser_options = ParserOptions::default();
 
-        for (source_id, content) in self.sources.content_iter() {
+        for (source_id, source_path, content) in self.sources.content_iter() {
             let i_source: usize = source_id.into();
             let tokens = &self.tokenized_sources[i_source];
 
@@ -270,7 +272,7 @@ where
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
 
-            let (output, errors) = file()
+            let (output, errors) = file(source_path)
                 .parse_with_state(spanned_tokens, &mut parser_options)
                 .into_output_errors();
 

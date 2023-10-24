@@ -1,8 +1,11 @@
 use super::format::{format, plain};
 use super::types::*;
 use nonempty::NonEmpty;
+use path_clean::PathClean;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::{
     collections::{hash_map, HashMap},
     fmt::{self, Display, Formatter},
@@ -31,6 +34,7 @@ pub enum BeancountOptionVariant<'a> {
     InferredToleranceDefault(CurrencyOrAny<'a>, Decimal),
     InferredToleranceMultiplier(Decimal),
     InferToleranceFromCost(bool),
+    Documents(PathBuf),
     Assimilated,
 }
 
@@ -56,6 +60,7 @@ impl<'a> BeancountOption<'a> {
     pub(crate) fn parse(
         name: Spanned<&'a str>,
         value: Spanned<&'a str>,
+        source_path: &Path,
     ) -> Result<BeancountOption<'a>, BeancountOptionError> {
         use BeancountOptionError::*;
         use BeancountOptionVariant::*;
@@ -118,6 +123,13 @@ impl<'a> BeancountOption<'a> {
             "infer_tolerance_from_cost" => bool::from_str(value.item)
                 .map(InferToleranceFromCost)
                 .map_err(|e| BadValueErrorKind::Bool(e).wrap()),
+
+            "documents" => Ok(source_path
+                .parent()
+                .map_or(PathBuf::from(value.item), |parent| {
+                    parent.join(value.item).clean()
+                }))
+            .map(Documents),
 
             _ => Err(UnknownOption),
         }
@@ -291,6 +303,7 @@ pub struct Options<'a> {
     inferred_tolerance_default: HashMap<Sourced<CurrencyOrAny<'a>>, Decimal>,
     inferred_tolerance_multiplier: OptionallySourced<Decimal>,
     infer_tolerance_from_cost: OptionallySourced<bool>,
+    documents: HashSet<Sourced<PathBuf>>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -313,6 +326,7 @@ impl<'a> Options<'a> {
             inferred_tolerance_default: HashMap::new(),
             inferred_tolerance_multiplier: unsourced(dec!(0.5)),
             infer_tolerance_from_cost: unsourced(false),
+            documents: HashSet::new(),
             parser_options,
         }
     }
@@ -370,6 +384,8 @@ impl<'a> Options<'a> {
             InferToleranceFromCost(value) => {
                 Self::update(&mut self.infer_tolerance_from_cost, value, source)
             }
+
+            Documents(path) => Self::update_hashset(&mut self.documents, path, source),
 
             // this value contains nothing
             Assimilated => Ok(()),
@@ -433,6 +449,28 @@ impl<'a> Options<'a> {
                 Ok(())
             }
             Occupied(entry) => Err(DuplicateValue(entry.key().source.value)),
+        }
+    }
+
+    fn update_hashset<K>(
+        field: &mut HashSet<Sourced<K>>,
+        key: K,
+        source: Source,
+    ) -> Result<(), OptionError>
+    where
+        K: Eq + Hash,
+    {
+        use OptionError::*;
+
+        let key = sourced(key, source);
+
+        match field.get(&key) {
+            None => {
+                field.insert(key);
+
+                Ok(())
+            }
+            Some(entry) => Err(DuplicateValue(entry.source.value)),
         }
     }
 

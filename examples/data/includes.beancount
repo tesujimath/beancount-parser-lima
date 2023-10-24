@@ -1,5 +1,7 @@
 ; an example Beancount file
 
+option "documents" "doc"
+
 1970-01-01 commodity NZD
 ;   ; New Zealand Dollar
 
