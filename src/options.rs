@@ -35,6 +35,7 @@ pub enum BeancountOptionVariant<'a> {
     InferredToleranceMultiplier(Decimal),
     InferToleranceFromCost(bool),
     Documents(PathBuf),
+    OperatingCurrency(Currency<'a>),
     Assimilated,
 }
 
@@ -130,6 +131,8 @@ impl<'a> BeancountOption<'a> {
                     parent.join(value.item).clean()
                 }))
             .map(Documents),
+
+            "operating_currency" => parse_currency(value.item).map(OperatingCurrency),
 
             _ => Err(UnknownOption),
         }
@@ -304,6 +307,7 @@ pub struct Options<'a> {
     inferred_tolerance_multiplier: OptionallySourced<Decimal>,
     infer_tolerance_from_cost: OptionallySourced<bool>,
     documents: HashSet<Sourced<PathBuf>>,
+    operating_currency: HashSet<Sourced<Currency<'a>>>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -327,6 +331,7 @@ impl<'a> Options<'a> {
             inferred_tolerance_multiplier: unsourced(dec!(0.5)),
             infer_tolerance_from_cost: unsourced(false),
             documents: HashSet::new(),
+            operating_currency: HashSet::new(),
             parser_options,
         }
     }
@@ -386,6 +391,10 @@ impl<'a> Options<'a> {
             }
 
             Documents(path) => Self::update_hashset(&mut self.documents, path, source),
+
+            OperatingCurrency(value) => {
+                Self::update_hashset(&mut self.operating_currency, value, source)
+            }
 
             // this value contains nothing
             Assimilated => Ok(()),
