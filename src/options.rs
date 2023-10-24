@@ -3,11 +3,11 @@ use super::types::*;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::collections::hash_map;
 use std::{
-    collections::HashMap,
+    collections::{hash_map, HashMap},
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
+    str::{FromStr, ParseBoolError},
 };
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -30,6 +30,7 @@ pub enum BeancountOptionVariant<'a> {
     ConversionCurrency(Currency<'a>),
     InferredToleranceDefault(CurrencyOrAny<'a>, Decimal),
     InferredToleranceMultiplier(Decimal),
+    InferToleranceFromCost(bool),
     Assimilated,
 }
 
@@ -114,6 +115,10 @@ impl<'a> BeancountOption<'a> {
                 .map(InferredToleranceMultiplier)
                 .map_err(|e| BadValueErrorKind::Decimal(e).wrap()),
 
+            "infer_tolerance_from_cost" => bool::from_str(value.item)
+                .map(InferToleranceFromCost)
+                .map_err(|e| BadValueErrorKind::Bool(e).wrap()),
+
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
@@ -196,10 +201,9 @@ enum BadValueErrorKind {
     AccountName(AccountNameError),
     Currency(CurrencyError),
     Decimal(rust_decimal::Error),
+    Bool(ParseBoolError),
     MissingColon,
     TooManyColons,
-    // TODO remove this:
-    IncorrectFormat(String),
 }
 
 impl Display for BadValueErrorKind {
@@ -212,9 +216,9 @@ impl Display for BadValueErrorKind {
             AccountName(e) => write!(f, "{}", e),
             Currency(e) => write!(f, "{}", e),
             Decimal(e) => write!(f, "{}", e),
+            Bool(e) => write!(f, "{}", e),
             MissingColon => f.write_str("missing colon"),
             TooManyColons => f.write_str("too many colons"),
-            IncorrectFormat(s) => write!(f, "{}", s),
         }
     }
 }
@@ -286,6 +290,7 @@ pub struct Options<'a> {
     conversion_currency: OptionallySourced<Currency<'a>>,
     inferred_tolerance_default: HashMap<Sourced<CurrencyOrAny<'a>>, Decimal>,
     inferred_tolerance_multiplier: OptionallySourced<Decimal>,
+    infer_tolerance_from_cost: OptionallySourced<bool>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -307,6 +312,7 @@ impl<'a> Options<'a> {
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
             inferred_tolerance_default: HashMap::new(),
             inferred_tolerance_multiplier: unsourced(dec!(0.5)),
+            infer_tolerance_from_cost: unsourced(false),
             parser_options,
         }
     }
@@ -359,6 +365,10 @@ impl<'a> Options<'a> {
 
             InferredToleranceMultiplier(value) => {
                 Self::update(&mut self.inferred_tolerance_multiplier, value, source)
+            }
+
+            InferToleranceFromCost(value) => {
+                Self::update(&mut self.infer_tolerance_from_cost, value, source)
             }
 
             // this value contains nothing
