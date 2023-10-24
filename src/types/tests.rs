@@ -1,12 +1,13 @@
 #![cfg(test)]
 use super::*;
 use proptest::prelude::*;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
 };
 use test_case::test_case;
-use {rust_decimal::Decimal, rust_decimal_macros::dec};
 
 prop_compose! {
     fn arb_source_id(max: u32)(id in 0..max) -> SourceId {

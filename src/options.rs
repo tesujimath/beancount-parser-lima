@@ -2,6 +2,7 @@ use super::format::{format, plain};
 use super::types::*;
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use std::collections::hash_map;
 use std::{
     collections::HashMap,
@@ -28,6 +29,7 @@ pub enum BeancountOptionVariant<'a> {
     AccountRounding(Subaccount<'a>),
     ConversionCurrency(Currency<'a>),
     InferredToleranceDefault(CurrencyOrAny<'a>, Decimal),
+    InferredToleranceMultiplier(Decimal),
     Assimilated,
 }
 
@@ -107,6 +109,10 @@ impl<'a> BeancountOption<'a> {
                     InferredToleranceDefault(currency_or_any, tolerance)
                 })
             }
+
+            "inferred_tolerance_multiplier" => Decimal::try_from(value.item)
+                .map(InferredToleranceMultiplier)
+                .map_err(|e| BadValueErrorKind::Decimal(e).wrap()),
 
             _ => Err(UnknownOption),
         }
@@ -279,6 +285,7 @@ pub struct Options<'a> {
     account_rounding: Option<Sourced<Subaccount<'a>>>,
     conversion_currency: OptionallySourced<Currency<'a>>,
     inferred_tolerance_default: HashMap<Sourced<CurrencyOrAny<'a>>, Decimal>,
+    inferred_tolerance_multiplier: OptionallySourced<Decimal>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -299,6 +306,7 @@ impl<'a> Options<'a> {
             account_rounding: None,
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
             inferred_tolerance_default: HashMap::new(),
+            inferred_tolerance_multiplier: unsourced(dec!(0.5)),
             parser_options,
         }
     }
@@ -348,6 +356,10 @@ impl<'a> Options<'a> {
                 tolerance,
                 source,
             ),
+
+            InferredToleranceMultiplier(value) => {
+                Self::update(&mut self.inferred_tolerance_multiplier, value, source)
+            }
 
             // this value contains nothing
             Assimilated => Ok(()),

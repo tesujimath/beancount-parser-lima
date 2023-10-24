@@ -22,6 +22,7 @@ nonempty = "0.8.1"
 path-clean = "1.0.1"
 proptest = "1.2.0"
 rust_decimal = "1.29.1"
+rust_decimal_macros = "1.29.1"
 stats_alloc = "0.1.10"
 string-interner = "0.14.0"
 strum = "0.25.0"
@@ -31,4 +32,3 @@ xflags = "0.3.1"
 
 [dev-dependencies]
 test-case = "3.1.0"
-rust_decimal_macros = "1.29.1"
