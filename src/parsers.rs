@@ -137,8 +137,9 @@ where
             });
 
             if let Ok(opt) = opt {
-                let parser_options: &mut ParserOptions = e.state();
-                parser_options
+                let parser_state: &mut ParserState = e.state();
+                parser_state
+                    .options
                     .assimilate(opt)
                     .map_err(|e| Rich::custom(value.span, e.to_string()))
             } else {
@@ -385,8 +386,8 @@ where
 
     account.try_map_with(|candidate, e| {
         let span = e.span();
-        let parser_options: &ParserOptions = e.state();
-        let account_type_names = &parser_options.account_type_names;
+        let parser_state: &ParserState = e.state();
+        let account_type_names = &parser_state.options.account_type_names;
         account_type_names
             .get(&candidate.account_type_name)
             .map(|account_type| Account {
@@ -1156,21 +1157,27 @@ impl<'a> From<ParserError<'a>> for Error {
     fn from(error: ParserError) -> Self {
         let error = error.map_token(|tok| tok.to_string());
 
-        Error {
-            span: *error.span(),
-            message: error.to_string(),
-            reason: error.reason().to_string(),
-            contexts: error
+        Error::with_contexts(
+            error.to_string(),
+            error.reason().to_string(),
+            *error.span(),
+            error
                 .contexts()
                 .map(|(label, span)| (label.to_string(), *span))
                 .collect(),
-            related: Vec::new(),
-        }
+        )
     }
 }
 
+// the state we thread through the parsers
+#[derive(Default, Debug)]
+pub(crate) struct ParserState<'a> {
+    pub(crate) options: ParserOptions<'a>,
+    pub(crate) warnings: Vec<Warning>,
+}
+
 // our ParserExtra with our error and state types
-pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, ParserOptions<'a>, ()>;
+pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, ParserState<'a>, ()>;
 
 /// `Emit` trait enables use of own functions which emit errors
 pub(crate) trait Emit<E> {

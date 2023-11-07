@@ -2,12 +2,11 @@
 #![allow(dead_code)]
 #![recursion_limit = "256"]
 
-use ariadne::{Color, Label, Report, ReportKind};
+use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
-use options::ParserOptions;
-use parsers::{file, includes};
+use parsers::{file, includes, ParserState};
 use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
 use std::{
@@ -87,22 +86,29 @@ impl BeancountSources {
         }
     }
 
-    pub fn write_errors<W>(&self, w: W, errors: Vec<Error>) -> io::Result<()>
+    pub fn write<W, K>(&self, w: W, errors_or_warnings: Vec<ErrorOrWarning<K>>) -> io::Result<()>
     where
         W: Write + Copy,
+        K: ErrorOrWarningKind,
     {
-        for error in errors.into_iter() {
+        for error_or_warning in errors_or_warnings.into_iter() {
             use chumsky::span::Span;
 
-            let src_id = self.source_id_string(&error.span);
-            Report::build(ReportKind::Error, src_id.to_string(), error.span.start)
-                .with_message(error.message)
+            let src_id = self.source_id_string(&error_or_warning.span);
+            let color = error_or_warning.color();
+            let report_kind = error_or_warning.report_kind();
+
+            Report::build(report_kind, src_id.to_string(), error_or_warning.span.start)
+                .with_message(error_or_warning.message)
                 .with_labels(Some(
-                    Label::new((src_id.to_string(), error.span.start()..error.span.end()))
-                        .with_message(error.reason)
-                        .with_color(Color::Red),
+                    Label::new((
+                        src_id.to_string(),
+                        error_or_warning.span.start()..error_or_warning.span.end(),
+                    ))
+                    .with_message(error_or_warning.reason)
+                    .with_color(color),
                 ))
-                .with_labels(error.contexts.into_iter().map(|(label, span)| {
+                .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
                     Label::new((
                         self.source_id_string(&span).to_string(),
                         span.start()..span.end(),
@@ -110,13 +116,13 @@ impl BeancountSources {
                     .with_message(lazy_format!("in this {}", label))
                     .with_color(Color::Yellow)
                 }))
-                .with_labels(error.related.into_iter().map(|(label, span)| {
+                .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
                     Label::new((
                         self.source_id_string(&span).to_string(),
                         span.start()..span.end(),
                     ))
                     .with_message(lazy_format!("{}", label))
-                    .with_color(Color::Cyan)
+                    .with_color(Color::Yellow)
                 }))
                 .finish()
                 .write(ariadne::sources(self.sources()), w)?;
@@ -214,6 +220,17 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
     chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
 >;
 
+/// result of parsing
+pub type ParseResult<'t> = (Vec<Spanned<Directive<'t>>>, Options<'t>, Vec<Warning>);
+
+// result of parse_declarations
+type ParseDeclarationsResult<'t> = (
+    Vec<Vec<Spanned<Declaration<'t>>>>,
+    Options<'t>,
+    Vec<Error>,
+    Vec<Warning>,
+);
+
 impl<'s, 't> BeancountParser<'s, 't>
 where
     's: 't,
@@ -231,12 +248,12 @@ where
         }
     }
 
-    /// Parse the sources, returning date-sorted directives and options, or errors.
-    pub fn parse(&'t self) -> Result<(Vec<Spanned<Directive<'t>>>, Options<'t>), Vec<Error>>
+    /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
+    pub fn parse(&'t self) -> Result<ParseResult<'t>, (Vec<Error>, Vec<Warning>)>
     where
         's: 't,
     {
-        let (all_declarations, options, mut errors) = self.parse_declarations();
+        let (all_declarations, options, mut errors, warnings) = self.parse_declarations();
         let mut p = PragmaProcessor::new(all_declarations, options);
 
         let sorted_directives = p
@@ -247,21 +264,21 @@ where
         errors.append(&mut pragma_errors);
 
         if errors.is_empty() {
-            Ok((sorted_directives, options))
+            Ok((sorted_directives, options, warnings))
         } else {
-            Err(errors)
+            Err((errors, warnings))
         }
     }
 
     /// Parse the sources, returning declarations and any errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> (Vec<Vec<Spanned<Declaration<'t>>>>, Options<'t>, Vec<Error>)
+    fn parse_declarations(&'t self) -> ParseDeclarationsResult<'t>
     where
         's: 't,
     {
         let mut all_outputs = Vec::new();
         let mut all_errors = Vec::new();
-        let mut parser_options = ParserOptions::default();
+        let mut parser_state = ParserState::default();
 
         for (source_id, source_path, content) in self.sources.content_iter() {
             let i_source: usize = source_id.into();
@@ -273,17 +290,20 @@ where
                 .with_context(source_id);
 
             let (output, errors) = file(source_path)
-                .parse_with_state(spanned_tokens, &mut parser_options)
+                .parse_with_state(spanned_tokens, &mut parser_state)
                 .into_output_errors();
 
             all_outputs.push(output.unwrap_or(Vec::new()));
             all_errors.extend(errors);
         }
 
+        let ParserState { options, warnings } = parser_state;
+
         (
             all_outputs,
-            Options::new(parser_options),
+            Options::new(options),
             all_errors.into_iter().map(Error::from).collect(),
+            warnings,
         )
     }
 }

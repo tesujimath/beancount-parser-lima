@@ -5,6 +5,7 @@ use chumsky::{
 };
 use nonempty::NonEmpty;
 use rust_decimal::Decimal;
+use std::marker::PhantomData;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -17,27 +18,76 @@ use std::{
 use strum_macros::{Display, EnumIter, EnumString};
 use time::Date;
 
-/// Our public error type
+/// Our public error or warning type
 #[derive(Debug)]
-pub struct Error {
+pub struct ErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
     pub(crate) message: String,
     pub(crate) reason: String,
     pub(crate) span: Span,
     pub(crate) contexts: Vec<(String, Span)>,
     pub(crate) related: Vec<(String, Span)>,
+    kind: PhantomData<K>,
 }
 
+#[derive(Debug)]
+pub struct ErrorKind();
+
+pub type Error = ErrorOrWarning<ErrorKind>;
+
+#[derive(Debug)]
+pub struct WarningKind();
+
+pub type Warning = ErrorOrWarning<WarningKind>;
+
 impl Error {
-    pub fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
-        Error {
+    pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
+        ErrorOrWarning {
             message: message.into(),
             reason: reason.into(),
             span,
             contexts: Vec::new(),
             related: Vec::new(),
+            kind: PhantomData,
         }
     }
 
+    pub(crate) fn with_contexts<M: Into<String>, R: Into<String>>(
+        message: M,
+        reason: R,
+        span: Span,
+        contexts: Vec<(String, Span)>,
+    ) -> Self {
+        ErrorOrWarning {
+            message: message.into(),
+            reason: reason.into(),
+            span,
+            contexts,
+            related: Vec::new(),
+            kind: PhantomData,
+        }
+    }
+}
+
+impl Warning {
+    pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
+        ErrorOrWarning {
+            message: message.into(),
+            reason: reason.into(),
+            span,
+            contexts: Vec::new(),
+            related: Vec::new(),
+            kind: PhantomData,
+        }
+    }
+}
+
+impl<K> ErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
     pub fn related_to<'a, T>(self, element: &'a Spanned<T>) -> Self
     where
         T: ElementType + 'a,
@@ -79,6 +129,14 @@ impl Error {
             .push((element.element_type().to_string(), element.span));
         e
     }
+
+    pub(crate) fn color(&self) -> ariadne::Color {
+        K::color()
+    }
+
+    pub(crate) fn report_kind(&self) -> ariadne::ReportKind<'static> {
+        K::report_kind()
+    }
 }
 
 impl Display for Error {
@@ -101,6 +159,32 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+pub trait ErrorOrWarningKind {
+    fn report_kind() -> ariadne::ReportKind<'static>;
+
+    fn color() -> ariadne::Color;
+}
+
+impl ErrorOrWarningKind for ErrorKind {
+    fn report_kind() -> ariadne::ReportKind<'static> {
+        ariadne::ReportKind::Error
+    }
+
+    fn color() -> ariadne::Color {
+        ariadne::Color::Red
+    }
+}
+
+impl ErrorOrWarningKind for WarningKind {
+    fn report_kind() -> ariadne::ReportKind<'static> {
+        ariadne::ReportKind::Warning
+    }
+
+    fn color() -> ariadne::Color {
+        ariadne::Color::Yellow
+    }
+}
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, Display, Debug)]
 pub enum AccountType {
@@ -300,6 +384,14 @@ where
     pub fn error<S: Into<String>>(&self, reason: S) -> Error {
         Error::new(
             format!("invalid {}", self.element_type()),
+            reason,
+            self.span,
+        )
+    }
+
+    pub fn warning<S: Into<String>>(&self, reason: S) -> Warning {
+        Warning::new(
+            format!("questionable {}", self.element_type()),
             reason,
             self.span,
         )

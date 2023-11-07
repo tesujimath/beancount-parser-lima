@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok((directives, _options)) => {
+        Ok((directives, _options, mut warnings)) => {
             let mut accounts = HashMap::new();
             let mut errors = Vec::new();
 
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
                                 opened,
                                 closed: None,
                             }) => {
-                                errors.push(d.error("duplicate open").related_to(opened));
+                                warnings.push(d.warning("duplicate open").related_to(opened));
                             }
                             Some(AccountStatus {
                                 closed: Some(closed),
@@ -87,14 +87,19 @@ fn main() -> Result<()> {
                 }
             }
 
+            sources.write(error_w, warnings).unwrap();
+
             if errors.is_empty() {
                 Ok(())
             } else {
-                sources.write_errors(error_w, errors).map_err(|e| e.into())
+                sources.write(error_w, errors).map_err(|e| e.into())
             }
         }
 
-        Err(errors) => sources.write_errors(error_w, errors).map_err(|e| e.into()),
+        Err((errors, warnings)) => {
+            sources.write(error_w, errors)?;
+            sources.write(error_w, warnings).map_err(|e| e.into())
+        }
     }
 }
 

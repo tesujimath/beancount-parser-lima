@@ -25,7 +25,7 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok((directives, options)) => {
+        Ok((directives, options, warnings)) => {
             println!("options are {:?}", &options);
 
             for d in directives {
@@ -61,9 +61,14 @@ fn main() -> Result<()> {
                 println!();
             }
 
+            sources.write(error_w, warnings)?;
+
             Ok(())
         }
-        Err(errors) => sources.write_errors(error_w, errors).map_err(|e| e.into()),
+        Err((errors, warnings)) => {
+            sources.write(error_w, errors)?;
+            sources.write(error_w, warnings).map_err(|e| e.into())
+        }
     }
 }
 
