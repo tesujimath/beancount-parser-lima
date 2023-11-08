@@ -6,6 +6,7 @@ use crate::{
 };
 use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
 use either::Either;
+use rust_decimal::Decimal;
 use std::{
     collections::{hash_map, HashMap, HashSet},
     ops::Deref,
@@ -18,9 +19,7 @@ pub(crate) fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, Extra<'sr
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    (just(Token::Include).ignore_then(string).map(Some))
+    (just(Token::Include).ignore_then(string()).map(Some))
         .or(any_ref().map(|_| None))
         .repeated()
         .collect::<Vec<_>>()
@@ -90,25 +89,21 @@ where
 {
     use Pragma::*;
 
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let key = select_ref!(Token::Key(key) => key);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     choice((
         just(Token::Pushtag)
-            .ignore_then(tag)
+            .ignore_then(tag())
             .map_with(|tag, e| Pushtag(spanned(tag, e.span()))),
         just(Token::Poptag)
-            .ignore_then(tag)
+            .ignore_then(tag())
             .map_with(|tag, e| Poptag(spanned(tag, e.span()))),
         just(Token::Pushmeta)
             .ignore_then(meta_key_value())
             .map(Pushmeta),
         just(Token::Popmeta)
-            .ignore_then(key)
+            .ignore_then(key())
             .then_ignore(just(Token::Colon))
             .map_with(|key, e| Popmeta(spanned(key, e.span()))),
-        just(Token::Include).ignore_then(string).map(Include),
+        just(Token::Include).ignore_then(string()).map(Include),
         option(source_path).map(Pragma::Option),
     ))
     .then_ignore(just(Token::Eol))
@@ -123,11 +118,9 @@ pub(crate) fn option<'src, I>(
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     just(Token::Option)
-        .ignore_then(string.map_with(|name, e| spanned(name, e.span())))
-        .then(string.map_with(|value, e| spanned(value, e.span())))
+        .ignore_then(string().map_with(|name, e| spanned(name, e.span())))
+        .then(string().map_with(|value, e| spanned(value, e.span())))
         .try_map_with(|(name, value), e| {
             use BeancountOptionError::*;
 
@@ -215,16 +208,13 @@ fn transaction_header_line<'src, I>() -> impl Parser<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         txn().map_with(spanned_extra),
         // payee and narration get special handling in case one is omitted
         group((
-            string.map_with(spanned_extra).or_not(),
-            string.map_with(spanned_extra).or_not(),
+            string().map_with(spanned_extra).or_not(),
+            string().map_with(spanned_extra).or_not(),
         ))
         .map(|(s1, s2)| match (s1, s2) {
             // a single string is narration
@@ -241,13 +231,10 @@ pub(crate) fn price<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'s
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Price),
-        currency.map_with(spanned_extra),
+        currency().map_with(spanned_extra),
         amount().map_with(spanned_extra),
         tags_links(),
     ))
@@ -273,10 +260,8 @@ pub(crate) fn balance<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Balance),
         account().map_with(spanned_extra),
         amount_with_tolerance().map_with(spanned_extra),
@@ -341,14 +326,11 @@ fn open_header_line<'src, I>() -> impl Parser<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Open),
         account().map_with(spanned_extra),
-        currency
+        currency()
             .map_with(spanned_extra)
             .repeated()
             .collect::<Vec<_>>()
@@ -409,9 +391,7 @@ fn booking<'src, I>() -> impl Parser<'src, I, Booking, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
-    string.try_map(|s, span| Booking::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
+    string().try_map(|s, span| Booking::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
 }
 
 /// Matches a close, including metadata, over several lines.
@@ -419,10 +399,8 @@ pub(crate) fn close<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'s
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Close),
         account().map_with(spanned_extra),
         tags_links(),
@@ -448,13 +426,10 @@ pub(crate) fn commodity<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extr
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Commodity),
-        currency.map_with(spanned_extra),
+        currency().map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -478,10 +453,8 @@ pub(crate) fn pad<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Pad),
         account().map_with(spanned_extra),
         account().map_with(spanned_extra),
@@ -508,14 +481,11 @@ pub(crate) fn document<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Document),
         account().map_with(spanned_extra),
-        string.map_with(spanned_extra),
+        string().map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -539,14 +509,11 @@ pub(crate) fn note<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'sr
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Note),
         account().map_with(spanned_extra),
-        string.map_with(spanned_extra),
+        string().map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -570,14 +537,11 @@ pub(crate) fn event<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'s
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let date = select_ref!(Token::Date(date) => *date);
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-
     group((
-        date.map_with(spanned_extra),
+        date().map_with(spanned_extra),
         just(Token::Event),
-        string.map_with(spanned_extra),
-        string.map_with(spanned_extra),
+        string().map_with(spanned_extra),
+        string().map_with(spanned_extra),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
@@ -626,15 +590,13 @@ fn posting<'src, I>() -> impl Parser<'src, I, Posting<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     just(Token::Indent)
         .ignore_then(
             group((
                 flag().map_with(spanned_extra).or_not(),
                 account().map_with(spanned_extra),
                 expr_value().map_with(spanned_extra).or_not(),
-                currency.map_with(spanned_extra).or_not(),
+                currency().map_with(spanned_extra).or_not(),
                 cost_spec().map_with(spanned_extra).or_not(),
                 price_annotation().map_with(spanned_extra).or_not(),
             ))
@@ -726,9 +688,8 @@ fn meta_key_value<'src, I>() -> impl Parser<'src, I, MetaKeyValue<'src>, Extra<'
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let key = select_ref!(Token::Key(key) => key);
-
-    key.map_with(spanned_extra)
+    key()
+        .map_with(spanned_extra)
         .then(just(Token::Colon).ignore_then(meta_value().map_with(spanned_extra)))
         .map(|(key, value)| MetaKeyValue { key, value })
 }
@@ -740,15 +701,12 @@ where
 {
     use Metadatum::*;
 
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-
     just(Token::Indent)
         .ignore_then(
             choice((
                 meta_key_value().map_with(spanned_extra).map(KeyValue),
-                tag.map_with(spanned_extra).map(Tag),
-                link.map_with(spanned_extra).map(Link),
+                tag().map_with(spanned_extra).map(Tag),
+                link().map_with(spanned_extra).map(Link),
             ))
             .then_ignore(just(Token::Eol)),
         )
@@ -775,19 +733,13 @@ where
 {
     use SimpleValue::*;
 
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-    let currency = select_ref!(Token::Currency(cur) => cur);
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-    let date = select_ref!(Token::Date(date) => *date);
-
     choice((
-        string.map(String),
-        currency.map(Currency),
+        string().map(String),
+        currency().map(Currency),
         account().map(Account),
-        tag.map(Tag),
-        link.map(Link),
-        date.map(Date),
+        tag().map(Tag),
+        link().map(Link),
+        date().map(Date),
         bool().map(Bool),
         just(Token::Null).to(None),
         expr_value().map(Expr),
@@ -798,11 +750,9 @@ pub(crate) fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, Extra<'src
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     group((
         expr_value().map_with(spanned_extra),
-        currency.map_with(spanned_extra),
+        currency().map_with(spanned_extra),
     ))
     .map(Amount::new)
 }
@@ -812,12 +762,10 @@ pub(crate) fn amount_with_tolerance<'src, I>(
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let number = select_ref! {Token::Number(x) => *x };
-
     group((
         amount().map_with(spanned_extra),
         just(Token::Tilde)
-            .ignore_then(number.map_with(spanned_extra))
+            .ignore_then(decimal().map_with(spanned_extra))
             .or_not(),
     ))
     .map(AmountWithTolerance::new)
@@ -827,11 +775,9 @@ pub(crate) fn loose_amount<'src, I>() -> impl Parser<'src, I, LooseAmount<'src>,
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     group((
         expr_value().map_with(spanned_extra).or_not(),
-        currency.map_with(spanned_extra).or_not(),
+        currency().map_with(spanned_extra).or_not(),
     ))
     .map(LooseAmount::new)
 }
@@ -842,12 +788,10 @@ where
 {
     use ScopedAmount::*;
 
-    let currency = select_ref!(Token::Currency(cur) => cur);
-
     choice((
-        (compound_expr().then(currency)).map(|(amount, cur)| CurrencyAmount(amount, cur)),
+        (compound_expr().then(currency())).map(|(amount, cur)| CurrencyAmount(amount, cur)),
         compound_expr().map(BareAmount),
-        currency.map(BareCurrency),
+        currency().map(BareCurrency),
     ))
 }
 
@@ -870,7 +814,6 @@ where
 {
     use ScopedAmount::*;
 
-    let currency = select_ref!(Token::Currency(cur) => cur);
     fn scope(amount: ExprValue, is_total: bool) -> ScopedExprValue {
         use ScopedExprValue::*;
 
@@ -884,7 +827,7 @@ where
     group((
         choice((just(Token::At).to(false), just(Token::AtAt).to(true))),
         expr_value().or_not(),
-        currency.or_not(),
+        currency().or_not(),
     ))
     .try_map(|(is_total, amount, cur), span| match (amount, cur) {
         (Some(amount), Some(cur)) => Ok(CurrencyAmount(scope(amount, is_total), cur)),
@@ -953,13 +896,10 @@ where
 {
     use CostComp::*;
 
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
-    let date = select_ref!(Token::Date(date) => *date);
-
     choice((
         compound_amount().map(ScopedAmount),
-        date.map(Date),
-        string.map(Label),
+        date().map(Date),
+        string().map(Label),
         just(Token::Asterisk).to(Merge),
     ))
 }
@@ -978,12 +918,9 @@ pub(crate) fn tags_links<'src, I>() -> impl Parser<
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let tag = select_ref!(Token::Tag(tag) => tag);
-    let link = select_ref!(Token::Link(link) => link);
-
     choice((
-        tag.map_with(spanned_extra).map(Either::Left),
-        link.map_with(spanned_extra).map(Either::Right),
+        tag().map_with(spanned_extra).map(Either::Left),
+        link().map_with(spanned_extra).map(Either::Right),
     ))
     .repeated()
     .collect::<Vec<_>>()
@@ -1080,6 +1017,90 @@ where
             .repeated(),
             |lhs, (op, rhs)| op(Box::new(lhs), Box::new(rhs)),
         )
+    })
+}
+
+/// Matches a Tag
+fn tag<'src, I>() -> impl Parser<'src, I, &'src Tag<'src>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Tag(tag) => tag)
+}
+
+/// Matches a Link
+fn link<'src, I>() -> impl Parser<'src, I, &'src Link<'src>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Link(link) => link)
+}
+
+/// Matches a Key
+fn key<'src, I>() -> impl Parser<'src, I, &'src Key<'src>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Key(key) => key)
+}
+
+/// Matches a Currency
+fn currency<'src, I>() -> impl Parser<'src, I, &'src Currency<'src>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Currency(currency) => currency)
+}
+
+/// Matches a Date
+fn date<'src, I>() -> impl Parser<'src, I, Date, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Date(date) => *date)
+}
+
+/// Matches a Decimal
+fn decimal<'src, I>() -> impl Parser<'src, I, Decimal, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    select_ref!(Token::Number(x) => *x)
+}
+
+/// Matches a string
+fn string<'src, I>() -> impl Parser<'src, I, &'src str, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+
+    string.map_with(|s, e| {
+        let span = e.span();
+        let parser_state: &mut ParserState = e.state();
+        let ParserState { warnings, options } = parser_state;
+        let line_count = s.chars().filter(|c| *c == '\n').count() + 1;
+        if line_count > options.long_string_maxlines.item {
+            let option_span = options.long_string_maxlines.source.map(|s| s.value);
+            let is_default = option_span.is_none();
+            let warning = Warning::new(
+                "string too long",
+                format!(
+                    "exceeds long_string_maxlines({}{}) - hint: would require option \"long_string_maxlines\" \"{}\"",
+                    if is_default { "default " } else { "" },
+                    options.long_string_maxlines.item,
+                    line_count
+                ),
+                span,
+            );
+
+            if let Some(option_span) = option_span {
+                warnings.push(warning.related_to_named_span("max allowed", option_span));
+            } else {
+                warnings.push(warning)
+            }
+        }
+        s
     })
 }
 

@@ -36,6 +36,7 @@ pub enum BeancountOptionVariant<'a> {
     Documents(PathBuf),
     OperatingCurrency(Currency<'a>),
     RenderCommas(bool),
+    LongStringMaxlines(usize),
     Assimilated,
 }
 
@@ -134,6 +135,12 @@ impl<'a> BeancountOption<'a> {
 
             "render_commas" => parse_bool(value.item).map(RenderCommas),
 
+            "long_string_maxlines" => value
+                .item
+                .parse::<usize>()
+                .map(LongStringMaxlines)
+                .map_err(|e| BadValueErrorKind::ParseIntError(e).wrap()),
+
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
@@ -230,6 +237,7 @@ enum BadValueErrorKind {
     Bool,
     MissingColon,
     TooManyColons,
+    ParseIntError(std::num::ParseIntError),
 }
 
 impl Display for BadValueErrorKind {
@@ -245,6 +253,7 @@ impl Display for BadValueErrorKind {
             Bool => f.write_str("must be true or false or case-insensitive equivalent"),
             MissingColon => f.write_str("missing colon"),
             TooManyColons => f.write_str("too many colons"),
+            ParseIntError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -255,10 +264,20 @@ impl BadValueErrorKind {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 /// ParserOptions are only those which affect the core parsing.
 pub(crate) struct ParserOptions<'a> {
     pub(crate) account_type_names: AccountTypeNames<'a>,
+    pub(crate) long_string_maxlines: OptionallySourced<usize>,
+}
+
+impl<'a> Default for ParserOptions<'a> {
+    fn default() -> Self {
+        ParserOptions {
+            account_type_names: AccountTypeNames::default(),
+            long_string_maxlines: unsourced(64),
+        }
+    }
 }
 
 impl<'a> ParserOptions<'a> {
@@ -268,23 +287,23 @@ impl<'a> ParserOptions<'a> {
     ) -> Result<BeancountOption<'a>, ParserOptionsError> {
         use BeancountOptionVariant::*;
 
-        // let mut variant = Assimilated;
-        // swap(&mut opt.variant, &mut variant);
+        let BeancountOption { source, variant } = opt;
 
-        match opt {
-            BeancountOption {
-                source,
-                variant: AccountTypeName(account_type, account_type_name),
-            } => self
+        match variant {
+            AccountTypeName(account_type, account_type_name) => self
                 .account_type_names
                 .update(account_type, account_type_name)
                 .map_err(ParserOptionsError)
-                .map(|_| BeancountOption {
-                    source,
-                    variant: Assimilated,
-                }),
-            _ => Ok(opt),
+                .map(|_| Assimilated),
+
+            LongStringMaxlines(n) => {
+                self.long_string_maxlines = optionally_sourced(n, source);
+                Ok(Assimilated)
+            }
+
+            _ => Ok(variant),
         }
+        .map(|variant| BeancountOption { source, variant })
     }
 
     pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
@@ -357,7 +376,7 @@ impl<'a> Options<'a> {
         match variant {
             Title(value) => Self::update(&mut self.title, value, source),
 
-            // this one was already assimilated into ParserOptions
+            // already assimilated into ParserOptions
             AccountTypeName(_, _) => Ok(()),
 
             AccountPreviousBalances(value) => {
@@ -410,6 +429,9 @@ impl<'a> Options<'a> {
             }
 
             RenderCommas(value) => Self::update(&mut self.render_commas, value, source),
+
+            // already assimilated into ParserOptions
+            LongStringMaxlines(_) => Ok(()),
 
             // this value contains nothing
             Assimilated => Ok(()),
@@ -538,9 +560,9 @@ fn sourced<T>(item: T, source: Source) -> Sourced<T> {
 }
 
 #[derive(Debug)]
-struct OptionallySourced<T> {
-    item: T,
-    source: Option<Source>,
+pub(crate) struct OptionallySourced<T> {
+    pub(crate) item: T,
+    pub(crate) source: Option<Source>,
 }
 
 fn unsourced<T>(item: T) -> OptionallySourced<T> {
@@ -555,9 +577,9 @@ fn optionally_sourced<T>(item: T, source: Source) -> OptionallySourced<T> {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-struct Source {
-    name: Span,
-    value: Span,
+pub(crate) struct Source {
+    pub(crate) name: Span,
+    pub(crate) value: Span,
 }
 
 #[derive(PartialEq, Eq, Debug)]
