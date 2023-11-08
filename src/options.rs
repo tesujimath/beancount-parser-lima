@@ -4,13 +4,13 @@ use nonempty::NonEmpty;
 use path_clean::PathClean;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{
     collections::{hash_map, HashMap},
     fmt::{self, Display, Formatter},
-    hash::{Hash, Hasher},
+    hash::Hash,
 };
+use strum::IntoEnumIterator;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct BeancountOption<'a> {
@@ -37,6 +37,7 @@ pub enum BeancountOptionVariant<'a> {
     OperatingCurrency(Currency<'a>),
     RenderCommas(bool),
     LongStringMaxlines(usize),
+    BookingMethod(Booking),
     Assimilated,
 }
 
@@ -141,6 +142,8 @@ impl<'a> BeancountOption<'a> {
                 .map(LongStringMaxlines)
                 .map_err(|e| BadValueErrorKind::ParseIntError(e).wrap()),
 
+            "booking_method" => parse_booking(value.item).map(BookingMethod),
+
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
@@ -194,6 +197,10 @@ fn parse_inferred_tolerance_default(
     }
 }
 
+fn parse_booking(value: &str) -> Result<Booking, BeancountOptionError> {
+    Booking::try_from(value).map_err(|e| BadValueErrorKind::Booking(e).wrap())
+}
+
 // case insenstive parsing
 fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
     if value.eq_ignore_ascii_case("true") {
@@ -233,6 +240,7 @@ enum BadValueErrorKind {
     AccountTypeNames(AccountTypeNamesError),
     AccountName(AccountNameError),
     Currency(CurrencyError),
+    Booking(strum::ParseError),
     Decimal(rust_decimal::Error),
     Bool,
     MissingColon,
@@ -249,6 +257,15 @@ impl Display for BadValueErrorKind {
             AccountTypeNames(e) => write!(f, "{}", e),
             AccountName(e) => write!(f, "{}", e),
             Currency(e) => write!(f, "{}", e),
+            Booking(_e) => write!(
+                f,
+                "Expected one of {}",
+                itertools::intersperse(
+                    crate::types::Booking::iter().map(|b| b.to_string()),
+                    ", ".to_string()
+                )
+                .collect::<String>()
+            ),
             Decimal(e) => write!(f, "{}", e),
             Bool => f.write_str("must be true or false or case-insensitive equivalent"),
             MissingColon => f.write_str("missing colon"),
@@ -306,8 +323,8 @@ impl<'a> ParserOptions<'a> {
         .map(|variant| BeancountOption { source, variant })
     }
 
-    pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
-        self.account_type_names.name_by_type[account_type as usize]
+    pub fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
+        &self.account_type_names.name_by_type[account_type as usize]
     }
 }
 
@@ -333,12 +350,13 @@ pub struct Options<'a> {
     account_unrealized_gains: OptionallySourced<Subaccount<'a>>,
     account_rounding: Option<Sourced<Subaccount<'a>>>,
     conversion_currency: OptionallySourced<Currency<'a>>,
-    inferred_tolerance_default: HashMap<Sourced<CurrencyOrAny<'a>>, Decimal>,
+    inferred_tolerance_default: HashMap<CurrencyOrAny<'a>, (Decimal, Source)>,
     inferred_tolerance_multiplier: OptionallySourced<Decimal>,
     infer_tolerance_from_cost: OptionallySourced<bool>,
-    documents: HashSet<Sourced<PathBuf>>,
-    operating_currency: HashSet<Sourced<Currency<'a>>>,
+    documents: HashMap<PathBuf, Source>,
+    operating_currency: HashMap<Currency<'a>, Source>,
     render_commas: OptionallySourced<bool>,
+    booking_method: OptionallySourced<Booking>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -361,9 +379,10 @@ impl<'a> Options<'a> {
             inferred_tolerance_default: HashMap::new(),
             inferred_tolerance_multiplier: unsourced(dec!(0.5)),
             infer_tolerance_from_cost: unsourced(false),
-            documents: HashSet::new(),
-            operating_currency: HashSet::new(),
+            documents: HashMap::new(),
+            operating_currency: HashMap::new(),
             render_commas: unsourced(false),
+            booking_method: unsourced(Booking::Strict),
             parser_options,
         }
     }
@@ -422,16 +441,18 @@ impl<'a> Options<'a> {
                 Self::update(&mut self.infer_tolerance_from_cost, value, source)
             }
 
-            Documents(path) => Self::update_hashset(&mut self.documents, path, source),
+            Documents(path) => Self::update_unit_hashmap(&mut self.documents, path, source),
 
             OperatingCurrency(value) => {
-                Self::update_hashset(&mut self.operating_currency, value, source)
+                Self::update_unit_hashmap(&mut self.operating_currency, value, source)
             }
 
             RenderCommas(value) => Self::update(&mut self.render_commas, value, source),
 
             // already assimilated into ParserOptions
             LongStringMaxlines(_) => Ok(()),
+
+            BookingMethod(value) => Self::update(&mut self.booking_method, value, source),
 
             // this value contains nothing
             Assimilated => Ok(()),
@@ -477,7 +498,7 @@ impl<'a> Options<'a> {
     }
 
     fn update_hashmap<K, V>(
-        field: &mut HashMap<Sourced<K>, V>,
+        field: &mut HashMap<K, (V, Source)>,
         key: K,
         value: V,
         source: Source,
@@ -488,44 +509,110 @@ impl<'a> Options<'a> {
         use hash_map::Entry::*;
         use OptionError::*;
 
-        match field.entry(sourced(key, source)) {
+        match field.entry(key) {
             Vacant(entry) => {
-                entry.insert(value);
+                entry.insert((value, source));
 
                 Ok(())
             }
-            Occupied(entry) => Err(DuplicateValue(entry.key().source.value)),
+            Occupied(entry) => Err(DuplicateValue(entry.get().1.value)),
         }
     }
 
-    fn update_hashset<K>(
-        field: &mut HashSet<Sourced<K>>,
+    // equivalent to a HashSet where the key has a source
+    fn update_unit_hashmap<K>(
+        field: &mut HashMap<K, Source>,
         key: K,
         source: Source,
     ) -> Result<(), OptionError>
     where
         K: Eq + Hash,
     {
+        use hash_map::Entry::*;
         use OptionError::*;
 
-        let key = sourced(key, source);
-
-        match field.get(&key) {
-            None => {
-                field.insert(key);
+        match field.entry(key) {
+            Vacant(entry) => {
+                entry.insert(source);
 
                 Ok(())
             }
-            Some(entry) => Err(DuplicateValue(entry.source.value)),
+            Occupied(entry) => Err(DuplicateValue(entry.get().value)),
         }
     }
 
-    // pub fn title(&self) -> &str {
-    //     self.title.value
-    // }
-
-    pub fn account_type_name(&self, account_type: AccountType) -> AccountTypeName {
+    pub fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
         self.parser_options.account_type_name(account_type)
+    }
+
+    pub fn title(&self) -> &str {
+        self.title.item
+    }
+
+    pub fn account_previous_balances(&self) -> &Subaccount {
+        &self.account_previous_balances.item
+    }
+
+    pub fn account_previous_earnings(&self) -> &Subaccount {
+        &self.account_previous_earnings.item
+    }
+
+    pub fn account_previous_conversions(&self) -> &Subaccount {
+        &self.account_previous_conversions.item
+    }
+
+    pub fn account_current_earnings(&self) -> &Subaccount {
+        &self.account_current_earnings.item
+    }
+
+    pub fn account_current_conversions(&self) -> &Subaccount {
+        &self.account_current_conversions.item
+    }
+
+    pub fn account_unrealized_gains(&self) -> &Subaccount {
+        &self.account_unrealized_gains.item
+    }
+
+    pub fn account_rounding(&self) -> Option<&Subaccount> {
+        self.account_rounding.as_ref().map(|x| &x.item)
+    }
+
+    pub fn conversion_currency(&self) -> &Currency {
+        &self.conversion_currency.item
+    }
+
+    pub fn inferred_tolerance_default(&self, currency: &Currency) -> Option<Decimal> {
+        self.inferred_tolerance_default
+            .get(&CurrencyOrAny::Currency(*currency))
+            .map(|d| d.0)
+            .or(self
+                .inferred_tolerance_default
+                .get(&CurrencyOrAny::Any)
+                .map(|d| d.0))
+    }
+
+    pub fn inferred_tolerance_multiplier(&self) -> Decimal {
+        self.inferred_tolerance_multiplier.item
+    }
+
+    pub fn infer_tolerance_from_cost(&self) -> bool {
+        self.infer_tolerance_from_cost.item
+    }
+
+    pub fn documents(&self) -> impl Iterator<Item = &PathBuf> {
+        self.documents.iter().map(|document| document.0)
+    }
+
+    pub fn operating_currency(&self) -> impl Iterator<Item = &Currency> {
+        self.operating_currency.iter().map(|document| document.0)
+    }
+
+    pub fn render_commas(&self) -> bool {
+        self.render_commas.item
+    }
+
+    pub fn booking_method(&self) -> Booking {
+        self.booking_method.item
     }
 }
 
@@ -545,15 +632,6 @@ where
 }
 
 impl<T> Eq for Sourced<T> where T: Eq {}
-
-impl<T> Hash for Sourced<T>
-where
-    T: Hash,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.item.hash(state)
-    }
-}
 
 fn sourced<T>(item: T, source: Source) -> Sourced<T> {
     Sourced { item, source }

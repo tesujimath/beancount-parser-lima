@@ -232,7 +232,7 @@ impl Display for Flag {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct FlagLetter(char);
 
 impl FlagLetter {
@@ -273,7 +273,7 @@ impl TryFrom<char> for FlagLetter {
 }
 
 /// The booking method for an account
-#[derive(EnumString, PartialEq, Eq, Default, Clone, Copy, Display, Debug)]
+#[derive(EnumString, EnumIter, PartialEq, Eq, Default, Clone, Copy, Display, Debug)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum Booking {
     #[default]
@@ -873,7 +873,7 @@ impl<'a> Display for CandidateAccount<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct AccountTypeName<'a>(&'a str);
 
 impl<'a> AccountTypeName<'a> {
@@ -966,7 +966,7 @@ impl Display for AccountTypeNameError {
 
 impl std::error::Error for AccountTypeNameError {}
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct AccountName<'a>(&'a str);
 
 impl<'a> AccountName<'a> {
@@ -1053,7 +1053,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Currency<'a>(&'a str);
 
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
@@ -1353,7 +1353,7 @@ impl<'a> Display for SimpleValue<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Tag<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
@@ -1388,7 +1388,7 @@ impl<'a> Display for Tag<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Link<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
 impl<'a> From<TagOrLinkIdentifier<'a>> for Link<'a> {
@@ -1423,7 +1423,7 @@ impl<'a> AsRef<str> for Link<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct TagOrLinkIdentifier<'a>(&'a str);
 
 /// The valid characters for tags and links besides alphanumeric.
@@ -1475,7 +1475,7 @@ impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Key<'a>(&'a str);
 
 impl<'a> Key<'a> {

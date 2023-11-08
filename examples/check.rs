@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::{collections::HashMap, io};
 
 use beancount_parser::{
-    BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, Posting, Spanned,
+    BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, ParseError, ParseResult,
+    Posting, Spanned,
 };
 
 /// This is a non-comprehensive example of reporting semantic errors in context.
@@ -27,7 +28,11 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok((directives, _options, mut warnings)) => {
+        Ok(ParseResult {
+            directives,
+            options: _,
+            mut warnings,
+        }) => {
             let mut accounts = HashMap::new();
             let mut errors = Vec::new();
 
@@ -96,7 +101,7 @@ fn main() -> Result<()> {
             }
         }
 
-        Err((errors, warnings)) => {
+        Err(ParseError { errors, warnings }) => {
             sources.write(error_w, errors)?;
             sources.write(error_w, warnings).map_err(|e| e.into())
         }

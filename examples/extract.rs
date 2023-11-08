@@ -1,19 +1,23 @@
 use anyhow::Result;
 use rust_decimal::Decimal;
+use std::borrow::Cow;
 use std::iter::{empty, Once};
 use std::path::PathBuf;
 use std::{io, iter::once};
+use strum::IntoEnumIterator;
 use time::Date;
 
 use beancount_parser::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
-    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, Posting, Price,
-    ScopedAmount, ScopedExprValue, SimpleValue, Tag, Transaction,
+    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
+    ParseResult, Posting, Price, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount, Tag,
+    Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
 /// We need to avoid leaning on the Display implementations to be sure we can extract a usable value in every case.
+/// This is why all values are mapped onto Primitive without recourse to Display.
 fn main() -> Result<()> {
     let flags = xflags::parse_or_exit! {
         /// File to parse
@@ -25,47 +29,45 @@ fn main() -> Result<()> {
     let beancount_parser = BeancountParser::new(&sources);
 
     match beancount_parser.parse() {
-        Ok((directives, options, warnings)) => {
-            println!("options are {:?}", &options);
-
-            for d in directives {
+        Ok(ParseResult {
+            directives,
+            options,
+            warnings,
+        }) => {
+            for p in extract_options(&options).chain(directives.iter().flat_map(|d| {
                 use DirectiveVariant::*;
 
-                for p in match d.variant() {
-                    Transaction(x) => transaction(x, &d),
+                match d.variant() {
+                    Transaction(x) => transaction(x, d),
 
-                    Price(x) => price(x, &d),
+                    Price(x) => price(x, d),
 
-                    Balance(x) => balance(x, &d),
+                    Balance(x) => balance(x, d),
 
-                    Open(x) => open(x, &d),
+                    Open(x) => open(x, d),
 
-                    Close(x) => close(x, &d),
+                    Close(x) => close(x, d),
 
-                    Commodity(x) => commodity(x, &d),
+                    Commodity(x) => commodity(x, d),
 
-                    Pad(x) => pad(x, &d),
+                    Pad(x) => pad(x, d),
 
-                    Document(x) => document(x, &d),
+                    Document(x) => document(x, d),
 
-                    Note(x) => note(x, &d),
+                    Note(x) => note(x, d),
 
-                    Event(x) => event(x, &d),
-                } {
-                    // if let Primitive::AccountType(t) = p {
-                    // print!("{}", options.account_type_name(t));
-                    // } else {
-                    p.write(&io::stdout(), &options)?;
-                    // }
+                    Event(x) => event(x, d),
                 }
-                println!();
+            })) {
+                p.write(&io::stdout(), &options)?;
             }
+            println!();
 
             sources.write(error_w, warnings)?;
 
             Ok(())
         }
-        Err((errors, warnings)) => {
+        Err(ParseError { errors, warnings }) => {
             sources.write(error_w, errors)?;
             sources.write(error_w, warnings).map_err(|e| e.into())
         }
@@ -73,9 +75,10 @@ fn main() -> Result<()> {
 }
 
 // we turn the whole output into a sequence of primitives
+// just to confirm that we actually can, using the crate public interface
 #[derive(Clone, Debug)]
 enum Primitive<'a> {
-    Str(&'a str, Decoration),
+    Str(Cow<'a, str>, Decoration),
     AccountType(AccountType),
     Flag(Flag),
     Decimal(Decimal),
@@ -142,6 +145,124 @@ impl<'a> Primitive<'a> {
     }
 }
 
+fn extract_options<'a>(options: &'a Options) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    Box::new(
+        option("title", string(options.title(), Decoration::None))
+            .chain(AccountType::iter().flat_map(|account_type| {
+                option(
+                    format!("name_{}", account_type.to_string().to_lowercase()),
+                    string_as_ref(options.account_type_name(account_type), Decoration::None),
+                )
+            }))
+            .chain(option(
+                "account_previous_balances",
+                subaccount(options.account_previous_balances()),
+            ))
+            .chain(option(
+                "account_previous_earnings",
+                subaccount(options.account_previous_earnings()),
+            ))
+            .chain(option(
+                "account_previous_conversions",
+                subaccount(options.account_previous_conversions()),
+            ))
+            .chain(option(
+                "account_current_earnings",
+                subaccount(options.account_current_earnings()),
+            ))
+            .chain(option(
+                "account_current_conversions",
+                subaccount(options.account_current_conversions()),
+            ))
+            .chain(option(
+                "account_unrealized_gains",
+                subaccount(options.account_unrealized_gains()),
+            ))
+            .chain(
+                options
+                    .account_rounding()
+                    .map(|account_rounding| {
+                        option("account_rounding", subaccount(account_rounding))
+                    })
+                    .unwrap_or(Box::new(empty())),
+            )
+            .chain(option(
+                "conversion_currency",
+                currency(options.conversion_currency()),
+            ))
+            .chain(
+                // some representative currencies, just to check we can pull out tolerances by currency
+                ["NZD", "GBP", "EUR", "USD"]
+                    .into_iter()
+                    .flat_map(|currency_str| {
+                        let currency = Currency::try_from(currency_str).unwrap();
+                        options
+                            .inferred_tolerance_default(&currency)
+                            .map(|tolerance| {
+                                option(
+                                    format!("inferred_tolerance_default({})", currency_str),
+                                    decimal(tolerance),
+                                )
+                            })
+                            .unwrap_or(Box::new(empty()))
+                    }),
+            )
+            .chain(option(
+                "inferred_tolerance_multiplier",
+                decimal(options.inferred_tolerance_multiplier()),
+            ))
+            .chain(option(
+                "infer_tolerance_from_cost",
+                bool(options.infer_tolerance_from_cost()),
+            ))
+            .chain(options.documents().flat_map(|documents| {
+                option(
+                    "documents",
+                    cow_string(documents.to_string_lossy(), Decoration::None),
+                )
+            }))
+            .chain(
+                options
+                    .operating_currency()
+                    .flat_map(|x| option("operating_currency", currency(x))),
+            )
+            .chain(option("render_commas", bool(options.render_commas())))
+            .chain(bare_option(
+                "booking_method",
+                booking(&options.booking_method()),
+            )),
+    )
+}
+
+fn option<'a, S>(
+    name: S,
+    value: impl Iterator<Item = Primitive<'a>> + 'a,
+) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a>
+where
+    S: std::fmt::Display,
+{
+    Box::new(
+        owned_string(format!("option \"{}\" \"", name), Decoration::None)
+            .chain(value)
+            .chain(string("\"", Decoration::None))
+            .chain(newline()),
+    )
+}
+
+fn bare_option<'a, S>(
+    name: S,
+    value: impl Iterator<Item = Primitive<'a>> + 'a,
+) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a>
+where
+    S: std::fmt::Display,
+{
+    Box::new(
+        owned_string(format!("option \"{}\" ", name), Decoration::None)
+            .chain(value)
+            .chain(newline()),
+    )
+}
+
 fn transaction<'a>(
     x: &'a Transaction,
     d: &'a Directive,
@@ -174,7 +295,10 @@ fn price<'a>(x: &'a Price, d: &'a Directive) -> Box<dyn Iterator<Item = Primitiv
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("price", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("price"),
+                Decoration::None,
+            )))
             .chain(currency(x.currency()))
             .chain(amount(x.amount()))
             .chain(tags_links_inline(m))
@@ -189,7 +313,10 @@ fn balance<'a>(x: &'a Balance, d: &'a Directive) -> Box<dyn Iterator<Item = Prim
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("balance", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("balance"),
+                Decoration::None,
+            )))
             .chain(account(x.account()))
             .chain(amount_with_tolerance(x.atol()))
             .chain(tags_links_inline(m))
@@ -204,7 +331,10 @@ fn open<'a>(x: &'a Open, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("open", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("open"),
+                Decoration::None,
+            )))
             .chain(account(x.account()))
             .chain(x.currencies().flat_map(|x| currency(x)))
             .chain(x.booking().into_iter().flat_map(|x| booking(x)))
@@ -220,7 +350,10 @@ fn close<'a>(x: &'a Close, d: &'a Directive) -> Box<dyn Iterator<Item = Primitiv
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("close", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("close"),
+                Decoration::None,
+            )))
             .chain(account(x.account()))
             .chain(tags_links_inline(m))
             .spaced()
@@ -237,7 +370,10 @@ fn commodity<'a>(
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("commodity", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("commodity"),
+                Decoration::None,
+            )))
             .chain(currency(x.currency()))
             .chain(tags_links_inline(m))
             .spaced()
@@ -251,7 +387,7 @@ fn pad<'a>(x: &'a Pad, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("pad", Decoration::None)))
+            .chain(once(Primitive::Str(Cow::Borrowed("pad"), Decoration::None)))
             .chain(account(x.account()))
             .chain(account(x.source()))
             .chain(tags_links_inline(m))
@@ -266,7 +402,10 @@ fn document<'a>(x: &'a Document, d: &'a Directive) -> Box<dyn Iterator<Item = Pr
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("document", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("document"),
+                Decoration::None,
+            )))
             .chain(account(x.account()))
             .chain(string(x.path(), Decoration::DoubleQuote))
             .chain(tags_links_inline(m))
@@ -281,7 +420,10 @@ fn note<'a>(x: &'a Note, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("note", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("note"),
+                Decoration::None,
+            )))
             .chain(account(x.account()))
             .chain(string(x.comment(), Decoration::DoubleQuote))
             .chain(tags_links_inline(m))
@@ -296,7 +438,10 @@ fn event<'a>(x: &'a Event, d: &'a Directive) -> Box<dyn Iterator<Item = Primitiv
 
     Box::new(
         date(d.date())
-            .chain(once(Primitive::Str("event", Decoration::None)))
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("event"),
+                Decoration::None,
+            )))
             .chain(string(x.event_type(), Decoration::DoubleQuote))
             .chain(string(x.description(), Decoration::DoubleQuote))
             .chain(tags_links_inline(m))
@@ -399,6 +544,14 @@ fn account<'a>(x: &'a Account) -> impl Iterator<Item = Primitive<'a>> {
         .spliced()
 }
 
+fn subaccount<'a>(x: &'a Subaccount) -> impl Iterator<Item = Primitive<'a>> {
+    let mut names = x.iter();
+    let first_name = names.next().unwrap(); // is NonEmpty so can't fail
+    string_as_ref(first_name, Decoration::None)
+        .chain(names.flat_map(|x| string_as_ref(x, Decoration::ColonPrefix)))
+        .spliced()
+}
+
 fn tag<'a>(x: &'a Tag) -> impl Iterator<Item = Primitive<'a>> {
     string_as_ref(x, Decoration::HashPrefix)
 }
@@ -481,6 +634,14 @@ where
 }
 
 fn string(x: &str, d: Decoration) -> impl Iterator<Item = Primitive<'_>> {
+    once(Primitive::Str(Cow::Borrowed(x), d))
+}
+
+fn owned_string<'a>(x: String, d: Decoration) -> impl Iterator<Item = Primitive<'a>> {
+    once(Primitive::Str(Cow::Owned(x), d))
+}
+
+fn cow_string<'a>(x: Cow<'a, str>, d: Decoration) -> impl Iterator<Item = Primitive<'a>> {
     once(Primitive::Str(x, d))
 }
 
@@ -492,7 +653,7 @@ fn indent<'a>() -> impl Iterator<Item = Primitive<'a>> {
     string("  ", Decoration::None)
 }
 
-const SPACE: Primitive = Primitive::Str(" ", Decoration::None);
+const SPACE: Primitive = Primitive::Str(Cow::Borrowed(" "), Decoration::None);
 
 trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
     /// Iterator adapter for spacing primtives

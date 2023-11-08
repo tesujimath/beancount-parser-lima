@@ -221,7 +221,17 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
 >;
 
 /// result of parsing
-pub type ParseResult<'t> = (Vec<Spanned<Directive<'t>>>, Options<'t>, Vec<Warning>);
+pub struct ParseResult<'t> {
+    pub directives: Vec<Spanned<Directive<'t>>>,
+    pub options: Options<'t>,
+    pub warnings: Vec<Warning>,
+}
+
+/// error result of parsing
+pub struct ParseError {
+    pub errors: Vec<Error>,
+    pub warnings: Vec<Warning>,
+}
 
 // result of parse_declarations
 type ParseDeclarationsResult<'t> = (
@@ -249,14 +259,14 @@ where
     }
 
     /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
-    pub fn parse(&'t self) -> Result<ParseResult<'t>, (Vec<Error>, Vec<Warning>)>
+    pub fn parse(&'t self) -> Result<ParseResult<'t>, ParseError>
     where
         's: 't,
     {
         let (all_declarations, options, mut errors, warnings) = self.parse_declarations();
         let mut p = PragmaProcessor::new(all_declarations, options);
 
-        let sorted_directives = p
+        let directives = p
             .by_ref()
             .sort(|d| *d.item().date().item())
             .collect::<Vec<_>>();
@@ -264,9 +274,13 @@ where
         errors.append(&mut pragma_errors);
 
         if errors.is_empty() {
-            Ok((sorted_directives, options, warnings))
+            Ok(ParseResult {
+                directives,
+                options,
+                warnings,
+            })
         } else {
-            Err((errors, warnings))
+            Err(ParseError { errors, warnings })
         }
     }
 

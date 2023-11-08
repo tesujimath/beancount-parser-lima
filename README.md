@@ -12,6 +12,20 @@ This is an incomplete list of what is currently unsupported.
 
 - plugins
 
+### Unsupported Options
+
+- `allow_pipe_separator`
+- `allow_deprecated_none_for_tags_and_links`
+- `default_tolerance`
+- `experiment_explicit_tolerances`
+- `insert_pythonpath`
+- `plugin`
+- `plugin_processing_mode`
+- `tolerance`
+- `use_legacy_fixed_tolerances`
+
+Also, unary options are not supported.
+
 ## License
 
 Licensed under either of
