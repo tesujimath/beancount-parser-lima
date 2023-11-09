@@ -257,14 +257,12 @@ impl Display for BadValueErrorKind {
             AccountTypeNames(e) => write!(f, "{}", e),
             AccountName(e) => write!(f, "{}", e),
             Currency(e) => write!(f, "{}", e),
-            Booking(_e) => write!(
+            Booking(_e) => format(
                 f,
-                "Expected one of {}",
-                itertools::intersperse(
-                    crate::types::Booking::iter().map(|b| b.to_string()),
-                    ", ".to_string()
-                )
-                .collect::<String>()
+                crate::types::Booking::iter(),
+                plain,
+                ", ",
+                Some("Expected one of "),
             ),
             Decimal(e) => write!(f, "{}", e),
             Bool => f.write_str("must be true or false or case-insensitive equivalent"),
