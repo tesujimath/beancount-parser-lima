@@ -2,7 +2,7 @@
 
 A zero-copy parser for Beancount in Rust, built with [Chumsky](https://docs.rs/chumsky/latest/chumsky/) and [Logos](https://docs.rs/logos/latest/logos/).
 
-It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated.  This README aims to document the limits of what is supported, but the list may not be comprehensive.
+It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated and other features as documented here (in a list which may not be comprehensive).
 
 Currently under active development.  APIs are subject to change, but I hope not majorly.
 
@@ -14,9 +14,11 @@ Note that zero-copy support in Chumsky is currently available only in alpha rele
 
 - beautiful error messages
 
-- interface for applications using this to also report beautiful errors in their original context
+- interface for applications using this to also report beautiful errors in their original context (as in the image below)
 
 - focus on conceptual clarity of application domain objects mapped to Rust types
+
+<img src="https://raw.githubusercontent.com/tesujimath/beancount-parser/master/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
 
 ## Roadmap
 

@@ -1,6 +1,7 @@
 // TODO remove suppression for dead code warning
 #![allow(dead_code)]
 #![recursion_limit = "256"]
+#![doc = include_str!("../README.md")]
 
 use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
@@ -22,6 +23,17 @@ pub use types::*;
 /// the transitive closure of all the include'd source files.
 ///
 /// Zero-copy parsing means that all string values are returned as references into these strings.
+///
+/// # Examples
+/// ```
+/// # use std::path::PathBuf;
+/// use beancount_parser::{BeancountParser, BeancountSources};
+///
+/// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
+/// let beancount_parser = BeancountParser::new(&sources);
+///
+/// let result = beancount_parser.parse();
+/// ````
 pub struct BeancountSources {
     // The source_id is the index in `content_paths`, and the first of these is the `root_path`.
     path_content: Vec<(PathBuf, String, String)>,
@@ -211,6 +223,34 @@ type SpannedToken<'t> = (Token<'t>, Span);
 
 /// The Beancount parser itself, which tokenizes and parses the source files
 /// contained in `BeancountSources`.
+///
+/// # Examples
+/// ```
+/// # use std::path::PathBuf;
+/// use beancount_parser::{BeancountParser, BeancountSources, ParseError, ParseResult};
+///
+/// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
+/// let beancount_parser = BeancountParser::new(&sources);
+/// let mut stderr = &std::io::stderr();
+///
+/// match beancount_parser.parse() {
+///     Ok(ParseResult {
+///         directives,
+///         options: _,
+///         warnings,
+///     }) => {
+///         for directive in directives {
+///             println!("{}\n", &directive);
+///         }
+///
+///         sources.write(stderr, warnings).unwrap();
+///     }
+///     Err(ParseError { errors, warnings }) => {
+///         sources.write(stderr, errors).unwrap();
+///         sources.write(stderr, warnings).unwrap();
+///     }
+/// }
+/// ````
 pub struct BeancountParser<'s, 't> {
     sources: &'s BeancountSources,
     // indexed by source_id as per sources
