@@ -6,6 +6,8 @@ It is intended to be a complete implementation of the Beancount file format, exc
 
 Currently under active development.  APIs are subject to change, but I hope not majorly.
 
+Note that zero-copy support in Chumsky is currently available only in alpha releases.
+
 ## Features
 
 - fast
