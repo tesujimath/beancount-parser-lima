@@ -1,4 +1,24 @@
-_Work in progress.  I have no headspace to review and incorporate contributions for now, sorry, but that will change._
+# beancount-parser
+
+A zero-copy parser for Beancount in Rust, built with [Chumsky](https://docs.rs/chumsky/latest/chumsky/) and [Logos](https://docs.rs/logos/latest/logos/).
+
+It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated.  This README aims to document the limits of what is supported, but the list may not be comprehensive.
+
+Currently under active development.  APIs are subject to change, but I hope not majorly.
+
+## Features
+
+- fast
+
+- beautiful error messages
+
+- interface for applications using this to also report beautiful errors in their original context
+
+## Roadmap
+
+- create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it ever will become that!)
+
+- address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
 
 ## Uncertainties / TODOs
 
