@@ -244,7 +244,7 @@ impl<'a> Display for Token<'a> {
 }
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
-/// and forcing a final Eol in case missing.
+/// and forcing a final `Eol` in case missing.
 ///
 /// Lexing errors are returned as `Error` tokens.
 pub fn lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {

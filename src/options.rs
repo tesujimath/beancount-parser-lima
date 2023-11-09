@@ -337,6 +337,7 @@ impl Display for ParserOptionsError {
 
 impl std::error::Error for ParserOptionsError {}
 
+/// All options read in from `option` pragmas, excluding those for internal processing only.
 #[derive(Debug)]
 pub struct Options<'a> {
     title: OptionallySourced<&'a str>,

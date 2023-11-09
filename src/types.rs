@@ -18,7 +18,7 @@ use std::{
 use strum_macros::{Display, EnumIter, EnumString};
 use time::Date;
 
-/// Our public error or warning type
+/// Error or warning, according to the marker type with which it is instantiated.
 #[derive(Debug)]
 pub struct ErrorOrWarning<K>
 where
@@ -32,14 +32,20 @@ where
     kind: PhantomData<K>,
 }
 
+/// Marker type for [ErrorOrWarning] error.
 #[derive(Debug)]
 pub struct ErrorKind();
 
+/// The type of errors returned by the parser.
+/// All that can usefully be done with these is write them via `BeancountSources`.
 pub type Error = ErrorOrWarning<ErrorKind>;
 
+/// Marker type for [ErrorOrWarning] warning.
 #[derive(Debug)]
 pub struct WarningKind();
 
+/// The type of warnings returned by the parser.
+/// All that can usefully be done with these is write them via `BeancountSources`.
 pub type Warning = ErrorOrWarning<WarningKind>;
 
 impl Error {
@@ -88,6 +94,7 @@ impl<K> ErrorOrWarning<K>
 where
     K: ErrorOrWarningKind,
 {
+    /// Annotate an error or warning as being related to another parsed element.
     pub fn related_to<'a, T>(self, element: &'a Spanned<T>) -> Self
     where
         T: ElementType + 'a,
@@ -98,6 +105,7 @@ where
         e
     }
 
+    /// Annotate an error or warning as being related to a number of parsed elements.
     pub fn related_to_all<'a, T>(self, elements: impl IntoIterator<Item = &'a Spanned<T>>) -> Self
     where
         T: ElementType + 'a,
@@ -120,6 +128,8 @@ where
         e
     }
 
+    /// Annotate an error or warning as being in the context of another parsed elememt,
+    /// for example an error on a [Posting] being in the context of its [Transaction].
     pub fn in_context<T>(self, element: &Spanned<T>) -> Self
     where
         T: ElementType,
@@ -160,6 +170,7 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Trait for formatting of [Error] separately from [Warning].
 pub trait ErrorOrWarningKind {
     fn report_kind() -> ariadne::ReportKind<'static>;
 
@@ -186,6 +197,7 @@ impl ErrorOrWarningKind for WarningKind {
     }
 }
 
+/// Top-level account type, the prefix of any fully-qualified [Account].
 #[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, Display, Debug)]
 pub enum AccountType {
     Assets,
@@ -194,6 +206,8 @@ pub enum AccountType {
     Income,
     Expenses,
 }
+
+/// A flag on a [Posting] or [Transaction].
 #[derive(PartialEq, Eq, Default, Clone, Copy, Debug)]
 pub enum Flag {
     #[default]
@@ -232,10 +246,12 @@ impl Display for Flag {
     }
 }
 
+/// A flag other than one of the builtin ones.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct FlagLetter(char);
 
 impl FlagLetter {
+    /// Field accessor.
     pub fn char(&self) -> char {
         self.0
     }
@@ -245,6 +261,7 @@ impl FlagLetter {
     }
 }
 
+/// Error type for invalid [FlagLetter].
 #[derive(PartialEq, Eq, Debug)]
 pub struct FlagLetterError(char);
 
@@ -272,7 +289,7 @@ impl TryFrom<char> for FlagLetter {
     }
 }
 
-/// The booking method for an account
+/// The booking method for an account.
 #[derive(EnumString, EnumIter, PartialEq, Eq, Default, Clone, Copy, Display, Debug)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum Booking {
@@ -292,7 +309,7 @@ impl ElementType for Booking {
     }
 }
 
-/// a `SourceId` identifies a source file.
+/// Identifies a source file.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
 pub struct SourceId(u32);
 
@@ -314,10 +331,10 @@ impl Display for SourceId {
     }
 }
 
-/// Our span type
+/// Identifies a span of text within its source file.
 pub type Span = chumsky::span::SimpleSpan<usize, SourceId>;
 
-/// A Spanned item may be located within a source file if the file path is known.
+/// A Spanned item is one located within its source file.
 /// The span is invisible with respect to equality and hashing.
 #[derive(Clone, Debug)]
 pub struct Spanned<T> {
@@ -351,14 +368,17 @@ where
 }
 
 impl<T> Spanned<T> {
+    /// Field accessor.
     pub fn item(&self) -> &T {
         &self.item
     }
 
+    /// Field accessor.
     pub fn span(&self) -> &Span {
         &self.span
     }
 
+    /// Converts from `&Spanned<T>` to `Spanned<&T>`.
     pub fn as_ref(&self) -> Spanned<&T> {
         Spanned {
             item: &self.item,
@@ -366,6 +386,7 @@ impl<T> Spanned<T> {
         }
     }
 
+    /// Maps a `Spanned<T>` to `Spanned<U>` by applying a function to the contained item, keeping the same span.
     pub fn map<U, F>(&self, f: F) -> Spanned<U>
     where
         F: FnOnce(&T) -> U,
@@ -381,6 +402,7 @@ impl<T> Spanned<T>
 where
     T: ElementType,
 {
+    /// Create a new `Error` referring to the spanned element.
     pub fn error<S: Into<String>>(&self, reason: S) -> Error {
         Error::new(
             format!("invalid {}", self.element_type()),
@@ -389,6 +411,7 @@ where
         )
     }
 
+    /// Create a new `Warning` referring to the spanned element.
     pub fn warning<S: Into<String>>(&self, reason: S) -> Warning {
         Warning::new(
             format!("questionable {}", self.element_type()),
@@ -429,7 +452,7 @@ where
     }
 }
 
-// for error reporting
+/// Implemented by any element, for access to its kind in error reporting.
 pub trait ElementType {
     fn element_type(&self) -> &'static str;
 }
@@ -468,6 +491,7 @@ pub(crate) enum Declaration<'a> {
     Pragma(Pragma<'a>),
 }
 
+/// A Beancount directive of a particular [DirectiveVariant].
 #[derive(Clone, Debug)]
 pub struct Directive<'a> {
     pub(crate) date: Spanned<Date>,
@@ -476,14 +500,17 @@ pub struct Directive<'a> {
 }
 
 impl<'a> Directive<'a> {
+    /// Field accessor.
     pub fn date(&self) -> &Spanned<Date> {
         &self.date
     }
 
+    /// Field accessor.
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
     }
 
+    /// Field accessor.
     pub fn variant(&self) -> &DirectiveVariant {
         &self.variant
     }
@@ -527,6 +554,7 @@ impl<'a> Display for Directive<'a> {
     }
 }
 
+/// A Beancount directive, without the fields common to all, which belong to [Directive].
 #[derive(Clone, Debug)]
 pub enum DirectiveVariant<'a> {
     Transaction(Transaction<'a>),
@@ -556,6 +584,7 @@ pub(crate) enum Pragma<'a> {
     // TODO (probably not) plugin
 }
 
+/// A Beancount transaction directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Transaction<'a> {
     pub(crate) flag: Spanned<Flag>,
@@ -582,23 +611,28 @@ impl<'a> Transaction<'a> {
         )
     }
 
+    /// Field accessor.
     pub fn flag(&self) -> &Spanned<Flag> {
         &self.flag
     }
 
+    /// Field accessor.
     pub fn payee(&self) -> Option<&Spanned<&str>> {
         self.payee.as_ref()
     }
 
+    /// Field accessor.
     pub fn narration(&self) -> Option<&Spanned<&str>> {
         self.narration.as_ref()
     }
 
+    /// Field accessor.
     pub fn postings(&self) -> impl ExactSizeIterator<Item = &Spanned<Posting>> {
         self.postings.iter()
     }
 }
 
+/// A Beancount price directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Price<'a> {
     pub(crate) currency: Spanned<&'a Currency<'a>>,
@@ -616,10 +650,12 @@ impl<'a> Price<'a> {
         Ok(())
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> &Spanned<&Currency> {
         &self.currency
     }
 
+    /// Field accessor.
     pub fn amount(&self) -> &Spanned<Amount> {
         &self.amount
     }
@@ -631,6 +667,7 @@ impl<'a> ElementType for Price<'a> {
     }
 }
 
+/// A Beancount balance directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Balance<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -648,10 +685,12 @@ impl<'a> Balance<'a> {
         Ok(())
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
+    /// Field accessor.
     pub fn atol(&self) -> &Spanned<AmountWithTolerance> {
         &self.atol
     }
@@ -663,6 +702,7 @@ impl<'a> ElementType for Balance<'a> {
     }
 }
 
+/// A Beancount open directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Open<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -680,19 +720,23 @@ impl<'a> Open<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
+    /// Field accessor.
     pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<&Currency>> {
         self.currencies.iter()
     }
 
+    /// Field accessor.
     pub fn booking(&self) -> Option<&Spanned<Booking>> {
         self.booking.as_ref()
     }
 }
 
+/// A Beancount close directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Close<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -706,11 +750,13 @@ impl<'a> Close<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 }
 
+/// A Beancount commodity directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Commodity<'a> {
     pub(crate) currency: Spanned<&'a Currency<'a>>,
@@ -724,11 +770,13 @@ impl<'a> Commodity<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> &Spanned<&Currency> {
         &self.currency
     }
 }
 
+/// A Beancount pad directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Pad<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -743,15 +791,18 @@ impl<'a> Pad<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
+    /// Field accessor.
     pub fn source(&self) -> &Spanned<Account> {
         &self.source
     }
 }
 
+/// A Beancount document directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Document<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -766,6 +817,7 @@ impl<'a> Document<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
@@ -777,6 +829,7 @@ impl<'a> Document<'a> {
     }
 }
 
+/// A Beancount note directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Note<'a> {
     pub(crate) account: Spanned<Account<'a>>,
@@ -791,15 +844,18 @@ impl<'a> Note<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
+    /// Field accessor.
     pub fn comment(&self) -> &Spanned<&str> {
         &self.comment
     }
 }
 
+/// A Beancount event directive, without the common [Directive] fields.
 #[derive(Clone, Debug)]
 pub struct Event<'a> {
     pub(crate) event_type: Spanned<&'a str>,
@@ -818,15 +874,18 @@ impl<'a> Event<'a> {
         metadata.fmt_keys_values(f)
     }
 
+    /// Field accessor.
     pub fn event_type(&self) -> &Spanned<&str> {
         &self.event_type
     }
 
+    /// Field accessor.
     pub fn description(&self) -> &Spanned<&str> {
         &self.description
     }
 }
 
+/// A Beancount account with account type and subaccount names.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account<'a> {
     pub(crate) account_type: AccountType,
@@ -834,10 +893,12 @@ pub struct Account<'a> {
 }
 
 impl<'a> Account<'a> {
+    /// Field accessor.
     pub fn account_type(&self) -> AccountType {
         self.account_type
     }
 
+    /// Field accessor.
     pub fn names(&self) -> impl ExactSizeIterator<Item = &AccountName> {
         self.candidate.subaccount.iter()
     }
@@ -856,7 +917,7 @@ impl<'a> Display for Account<'a> {
     }
 }
 
-/// `Subaccount` comprises the colon-separated components of an account, without the account type prefix.
+/// The individual colon-separated components of an account, without the [AccountType] prefix.
 pub type Subaccount<'a> = NonEmpty<AccountName<'a>>;
 
 /// A CandidateAccount is one where the account_type_name has not yet been resolved against current options.
@@ -873,6 +934,7 @@ impl<'a> Display for CandidateAccount<'a> {
     }
 }
 
+/// A validated name for an account type.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct AccountTypeName<'a>(&'a str);
 
@@ -930,6 +992,7 @@ impl<'a> Display for AccountTypeName<'a> {
     }
 }
 
+/// Error type for [AccountTypeName] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct AccountTypeNameError(AccountTypeNameErrorKind);
 
@@ -966,6 +1029,7 @@ impl Display for AccountTypeNameError {
 
 impl std::error::Error for AccountTypeNameError {}
 
+/// One component of a colon-separated account.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct AccountName<'a>(&'a str);
 
@@ -997,6 +1061,7 @@ impl<'a> Display for AccountName<'a> {
     }
 }
 
+/// Error type for [AccountName] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct AccountNameError(AccountNameErrorKind);
 
@@ -1053,6 +1118,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
     }
 }
 
+/// A Beancount currency.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Currency<'a>(&'a str);
 
@@ -1093,6 +1159,7 @@ impl<'a> Display for Currency<'a> {
     }
 }
 
+/// Error type for [Currency] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct CurrencyError(CurrencyErrorKind);
 
@@ -1174,6 +1241,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
     }
 }
 
+/// A single posting within a [Transaction].
 #[derive(Clone, Debug)]
 pub struct Posting<'a> {
     pub(crate) flag: Option<Spanned<Flag>>,
@@ -1186,30 +1254,37 @@ pub struct Posting<'a> {
 }
 
 impl<'a> Posting<'a> {
+    /// Field accessor.
     pub fn flag(&self) -> Option<&Spanned<Flag>> {
         self.flag.as_ref()
     }
 
+    /// Field accessor.
     pub fn account(&self) -> &Spanned<Account> {
         &self.account
     }
 
+    /// Field accessor.
     pub fn amount(&self) -> Option<&Spanned<ExprValue>> {
         self.amount.as_ref()
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> Option<&Spanned<&Currency>> {
         self.currency.as_ref()
     }
 
+    /// Field accessor.
     pub fn cost_spec(&self) -> Option<&Spanned<CostSpec>> {
         self.cost_spec.as_ref()
     }
 
+    /// Field accessor.
     pub fn price_annotation(&self) -> Option<&Spanned<ScopedAmount>> {
         self.price_annotation.as_ref()
     }
 
+    /// Field accessor.
     pub fn metadata(&self) -> &Metadata<'a> {
         &self.metadata
     }
@@ -1241,6 +1316,10 @@ impl<'a> Display for Posting<'a> {
     }
 }
 
+/// Metadata associated with a [Directive] or a [Posting].
+///
+/// Note that tags and links and key/values that may have been specified at the top-level
+/// of a directive are subsumed into the metadata element of the directive.
 #[derive(Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub(crate) key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
@@ -1249,16 +1328,19 @@ pub struct Metadata<'a> {
 }
 
 impl<'a> Metadata<'a> {
+    /// Field accessor.
     pub fn key_values(
         &self,
     ) -> impl ExactSizeIterator<Item = (&Spanned<&Key>, &Spanned<MetaValue>)> {
         self.key_values.iter()
     }
 
+    /// Field accessor.
     pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<&Tag>> {
         self.tags.iter()
     }
 
+    /// Field accessor.
     pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<&Link>> {
         self.links.iter()
     }
@@ -1299,6 +1381,7 @@ impl<'a> Display for MetaKeyValue<'a> {
     }
 }
 
+/// A value of metadata key/value.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MetaValue<'a> {
     Simple(SimpleValue<'a>),
@@ -1316,6 +1399,7 @@ impl<'a> Display for MetaValue<'a> {
     }
 }
 
+/// One possible type of [MetaValue].
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SimpleValue<'a> {
     String(&'a str),
@@ -1353,6 +1437,7 @@ impl<'a> Display for SimpleValue<'a> {
     }
 }
 
+/// A tag.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Tag<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
@@ -1388,6 +1473,7 @@ impl<'a> Display for Tag<'a> {
     }
 }
 
+/// A link.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Link<'a>(pub(crate) TagOrLinkIdentifier<'a>);
 
@@ -1423,6 +1509,7 @@ impl<'a> AsRef<str> for Link<'a> {
     }
 }
 
+/// The validated identifier part of a `Tag` or `Link` without the `#` or `^` prefix.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct TagOrLinkIdentifier<'a>(&'a str);
 
@@ -1435,6 +1522,7 @@ impl<'a> TagOrLinkIdentifier<'a> {
     }
 }
 
+/// Error type for [TagOrLinkIdentifier] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct TagOrLinkIdentifierError(Vec<char>);
 
@@ -1475,6 +1563,7 @@ impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
     }
 }
 
+/// A key for a [Metadata] [MetaValue].
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Key<'a>(&'a str);
 
@@ -1506,6 +1595,7 @@ impl<'a> Display for Key<'a> {
     }
 }
 
+/// Error type for [Key] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct KeyError(KeyErrorKind);
 
@@ -1570,12 +1660,15 @@ impl<'a> TryFrom<&'a str> for Key<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// An `Expr` which has been evaluated.
+///
+/// Note that the [decimal scale](https://docs.rs/rust_decimal/latest/rust_decimal/index.html) is set according to the maximum of the scales used within the expression.
 pub struct ExprValue {
     value: Decimal,
     expr: Expr,
 }
 
 impl ExprValue {
+    /// Field accessor.
     pub fn value(&self) -> Decimal {
         self.value
     }
@@ -1603,6 +1696,7 @@ impl Display for ExprValue {
     }
 }
 
+/// A numeric expression which respects standard operator precedence.
 #[derive(PartialEq, Eq, Clone)]
 pub enum Expr {
     Value(Decimal),
@@ -1680,7 +1774,7 @@ impl fmt::Debug for Expr {
     }
 }
 
-/// An expression which quantifies a total or per-unit.
+/// An `ExprValue` which quantifies a total or per-unit.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ScopedExprValue {
     PerUnit(ExprValue),
@@ -1698,6 +1792,7 @@ impl Display for ScopedExprValue {
     }
 }
 
+/// A `ExprValue` and `Currency`.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Amount<'a> {
     number: Spanned<ExprValue>,
@@ -1712,10 +1807,12 @@ impl<'a> Amount<'a> {
         }
     }
 
+    /// Field accessor.
     pub fn number(&self) -> &Spanned<ExprValue> {
         &self.number
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> &Spanned<&Currency> {
         &self.currency
     }
@@ -1727,6 +1824,7 @@ impl<'a> Display for Amount<'a> {
     }
 }
 
+/// An `Amount` with optional tolerance.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct AmountWithTolerance<'a> {
     amount: Spanned<Amount<'a>>,
@@ -1741,10 +1839,12 @@ impl<'a> AmountWithTolerance<'a> {
         }
     }
 
+    /// Field accessor.
     pub fn amount(&self) -> &Spanned<Amount> {
         &self.amount
     }
 
+    /// Field accessor.
     pub fn tolerance(&self) -> Option<&Spanned<Decimal>> {
         self.tolerance.as_ref()
     }
@@ -1760,8 +1860,8 @@ impl<'a> Display for AmountWithTolerance<'a> {
     }
 }
 
+/// An amount where each element of `ExprValue` and `Currency` may not actually be specified.
 #[derive(PartialEq, Eq, Clone, Debug)]
-/// An amount where each element may not actually be specified.
 pub struct LooseAmount<'a> {
     number: Option<Spanned<ExprValue>>,
     currency: Option<Spanned<&'a Currency<'a>>>,
@@ -1780,17 +1880,19 @@ impl<'a> LooseAmount<'a> {
         }
     }
 
+    /// Field accessor.
     pub fn number(&self) -> Option<&Spanned<ExprValue>> {
         self.number.as_ref()
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> Option<&Spanned<&Currency>> {
         self.currency.as_ref()
     }
 }
 
+/// An amount which specifies a total or per-unit `ScopedExprValue`, or simply just a `Currency`.
 #[derive(PartialEq, Eq, Clone, Debug)]
-/// An amount which specifies a total or per-unit, or simply just a currency.
 pub enum ScopedAmount<'a> {
     BareCurrency(&'a Currency<'a>),
     BareAmount(ScopedExprValue),
@@ -1808,6 +1910,7 @@ impl<'a> Display for ScopedAmount<'a> {
     }
 }
 
+/// A cost specification.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CostSpec<'a> {
     per_unit: Option<Spanned<ExprValue>>,
@@ -1819,26 +1922,32 @@ pub struct CostSpec<'a> {
 }
 
 impl<'a> CostSpec<'a> {
+    /// Field accessor.
     pub fn per_unit(&self) -> Option<&Spanned<ExprValue>> {
         self.per_unit.as_ref()
     }
 
+    /// Field accessor.
     pub fn total(&self) -> Option<&Spanned<ExprValue>> {
         self.total.as_ref()
     }
 
+    /// Field accessor.
     pub fn currency(&self) -> Option<&Spanned<&Currency<'_>>> {
         self.currency.as_ref()
     }
 
+    /// Field accessor.
     pub fn date(&self) -> Option<&Spanned<Date>> {
         self.date.as_ref()
     }
 
+    /// Field accessor.
     pub fn label(&self) -> Option<&Spanned<&str>> {
         self.label.as_ref()
     }
 
+    /// Field accessor.
     pub fn merge(&self) -> bool {
         self.merge
     }
@@ -1999,6 +2108,7 @@ impl<'a> CostSpecBuilder<'a> {
     }
 }
 
+/// Error type for [CostSpec] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct CostSpecError(CostSpecErrorKind);
 
@@ -2036,6 +2146,7 @@ impl Display for CostSpecError {
 
 impl std::error::Error for CostSpecError {}
 
+/// Multiple errors arising from creation of a [CostSpec].
 #[derive(PartialEq, Eq, Debug)]
 pub struct CostSpecErrors(Vec<CostSpecError>);
 

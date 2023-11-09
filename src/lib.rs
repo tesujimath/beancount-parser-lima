@@ -18,7 +18,10 @@ use std::{
 };
 pub use types::*;
 
-/// The transitive closure of all the include'd source files.
+/// Contains the content of the Beancount source file, and the content of
+/// the transitive closure of all the include'd source files.
+///
+/// Zero-copy parsing means that all string values are returned as references into these strings.
 pub struct BeancountSources {
     // The source_id is the index in `content_paths`, and the first of these is the `root_path`.
     path_content: Vec<(PathBuf, String, String)>,
@@ -206,6 +209,8 @@ where
 
 type SpannedToken<'t> = (Token<'t>, Span);
 
+/// The Beancount parser itself, which tokenizes and parses the source files
+/// contained in `BeancountSources`.
 pub struct BeancountParser<'s, 't> {
     sources: &'s BeancountSources,
     // indexed by source_id as per sources
@@ -220,14 +225,14 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
     chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
 >;
 
-/// result of parsing
+/// The result of parsing all the files, containing date-ordered `Directive`s, `Options`, and any `Warning`s.
 pub struct ParseResult<'t> {
     pub directives: Vec<Spanned<Directive<'t>>>,
     pub options: Options<'t>,
     pub warnings: Vec<Warning>,
 }
 
-/// error result of parsing
+/// The value returned when parsing fails.
 pub struct ParseError {
     pub errors: Vec<Error>,
     pub warnings: Vec<Warning>,
@@ -245,6 +250,7 @@ impl<'s, 't> BeancountParser<'s, 't>
 where
     's: 't,
 {
+    /// Create a `BeancountParser` from `BeancountSources` read from all input files.
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = Vec::new();
 
@@ -322,7 +328,7 @@ where
     }
 }
 
-/// `PragmaProcessor` is an iterator which folds in the pragmas into the sequence of `Directive`s.
+/// Iterator which applies pragmas to the sequence of `Directive`s.
 ///
 /// When the iterator is exhausted, any errors should be collected by the caller.
 #[derive(Debug)]

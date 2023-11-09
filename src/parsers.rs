@@ -41,7 +41,7 @@ where
     declaration(source_path).repeated().collect::<Vec<_>>()
 }
 
-/// Matches a `Declaration`, and returns with Span.
+/// Matches a [Declaration], and returns with Span.
 pub(crate) fn declaration<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, Spanned<Declaration<'src>>, Extra<'src>>
@@ -55,7 +55,7 @@ where
         .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
 }
 
-/// Matches a `Directive`.
+/// Matches a [Directive].
 pub(crate) fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -80,7 +80,7 @@ where
     ))
 }
 
-/// Matches a `Pragma`.
+/// Matches a [Pragma].
 pub(crate) fn pragma<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, Pragma<'src>, Extra<'src>>
@@ -111,7 +111,7 @@ where
     .as_context()
 }
 
-/// Matches a `BeancountOption`, failing if the option cannot be processed.
+/// Matches a [BeancountOption], failing if the option cannot be processed.
 pub(crate) fn option<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, BeancountOption<'src>, Extra<'src>>
@@ -359,7 +359,7 @@ where
     })
 }
 
-/// Matches a `Account`.
+/// Matches a [Account].
 fn account<'src, I>() -> impl Parser<'src, I, Account<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -386,7 +386,7 @@ where
     })
 }
 
-/// Matches a `Booking`.
+/// Matches a [Booking].
 fn booking<'src, I>() -> impl Parser<'src, I, Booking, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -585,7 +585,7 @@ where
     ))
 }
 
-/// Matches a `Posting` complete with `Metadata` over several lines.
+/// Matches a [Posting] complete with [Metadata] over several lines.
 fn posting<'src, I>() -> impl Parser<'src, I, Posting<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -620,7 +620,7 @@ where
         .as_context()
 }
 
-/// Matches `Metadata`, over several lines.
+/// Matches [Metadata], over several lines.
 fn metadata<'src, I>() -> impl Parser<'src, I, Metadata<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -676,7 +676,7 @@ where
         })
 }
 
-/// A single instance of `Metadata`
+/// A single instance of [Metadata]
 enum Metadatum<'a> {
     KeyValue(Spanned<MetaKeyValue<'a>>),
     Tag(Spanned<&'a Tag<'a>>),
@@ -714,7 +714,7 @@ where
         .as_context()
 }
 
-/// Matches a `MetaValue`.
+/// Matches a [MetaValue].
 pub(crate) fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -724,7 +724,7 @@ where
     choice((simple_value().map(Simple), amount().map(Amount)))
 }
 
-/// Matches a `SimpleValue`.
+/// Matches a [SimpleValue].
 /// TODO: the original parser allowed for the SimpleValue to be empty, which we don't support here,
 /// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
 pub(crate) fn simple_value<'src, I>() -> impl Parser<'src, I, SimpleValue<'src>, Extra<'src>>
@@ -837,7 +837,7 @@ where
     })
 }
 
-/// Matches a `CostSpec`.
+/// Matches a [CostSpec].
 /// For now we only match the new syntax of single braces.
 fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, Extra<'src>>
 where
@@ -881,7 +881,7 @@ where
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// One component of a cost specification.
-/// Setting a field type multiple times is rejected by methods in `CostSpec`.
+/// Setting a field type multiple times is rejected by methods in [CostSpec].
 enum CostComp<'a> {
     ScopedAmount(ScopedAmount<'a>),
     Date(Date),
@@ -889,7 +889,7 @@ enum CostComp<'a> {
     Merge,
 }
 
-/// Matches one component of a `CostSpec`.
+/// Matches one component of a [CostSpec].
 fn cost_comp<'src, I>() -> impl Parser<'src, I, CostComp<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -1200,7 +1200,7 @@ pub(crate) struct ParserState<'a> {
 // our ParserExtra with our error and state types
 pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, ParserState<'a>, ()>;
 
-/// `Emit` trait enables use of own functions which emit errors
+/// Enable use of own functions which emit errors
 pub(crate) trait Emit<E> {
     fn emit(&mut self, err: E);
 }

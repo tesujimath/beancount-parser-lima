@@ -16,9 +16,13 @@ Note that zero-copy support in Chumsky is currently available only in alpha rele
 
 - interface for applications using this to also report beautiful errors in their original context
 
+- focus on conceptual clarity of application domain objects mapped to Rust types
+
 ## Roadmap
 
 - create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it ever will become that!)
+
+- improve API in the light of experience, i.e. when it gets some use ;-)
 
 - address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
 
