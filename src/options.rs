@@ -13,13 +13,13 @@ use std::{
 use strum::IntoEnumIterator;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct BeancountOption<'a> {
+pub(crate) struct BeancountOption<'a> {
     source: Source,
     variant: BeancountOptionVariant<'a>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum BeancountOptionVariant<'a> {
+pub(crate) enum BeancountOptionVariant<'a> {
     Title(&'a str),
     AccountTypeName(AccountType, AccountTypeName<'a>),
     AccountPreviousBalances(Subaccount<'a>),
@@ -42,7 +42,7 @@ pub enum BeancountOptionVariant<'a> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub enum CurrencyOrAny<'a> {
+pub(crate) enum CurrencyOrAny<'a> {
     Currency(Currency<'a>),
     Any,
 }
@@ -232,7 +232,7 @@ impl Display for BeancountOptionError {
 impl std::error::Error for BeancountOptionError {}
 
 #[derive(Debug)]
-pub struct BadValueError(BadValueErrorKind);
+pub(crate) struct BadValueError(BadValueErrorKind);
 
 #[derive(Debug)]
 enum BadValueErrorKind {
@@ -323,13 +323,13 @@ impl<'a> ParserOptions<'a> {
         .map(|variant| BeancountOption { source, variant })
     }
 
-    pub fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
+    pub(crate) fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
         &self.account_type_names.name_by_type[account_type as usize]
     }
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct ParserOptionsError(AccountTypeNamesError);
+pub(crate) struct ParserOptionsError(AccountTypeNamesError);
 
 impl Display for ParserOptionsError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -661,7 +661,7 @@ pub(crate) struct Source {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum OptionError {
+pub(crate) enum OptionError {
     DuplicateOption(Span),
     DuplicateValue(Span),
 }
@@ -779,7 +779,7 @@ impl<'a> Display for AccountTypeNames<'a> {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct AccountTypeNamesError(AccountTypeNamesErrorKind);
+pub(crate) struct AccountTypeNamesError(AccountTypeNamesErrorKind);
 
 #[derive(PartialEq, Eq, Debug)]
 enum AccountTypeNamesErrorKind {

@@ -641,7 +641,7 @@ fn owned_string<'a>(x: String, d: Decoration) -> impl Iterator<Item = Primitive<
     once(Primitive::Str(Cow::Owned(x), d))
 }
 
-fn cow_string<'a>(x: Cow<'a, str>, d: Decoration) -> impl Iterator<Item = Primitive<'a>> {
+fn cow_string(x: Cow<str>, d: Decoration) -> impl Iterator<Item = Primitive> {
     once(Primitive::Str(x, d))
 }
 
