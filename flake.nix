@@ -14,7 +14,6 @@
           overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs {
             inherit system overlays;
-            config = { allowUnfree = true; }; # for clion
           };
           # cargo-nightly based on https://github.com/oxalica/rust-overlay/issues/82
           nightly = pkgs.rust-bin.selectLatestNightlyWith (t: t.default);
@@ -39,11 +38,6 @@
                 rust-analyzer
                 rust-bin.stable.latest.default
                 rustfmt
-
-                # runtime dependencies
-
-                # devtools
-                rustPlatform.rustcSrc # for CLion
               ];
             };
           }
