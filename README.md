@@ -1,20 +1,20 @@
 # beancount-parser
 
-A zero-copy parser for Beancount in Rust, built with [Chumsky](https://docs.rs/chumsky/latest/chumsky/) and [Logos](https://docs.rs/logos/latest/logos/).
+A zero-copy parser for Beancount in Rust.
 
 It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated and other features as documented here (in a list which may not be comprehensive).
 
 Currently under active development.  APIs are subject to change, but I hope not majorly.
 
-Note that zero-copy support in Chumsky is currently available only in alpha releases.
+(Note that zero-copy support from Chumsky is currently available only in alpha releases.)
 
 ## Features
 
-- fast
+- fast, thanks to [Logos](https://docs.rs/logos/latest/logos/) and [Chumsky](https://docs.rs/chumsky/latest/chumsky/) zero copy
 
-- beautiful error messages
+- beautiful error messages, thanks to [Ariadne](https://docs.rs/ariadne/latest/ariadne/)
 
-- interface for applications using this to also report beautiful errors in their original context (as in the image below)
+- interface for applications to also report beautiful errors in their original context, as in the example below
 
 - focus on conceptual clarity of application domain objects mapped to Rust types
 
@@ -22,9 +22,9 @@ Note that zero-copy support in Chumsky is currently available only in alpha rele
 
 ## Roadmap
 
-- create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it ever will become that!)
+- create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it will necessarily become that!)
 
-- improve API in the light of experience, i.e. when it gets some use ;-)
+- improve API in the light of experience, i.e. when it gets some use 😅
 
 - address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
 
@@ -59,9 +59,9 @@ Also, unary options are not supported.
 Licensed under either of
 
  * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+   [LICENSE-APACHE](http://www.apache.org/licenses/LICENSE-2.0)
  * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+   [LICENSE-MIT](http://opensource.org/licenses/MIT)
 
 at your option.
 

@@ -3,6 +3,77 @@
 #![recursion_limit = "256"]
 #![doc = include_str!("../README.md")]
 
+//! # Examples
+//!
+//! This example generates the output as shown above.
+//!
+//!```
+//! # use rust_decimal::Decimal;
+//! # use std::io;
+//! # use std::path::PathBuf;
+//!
+//!use beancount_parser::{
+//!    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseResult,
+//!};
+//!
+//!fn main() {
+//!    let stderr = &io::stderr();
+//!    let sources = BeancountSources::new(PathBuf::from("examples/data/error-post-balancing.beancount"));
+//!    let beancount_parser = BeancountParser::new(&sources);
+//!
+//!    match beancount_parser.parse() {
+//!        Ok(ParseResult {
+//!            directives,
+//!            options: _,
+//!            mut warnings,
+//!        }) => {
+//!            let mut errors = Vec::new();
+//!
+//!            for directive in directives {
+//!                if let DirectiveVariant::Transaction(transaction) = directive.variant() {
+//!                    let mut postings = transaction.postings().collect::<Vec<_>>();
+//!                    let n_postings = postings.len();
+//!                    let n_amounts = itertools::partition(&mut postings, |p| p.amount().is_some());
+//!
+//!                    if postings.is_empty() {
+//!                        warnings.push(directive.warning("no postings"));
+//!                    } else if n_amounts + 1 < n_postings {
+//!                        errors.push(
+//!                            directive
+//!                                .error("multiple postings without amount specified")
+//!                                .related_to_all(postings[n_amounts..].iter().copied()),
+//!                        );
+//!                    } else if n_amounts == n_postings {
+//!                        let total: Decimal =
+//!                            postings.iter().map(|p| p.amount().unwrap().value()).sum();
+//!
+//!                        if total != Decimal::ZERO {
+//!                            let last_amount = postings.pop().unwrap().amount().unwrap();
+//!                            let other_amounts = postings.iter().map(|p| p.amount().unwrap());
+//!
+//!                            errors.push(
+//!                                last_amount
+//!                                    .error(format!("sum is {}, expected zero", total))
+//!                                    .related_to_all(other_amounts)
+//!                                    .in_context(&directive),
+//!                            )
+//!                        }
+//!                    }
+//!                }
+//!            }
+//!
+//!            sources.write(stderr, errors).unwrap();
+//!            sources.write(stderr, warnings).unwrap();
+//!        }
+//!
+//!        Err(ParseError { errors, warnings }) => {
+//!            sources.write(stderr, errors).unwrap();
+//!            sources.write(stderr, warnings).unwrap();
+//!        }
+//!    }
+//!}
+//!```
+
 use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
 use lazy_format::lazy_format;
@@ -33,7 +104,7 @@ pub use types::*;
 /// let beancount_parser = BeancountParser::new(&sources);
 ///
 /// let result = beancount_parser.parse();
-/// ````
+/// ```
 pub struct BeancountSources {
     // The source_id is the index in `content_paths`, and the first of these is the `root_path`.
     path_content: Vec<(PathBuf, String, String)>,

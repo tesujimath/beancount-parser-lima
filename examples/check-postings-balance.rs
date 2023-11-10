@@ -51,14 +51,13 @@ fn main() {
                             postings.iter().map(|p| p.amount().unwrap().value()).sum();
 
                         if total != Decimal::ZERO {
-                            let last_posting = postings.pop().unwrap(); // can't fail as n_postings > 0
+                            let last_amount = postings.pop().unwrap().amount().unwrap();
+                            let other_amounts = postings.iter().map(|p| p.amount().unwrap());
 
                             errors.push(
-                                last_posting
-                                    .amount()
-                                    .unwrap()
+                                last_amount
                                     .error(format!("sum is {}, expected zero", total))
-                                    .related_to_all(postings.iter().map(|p| p.amount().unwrap()))
+                                    .related_to_all(other_amounts)
                                     .in_context(&directive),
                             )
                         }
