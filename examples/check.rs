@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use std::path::PathBuf;
 use std::{collections::HashMap, io};
 
-use beancount_parser::{
+use beancount_parser_lima::{
     BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, ParseError, ParseResult,
     Posting, Spanned,
 };

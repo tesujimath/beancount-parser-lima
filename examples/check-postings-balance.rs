@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use std::io;
 use std::path::PathBuf;
 
-use beancount_parser::{
+use beancount_parser_lima::{
     BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseResult,
 };
 

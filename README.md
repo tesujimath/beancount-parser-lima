@@ -1,10 +1,12 @@
-# beancount-parser
+# beancount-parser-lima
 
 A zero-copy parser for Beancount in Rust.
 
 It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated and other features as documented here (in a list which may not be comprehensive).
 
 Currently under active development.  APIs are subject to change, but I hope not majorly.
+
+The slightly strange name is because of a somewhat careless failure on my part to notice the existing [beancount-parser](https://github.com/jcornaz/beancount-parser) when starting this project, for which apologies.
 
 (Note that zero-copy support from Chumsky is currently available only in alpha releases.)
 
@@ -18,7 +20,7 @@ Currently under active development.  APIs are subject to change, but I hope not 
 
 - focus on conceptual clarity of application domain objects mapped to Rust types
 
-<img src="https://raw.githubusercontent.com/tesujimath/beancount-parser/master/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
+<img src="https://raw.githubusercontent.com/tesujimath/beancount-parser-lima/master/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
 
 ## Roadmap
 
@@ -53,6 +55,11 @@ This is an incomplete list of what is currently unsupported.
 - `use_legacy_fixed_tolerances`
 
 Also, unary options are not supported.
+
+## Alternatives
+
+[beancount-parser](https://github.com/jcornaz/beancount-parser) is another parser for Beancount which predates this one,
+using [nom](https://docs.rs/nom/latest/nom/) instead of [Chumsky](https://docs.rs/chumsky/latest/chumsky/).
 
 ## License
 

@@ -12,7 +12,7 @@
 //! # use std::io;
 //! # use std::path::PathBuf;
 //!
-//!use beancount_parser::{
+//!use beancount_parser_lima::{
 //!    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseResult,
 //!};
 //!
@@ -98,7 +98,7 @@ pub use types::*;
 /// # Examples
 /// ```
 /// # use std::path::PathBuf;
-/// use beancount_parser::{BeancountParser, BeancountSources};
+/// use beancount_parser_lima::{BeancountParser, BeancountSources};
 ///
 /// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
 /// let beancount_parser = BeancountParser::new(&sources);
@@ -298,7 +298,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 /// # Examples
 /// ```
 /// # use std::path::PathBuf;
-/// use beancount_parser::{BeancountParser, BeancountSources, ParseError, ParseResult};
+/// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseResult};
 ///
 /// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
 /// let beancount_parser = BeancountParser::new(&sources);

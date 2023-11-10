@@ -1,11 +1,11 @@
 [package]
-name = "beancount-parser"
+name = "beancount-parser-lima"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A zero-copy parser for Beancount"
-homepage = "https://github.com/tesujimath/beancount-parser"
-repository = "https://github.com/tesujimath/beancount-parser"
+homepage = "https://github.com/tesujimath/beancount-parser-lima"
+repository = "https://github.com/tesujimath/beancount-parser-lima"
 readme = "README.md"
 exclude = [
     "examples/images/*"

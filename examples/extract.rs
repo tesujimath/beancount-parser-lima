@@ -7,7 +7,7 @@ use std::{io, iter::once};
 use strum::IntoEnumIterator;
 use time::Date;
 
-use beancount_parser::{
+use beancount_parser_lima::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
     ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
@@ -120,7 +120,7 @@ impl<'a> Primitive<'a> {
 
             AccountType(x) => write!(w, "{}", options.account_type_name(*x)),
             Flag(x) => {
-                if let beancount_parser::Flag::Letter(flag_letter) = x {
+                if let beancount_parser_lima::Flag::Letter(flag_letter) = x {
                     let c = flag_letter.char();
                     write!(w, "'{}", c)
                 } else {
