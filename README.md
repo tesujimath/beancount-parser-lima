@@ -40,6 +40,8 @@ Yeah, Beancount is complicated, and I may have made some mistakes here.  Current
 
 This is an incomplete list of what is currently unsupported.
 
+- query directive
+- custom directive
 - plugins
 
 ### Unsupported Options
