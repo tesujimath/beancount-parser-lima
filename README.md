@@ -8,8 +8,6 @@ Currently under active development.  APIs are subject to change, but I hope not 
 
 The slightly strange name is because of a somewhat careless failure on my part to notice the existing [beancount-parser](https://github.com/jcornaz/beancount-parser) when starting this project, for which apologies.
 
-(Note that zero-copy support from Chumsky is currently available only in alpha releases.)
-
 ## Features
 
 - fast, thanks to [Logos](https://docs.rs/logos/latest/logos/) and [Chumsky](https://docs.rs/chumsky/latest/chumsky/) zero copy
@@ -57,6 +55,12 @@ This is an incomplete list of what is currently unsupported.
 - `use_legacy_fixed_tolerances`
 
 Also, unary options are not supported.
+
+## Alpha Status Dependencies
+
+- Chumsky `1.0.0.alpha.*` releases are required for zero-copy support
+
+- smallvec `2.0.0-alpha.*` releases are required for correct lifetime inference
 
 ## Alternatives
 
