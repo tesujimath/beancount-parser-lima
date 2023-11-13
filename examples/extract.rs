@@ -1,6 +1,6 @@
-use anyhow::Result;
 use rust_decimal::Decimal;
 use std::borrow::Cow;
+use std::io::Write;
 use std::iter::{empty, Once};
 use std::path::PathBuf;
 use std::{io, iter::once};
@@ -18,17 +18,24 @@ use beancount_parser_lima::{
 /// This example is really a test that there is sufficient public access to parser output types.
 /// We need to avoid leaning on the Display implementations to be sure we can extract a usable value in every case.
 /// This is why all values are mapped onto Primitive without recourse to Display.
-fn main() -> Result<()> {
+fn main() {
     let flags = xflags::parse_or_exit! {
         /// File to parse
         required path: PathBuf
     };
 
-    let error_w = &io::stderr();
+    let stderr = &io::stderr();
     let sources = BeancountSources::new(flags.path);
-    let beancount_parser = BeancountParser::new(&sources);
+    let parser = BeancountParser::new(&sources);
 
-    match beancount_parser.parse() {
+    parse(&sources, &parser, stderr);
+}
+
+fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+where
+    W: Write + Copy,
+{
+    match parser.parse() {
         Ok(ParseResult {
             directives,
             options,
@@ -59,17 +66,15 @@ fn main() -> Result<()> {
                     Event(x) => event(x, d),
                 }
             })) {
-                p.write(&io::stdout(), &options)?;
+                p.write(&io::stdout(), &options).unwrap();
             }
             println!();
 
-            sources.write(error_w, warnings)?;
-
-            Ok(())
+            sources.write(error_w, warnings).unwrap();
         }
         Err(ParseError { errors, warnings }) => {
-            sources.write(error_w, errors)?;
-            sources.write(error_w, warnings).map_err(|e| e.into())
+            sources.write(error_w, errors).unwrap();
+            sources.write(error_w, warnings).unwrap();
         }
     }
 }

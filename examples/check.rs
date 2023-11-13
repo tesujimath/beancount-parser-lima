@@ -1,5 +1,5 @@
-use anyhow::Result;
 use rust_decimal::Decimal;
+use std::io::Write;
 use std::path::PathBuf;
 use std::{collections::HashMap, io};
 
@@ -17,17 +17,24 @@ use beancount_parser_lima::{
 /// 1. A transaction with all postings specifying an amount must sum to zero. (It is good practice to let the last posting amount be inferred.)
 ///
 /// 2. No posting must refer to an unknown or closed account.
-fn main() -> Result<()> {
+fn main() {
     let flags = xflags::parse_or_exit! {
         /// File to parse
         required path: PathBuf
     };
 
-    let error_w = &io::stderr();
+    let stderr = &io::stderr();
     let sources = BeancountSources::new(flags.path);
-    let beancount_parser = BeancountParser::new(&sources);
+    let parser = BeancountParser::new(&sources);
 
-    match beancount_parser.parse() {
+    parse(&sources, &parser, stderr);
+}
+
+fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+where
+    W: Write + Copy,
+{
+    match parser.parse() {
         Ok(ParseResult {
             directives,
             options: _,
@@ -94,16 +101,14 @@ fn main() -> Result<()> {
 
             sources.write(error_w, warnings).unwrap();
 
-            if errors.is_empty() {
-                Ok(())
-            } else {
-                sources.write(error_w, errors).map_err(|e| e.into())
+            if !errors.is_empty() {
+                sources.write(error_w, errors).unwrap();
             }
         }
 
         Err(ParseError { errors, warnings }) => {
-            sources.write(error_w, errors)?;
-            sources.write(error_w, warnings).map_err(|e| e.into())
+            sources.write(error_w, errors).unwrap();
+            sources.write(error_w, warnings).unwrap();
         }
     }
 }
