@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
 
@@ -13,7 +12,7 @@ use beancount_parser_lima::{
     BeancountParser, BeancountSources, Directive, ParseError, ParseResult,
 };
 
-fn main() -> Result<()> {
+fn main() {
     let flags = xflags::parse_or_exit! {
         /// Show allocations
         optional --show-allocations
@@ -22,20 +21,31 @@ fn main() -> Result<()> {
         required path: PathBuf
     };
 
+    let mut stderr = &io::stderr();
+
+    let sources = BeancountSources::new(flags.path);
+    let parser = BeancountParser::new(&sources);
+    writeln!(stderr, "{:?}", &sources).unwrap();
+
+    parse(&sources, &parser, flags.show_allocations, stderr);
+}
+
+fn parse<W>(
+    sources: &BeancountSources,
+    parser: &BeancountParser,
+    show_allocations: bool,
+    error_w: W,
+) where
+    W: Write + Copy,
+{
     // allocation counting
     let reg = Region::new(GLOBAL);
 
-    let mut error_w = &io::stderr();
-
-    let sources = BeancountSources::new(flags.path);
-    writeln!(error_w, "{:?}", &sources)?;
-
-    if flags.show_allocations {
+    if show_allocations {
         eprintln!("Allocations before parsing: {:#?}", reg.change());
     }
 
-    let beancount_parser = BeancountParser::new(&sources);
-    match beancount_parser.parse() {
+    match parser.parse() {
         Ok(ParseResult {
             directives,
             options: _,
@@ -43,7 +53,7 @@ fn main() -> Result<()> {
         }) => {
             let mut directives_as_strings = Vec::new();
 
-            if flags.show_allocations {
+            if show_allocations {
                 eprintln!(
                     "Allocations before printing directives: {:#?}",
                     reg.change()
@@ -66,24 +76,18 @@ fn main() -> Result<()> {
             }
 
             for directive in directives {
-                show_directive(
-                    &directive,
-                    flags.show_allocations,
-                    &mut directives_as_strings,
-                );
+                show_directive(&directive, show_allocations, &mut directives_as_strings);
             }
 
-            if flags.show_allocations {
+            if show_allocations {
                 eprintln!("Allocations after printing directives: {:#?}", reg.change());
             }
 
-            sources.write(error_w, warnings)?;
-
-            Ok(())
+            sources.write(error_w, warnings).unwrap();
         }
         Err(ParseError { errors, warnings }) => {
-            sources.write(error_w, errors)?;
-            sources.write(error_w, warnings).map_err(|e| e.into())
+            sources.write(error_w, errors).unwrap();
+            sources.write(error_w, warnings).unwrap();
         }
     }
 }
