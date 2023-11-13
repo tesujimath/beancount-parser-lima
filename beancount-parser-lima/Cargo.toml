@@ -1,0 +1,41 @@
+[package]
+name = "beancount-parser-lima"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A zero-copy parser for Beancount"
+homepage = "https://github.com/tesujimath/beancount-parser-lima"
+repository = "https://github.com/tesujimath/beancount-parser-lima"
+readme = "README.md"
+exclude = [
+    "examples/images/*"
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.71"
+ariadne = "0.3.0"
+# for bleeding edge ariadne
+# ariadne= { path = "../../../third-party/rust/ariadne" }
+chumsky = { version = "1.0.0-alpha.6", features = ["label", "regex"] }
+# for bleeding edge chumsky:
+# chumsky = { git = "https://github.com/tesujimath/chumsky", features = ["label", "regex"] }
+# chumsky = { path = "../../../third-party/rust/chumsky", features = ["label", "regex"] }
+either = "1.8.1"
+itertools = "0.10.5"
+lazy_format = "2.0.0"
+logos = "0.13.0"
+path-clean = "1.0.1"
+proptest = "1.2.0"
+rust_decimal = "1.29.1"
+rust_decimal_macros = "1.29.1"
+smallvec = "2.0.0-alpha.1"
+stats_alloc = "0.1.10"
+strum = "0.25.0"
+strum_macros = "0.25.0"
+time = "0.3.28"
+xflags = "0.3.1"
+
+[dev-dependencies]
+test-case = "3.1.0"
