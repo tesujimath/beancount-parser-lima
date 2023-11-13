@@ -919,7 +919,7 @@ impl<'a> Display for Account<'a> {
 
 /// The individual colon-separated components of an account, without the [AccountType] prefix.
 /// `SmallVec` stores a small number of these inline, before making use of the heap.
-pub type Subaccount<'a> = SmallVec<[AccountName<'a>; 4]>;
+pub type Subaccount<'a> = SmallVec<AccountName<'a>, 4>;
 
 /// A CandidateAccount is one where the account_type_name has not yet been resolved against current options.
 #[derive(PartialEq, Eq, Clone, Debug)]
