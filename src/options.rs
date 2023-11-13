@@ -1,6 +1,5 @@
 use super::format::{format, plain};
 use super::types::*;
-use nonempty::NonEmpty;
 use path_clean::PathClean;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -157,14 +156,11 @@ impl<'a> BeancountOption<'a> {
 }
 
 fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOptionError> {
-    let subaccount_names = colon_separated
+    colon_separated
         .split(':')
-        .by_ref()
         .map(AccountName::try_from)
-        .collect::<Result<Vec<AccountName>, _>>()
-        .map_err(|e| BadValueErrorKind::AccountName(e).wrap())?;
-
-    Ok(NonEmpty::collect(subaccount_names).unwrap())
+        .collect::<Result<Subaccount, _>>()
+        .map_err(|e| BadValueErrorKind::AccountName(e).wrap())
 }
 
 fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {

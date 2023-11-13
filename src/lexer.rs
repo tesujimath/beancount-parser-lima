@@ -1,6 +1,5 @@
 use super::{end_of_input, types::*};
 use logos::Logos;
-use nonempty::NonEmpty;
 use rust_decimal::Decimal;
 use std::{
     borrow::Cow,
@@ -353,13 +352,12 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
 fn parse_candidate_account(s: &str) -> Result<CandidateAccount, LexerError> {
     let mut account = s.split(':');
     let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())?;
-    let subaccount_names = account
-        .by_ref()
+    let subaccount = account
         .map(AccountName::try_from)
-        .collect::<Result<Vec<AccountName>, _>>()?;
+        .collect::<Result<Subaccount, _>>()?;
     Ok(CandidateAccount {
         account_type_name,
-        subaccount: NonEmpty::collect(subaccount_names).unwrap(),
+        subaccount,
     })
 }
 
