@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["beancount-parser-lima"]
+members = ["beancount-parser-lima", "beancount-parser-lima-python"]

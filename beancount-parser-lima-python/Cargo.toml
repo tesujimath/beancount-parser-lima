@@ -1,0 +1,15 @@
+[package]
+name = "beancount-parser-lima-python"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Python bindings for beancount-parser-lima"
+homepage = "https://github.com/tesujimath/beancount-parser-lima"
+repository = "https://github.com/tesujimath/beancount-parser-lima"
+
+[lib]
+name = "beancount_parser_lima"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.16.5", features = ["extension-module"] }

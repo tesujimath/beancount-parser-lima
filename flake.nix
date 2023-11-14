@@ -38,6 +38,10 @@
                 rust-analyzer
                 rust-bin.stable.latest.default
                 rustfmt
+
+                # for Python bindings
+                maturin
+                python3
               ];
             };
           }
