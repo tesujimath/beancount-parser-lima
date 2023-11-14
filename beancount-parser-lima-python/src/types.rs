@@ -5,21 +5,32 @@ use beancount_parser_lima as lima;
 use pyo3::{
     pyclass,
     types::{PyDate, PyString},
-    Py, Python,
+    IntoPy, Py, PyAny, PyResult, Python,
 };
 use time::Date;
 
 /// Beancount directive base class.
 #[derive(Debug)]
-#[pyclass]
-struct Directive {
+#[pyclass(subclass)]
+pub(crate) struct Directive {
+    #[pyo3(get)]
     date: Py<PyDate>,
     // metadata: Metadata<'a>,
 }
 
+impl Directive {
+    fn new(py: Python<'_>, date: &Date) -> Self {
+        Directive {
+            date: PyDate::new(py, date.year(), date.month() as u8, date.day())
+                .unwrap()
+                .into(),
+        }
+    }
+}
+
 /// Beancount transaction directive.
 #[derive(Debug)]
-#[pyclass]
+#[pyclass(extends=Directive)]
 pub(crate) struct Transaction {
     // flag: Py<PyString>,
     // payee: Option<Py<PyString>>,
@@ -30,14 +41,14 @@ pub(crate) struct Transaction {
 
 pub(crate) fn transaction<'a>(
     py: Python<'_>,
-    _date: &'a Date,
+    date: &'a Date,
     x: &lima::Transaction<'a>,
-) -> Transaction {
+) -> PyResult<Py<PyAny>> {
     let narration = x
         .narration()
         .map(|narration| PyString::new(py, narration.item()).into());
 
-    Transaction { narration }
+    Ok(Py::new(py, (Transaction { narration }, Directive::new(py, date)))?.into_py(py))
 }
 
 // A single posting within a [Transaction].

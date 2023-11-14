@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 /// Integrated all-in-one parse.
 #[pyfunction]
-fn parse(py: Python<'_>, path: &str) -> PyResult<Vec<Transaction>> {
+fn parse(py: Python<'_>, path: &str) -> PyResult<Vec<Py<PyAny>>> {
     let mut stderr = &io::stderr();
 
     let sources = BeancountSources::new(PathBuf::from(path));
@@ -13,7 +13,6 @@ fn parse(py: Python<'_>, path: &str) -> PyResult<Vec<Transaction>> {
     writeln!(stderr, "{:?}", &sources).unwrap();
 
     parse_sources(py, &sources, &parser, stderr)
-        .map_err(|n_errors| ParseError::new_err(format!("{} errors", n_errors)))
 }
 
 /// The Python module in Rust.
@@ -28,7 +27,7 @@ fn parse_sources<W>(
     sources: &BeancountSources,
     parser: &BeancountParser,
     error_w: W,
-) -> Result<Vec<Transaction>, usize>
+) -> PyResult<Vec<Py<PyAny>>>
 where
     W: Write + Copy,
 {
@@ -40,24 +39,22 @@ where
         }) => {
             use DirectiveVariant as V;
 
-            let directives = directives
+            sources.write(error_w, warnings).unwrap();
+
+            directives
                 .into_iter()
                 .filter_map(|d| match d.variant() {
                     V::Transaction(x) => Some(transaction(py, d.date(), x)),
                     _ => None,
                 })
-                .collect::<Vec<_>>();
-
-            sources.write(error_w, warnings).unwrap();
-
-            Ok(directives)
+                .collect::<PyResult<Vec<Py<PyAny>>>>()
         }
         Err(beancount_parser_lima::ParseError { errors, warnings }) => {
             let n_errors = errors.len();
 
             sources.write(error_w, errors).unwrap();
             sources.write(error_w, warnings).unwrap();
-            Err(n_errors)
+            Err(ParseError::new_err(format!("{} errors", n_errors)))
         }
     }
 }
