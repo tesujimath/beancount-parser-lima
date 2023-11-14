@@ -1,18 +1,18 @@
-use beancount_parser_lima::{BeancountParser, BeancountSources, ParseResult};
+use beancount_parser_lima::{BeancountParser, BeancountSources, DirectiveVariant, ParseResult};
 use pyo3::{create_exception, exceptions::PyException, prelude::*};
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
 
 /// Integrated all-in-one parse.
 #[pyfunction]
-fn parse(path: &str) -> PyResult<String> {
+fn parse(py: Python<'_>, path: &str) -> PyResult<Vec<Transaction>> {
     let mut stderr = &io::stderr();
 
     let sources = BeancountSources::new(PathBuf::from(path));
     let parser = BeancountParser::new(&sources);
     writeln!(stderr, "{:?}", &sources).unwrap();
 
-    parse_sources(&sources, &parser, stderr)
+    parse_sources(py, &sources, &parser, stderr)
         .map_err(|n_errors| ParseError::new_err(format!("{} errors", n_errors)))
 }
 
@@ -24,10 +24,11 @@ fn beancount_parser_lima(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 fn parse_sources<W>(
+    py: Python<'_>,
     sources: &BeancountSources,
     parser: &BeancountParser,
     error_w: W,
-) -> Result<String, usize>
+) -> Result<Vec<Transaction>, usize>
 where
     W: Write + Copy,
 {
@@ -37,13 +38,19 @@ where
             options: _,
             warnings,
         }) => {
-            for directive in directives {
-                println!("{}\n", &directive);
-            }
+            use DirectiveVariant as V;
+
+            let directives = directives
+                .into_iter()
+                .filter_map(|d| match d.variant() {
+                    V::Transaction(x) => Some(transaction(py, d.date(), x)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
 
             sources.write(error_w, warnings).unwrap();
 
-            Ok("Yay!".to_owned())
+            Ok(directives)
         }
         Err(beancount_parser_lima::ParseError { errors, warnings }) => {
             let n_errors = errors.len();
@@ -63,3 +70,4 @@ create_exception!(
 );
 
 mod types;
+use types::*;
