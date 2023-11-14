@@ -6,10 +6,11 @@
 //! # Examples
 //!
 //! This example generates the output as shown above.
+//! The supporting function `parse` is required in order to avoid lifetime problems.
 //!
 //!```
 //! # use rust_decimal::Decimal;
-//! # use std::io;
+//! # use std::io::{self, Write};
 //! # use std::path::PathBuf;
 //!
 //!use beancount_parser_lima::{
@@ -17,11 +18,17 @@
 //!};
 //!
 //!fn main() {
-//!    let stderr = &io::stderr();
 //!    let sources = BeancountSources::new(PathBuf::from("examples/data/error-post-balancing.beancount"));
-//!    let beancount_parser = BeancountParser::new(&sources);
+//!    let parser = BeancountParser::new(&sources);
 //!
-//!    match beancount_parser.parse() {
+//!    parse(&sources, &parser, &io::stderr());
+//!}
+//!
+//!fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+//!where
+//!    W: Write + Copy,
+//!{
+//!    match parser.parse() {
 //!        Ok(ParseResult {
 //!            directives,
 //!            options: _,
@@ -62,13 +69,13 @@
 //!                }
 //!            }
 //!
-//!            sources.write(stderr, errors).unwrap();
-//!            sources.write(stderr, warnings).unwrap();
+//!            sources.write(error_w, errors).unwrap();
+//!            sources.write(error_w, warnings).unwrap();
 //!        }
 //!
 //!        Err(ParseError { errors, warnings }) => {
-//!            sources.write(stderr, errors).unwrap();
-//!            sources.write(stderr, warnings).unwrap();
+//!            sources.write(error_w, errors).unwrap();
+//!            sources.write(error_w, warnings).unwrap();
 //!        }
 //!    }
 //!}
@@ -297,28 +304,38 @@ type SpannedToken<'t> = (Token<'t>, Span);
 ///
 /// # Examples
 /// ```
+/// # use std::io::{self, Write};
 /// # use std::path::PathBuf;
+///
 /// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseResult};
 ///
-/// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
-/// let beancount_parser = BeancountParser::new(&sources);
-/// let mut stderr = &std::io::stderr();
+/// fn main() {
+///     let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
+///     let parser = BeancountParser::new(&sources);
 ///
-/// match beancount_parser.parse() {
-///     Ok(ParseResult {
-///         directives,
-///         options: _,
-///         warnings,
-///     }) => {
-///         for directive in directives {
-///             println!("{}\n", &directive);
+///     parse(&sources, &parser, &io::stderr());
+/// }
+///
+/// fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+/// where
+///     W: Write + Copy,
+/// {
+///     match parser.parse() {
+///         Ok(ParseResult {
+///             directives,
+///             options: _,
+///             warnings,
+///         }) => {
+///             for directive in directives {
+///                 println!("{}\n", &directive);
+///             }
+///    
+///             sources.write(error_w, warnings).unwrap();
 ///         }
-///
-///         sources.write(stderr, warnings).unwrap();
-///     }
-///     Err(ParseError { errors, warnings }) => {
-///         sources.write(stderr, errors).unwrap();
-///         sources.write(stderr, warnings).unwrap();
+///         Err(ParseError { errors, warnings }) => {
+///             sources.write(error_w, errors).unwrap();
+///             sources.write(error_w, warnings).unwrap();
+///         }
 ///     }
 /// }
 /// ````

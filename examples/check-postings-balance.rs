@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use std::io;
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 use beancount_parser_lima::{
@@ -22,9 +22,16 @@ fn main() {
 
     let stderr = &io::stderr();
     let sources = BeancountSources::new(flags.path);
-    let beancount_parser = BeancountParser::new(&sources);
+    let parser = BeancountParser::new(&sources);
 
-    match beancount_parser.parse() {
+    parse(&sources, &parser, stderr);
+}
+
+fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+where
+    W: Write + Copy,
+{
+    match parser.parse() {
         Ok(ParseResult {
             directives,
             options: _,
@@ -65,13 +72,13 @@ fn main() {
                 }
             }
 
-            sources.write(stderr, errors).unwrap();
-            sources.write(stderr, warnings).unwrap();
+            sources.write(error_w, errors).unwrap();
+            sources.write(error_w, warnings).unwrap();
         }
 
         Err(ParseError { errors, warnings }) => {
-            sources.write(stderr, errors).unwrap();
-            sources.write(stderr, warnings).unwrap();
+            sources.write(error_w, errors).unwrap();
+            sources.write(error_w, warnings).unwrap();
         }
     }
 }
