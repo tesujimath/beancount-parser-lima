@@ -18,7 +18,7 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 - focus on conceptual clarity of application domain objects mapped to Rust types
 
-- [Python bindings](../beancount-parser-lima-python/README.md) (work-in-progress)
+- [Python bindings](/beancount-parser-lima-python/README.md) (work-in-progress)
 
 <img src="https://raw.githubusercontent.com/tesujimath/beancount-parser-lima/master/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
 
