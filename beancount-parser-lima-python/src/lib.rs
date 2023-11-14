@@ -1,4 +1,4 @@
-use beancount_parser_lima::{BeancountParser, BeancountSources, Directive, ParseResult};
+use beancount_parser_lima::{BeancountParser, BeancountSources, ParseResult};
 use pyo3::exceptions::PyException;
 use pyo3::{create_exception, prelude::*};
 use std::io::{self, prelude::*};
