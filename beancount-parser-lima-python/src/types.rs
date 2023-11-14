@@ -36,30 +36,51 @@ pub(crate) struct Transaction {
     // payee: Option<Py<PyString>>,
     #[pyo3(get)]
     narration: Option<Py<PyString>>,
-    // postings: Vec<Posting>,
+    #[pyo3(get)]
+    postings: Vec<Posting>,
 }
 
-pub(crate) fn transaction<'a>(
+pub(crate) fn transaction(
     py: Python<'_>,
-    date: &'a Date,
-    x: &lima::Transaction<'a>,
+    date: &Date,
+    x: &lima::Transaction<'_>,
 ) -> PyResult<Py<PyAny>> {
     let narration = x
         .narration()
         .map(|narration| PyString::new(py, narration.item()).into());
+    let postings = x.postings().map(|p| posting(py, p)).collect::<Vec<_>>();
 
-    Ok(Py::new(py, (Transaction { narration }, Directive::new(py, date)))?.into_py(py))
+    Ok(Py::new(
+        py,
+        (
+            Transaction {
+                narration,
+                postings,
+            },
+            Directive::new(py, date),
+        ),
+    )?
+    .into_py(py))
 }
 
 // A single posting within a [Transaction].
-// #[derive(Debug)]
-// #[pyclass]
-// struct Posting {
-// flag: Option<Spanned<Flag>>,
-// account: Py<PyList>,
-// amount: Option<Decimal>,
-// currency: Option<Py<PyString>>,
-// cost_spec: Option<Spanned<CostSpec<'a>>>,
-// price_annotation: Option<Spanned<ScopedAmount<'a>>>,
-// metadata: Metadata<'a>,
-// }
+#[derive(Clone, Debug)]
+#[pyclass]
+struct Posting {
+    // flag: Option<Spanned<Flag>>,
+    // account: Py<PyList>,
+    // amount: Option<Decimal>,
+    #[pyo3(get)]
+    currency: Option<Py<PyString>>,
+    // cost_spec: Option<Spanned<CostSpec<'a>>>,
+    // price_annotation: Option<Spanned<ScopedAmount<'a>>>,
+    // metadata: Metadata<'a>,
+}
+
+fn posting(py: Python<'_>, x: &lima::Posting<'_>) -> Posting {
+    let currency = x
+        .currency()
+        .map(|currency| PyString::new(py, currency.item().as_ref()).into());
+
+    Posting { currency }
+}
