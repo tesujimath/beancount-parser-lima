@@ -1,4 +1,4 @@
-# Python bindings for beancount-parser-lima
+# Python Bindings for beancount-parser-lima
 
 The Python bindings are a simplification of the Rust interface, mainly because zero-copy is not possible, and all directives are returned by value.
 
@@ -43,7 +43,7 @@ A single list is allocated with contents `["Assets", "Bank", "Current"]`, and th
 
 String values which are expected to be unique (or mostly so), such as narrations, are not interned.
 
-## Development shell
+## Development Shell
 
 If you have a Rust toolchain and other required tools such as `maturin` installed (for which see `flake.nix`), the parser may be built and run locally as follows.
 
@@ -54,3 +54,9 @@ $ maturin develop
 $ source .venv/bin/activate
 $ python-examples/parse.py ../beancount-parser-lima/examples/data/full.beancount
 ```
+
+## Open Issues and Future Work
+
+### Spanned
+
+It would be desirable to be able to return spanned values, for application error reporting.
