@@ -1,4 +1,10 @@
-use std::{cell::RefCell, cmp::Ordering, iter::once};
+use std::{
+    cell::RefCell,
+    cmp::Ordering,
+    collections::{hash_map, HashMap},
+    hash::Hash,
+    iter::{once, FromIterator},
+};
 
 use crate::types::*;
 use beancount_parser_lima as lima;
@@ -6,6 +12,7 @@ use pyo3::{
     types::{PyDate, PyList, PyString},
     IntoPy, Py, PyAny, PyResult, Python,
 };
+use smallvec::SmallVec;
 use string_interner::{symbol::SymbolU32, StringInterner, Symbol};
 use time::Date;
 
@@ -13,18 +20,17 @@ use time::Date;
 ///
 /// While PyO3 does seem to support string interning, there's a comment there that
 /// every string interning request results in creation of a temporary Python String
-/// object, which we must avoid.
+/// object, which we choose to avoid.
 pub(crate) struct Converter {
-    string_interner: StringInterner,
-    py_strings: Vec<Py<PyString>>,
+    string: StringFactory,
+    account: AccountFactory,
 }
 
 impl Converter {
     pub(crate) fn new() -> Self {
         Converter {
-            string_interner: StringInterner::new(),
-            // the StringInterner never produces symbol zero, so:
-            py_strings: Vec::new(),
+            string: StringFactory::new(),
+            account: AccountFactory::new(),
         }
     }
 
@@ -44,7 +50,7 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let narration = x
             .narration()
-            .map(|narration| PyString::new(py, narration.item()).into());
+            .map(|narration| self.string.create_or_reuse(py, narration.item()));
         let postings = x
             .postings()
             .map(|p| self.posting(py, p))
@@ -64,43 +70,42 @@ impl Converter {
     }
 
     pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> Posting {
-        let account = self.account(py, x.account());
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
         let currency = x
             .currency()
-            .map(|currency| self.string(py, currency.item().as_ref()));
+            .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref()));
 
         Posting { account, currency }
     }
+}
 
-    pub(crate) fn account(&mut self, py: Python<'_>, x: &lima::Account) -> Py<PyList> {
-        let rc = RefCell::new(self);
-        let account_type = rc.borrow_mut().str2sym(py, x.account_type().as_ref());
-        let subaccount = x.names().map(|name| {
-            // let mut c = rc.borrow_mut();
+struct StringFactory {
+    string_interner: StringInterner,
+    py_strings: Vec<Py<PyString>>,
+}
 
-            rc.borrow_mut().str2sym(py, name.as_ref())
-        });
-
-        PyList::new(
-            py,
-            once(account_type)
-                .chain(subaccount)
-                .map(|sym| rc.borrow_mut().sym2string(py, sym))
-                .collect::<Vec<_>>(),
-        )
-        .into()
+impl StringFactory {
+    fn new() -> Self {
+        StringFactory {
+            string_interner: StringInterner::new(),
+            py_strings: Vec::new(),
+        }
     }
 
-    pub(crate) fn string(&mut self, py: Python<'_>, x: &str) -> Py<PyString> {
-        let sym = self.str2sym(py, x);
-        self.sym2string(py, sym)
+    // either create a new string or reuse an existing one if we've already seen this string before
+    fn create_or_reuse(&mut self, py: Python<'_>, x: &str) -> Py<PyString> {
+        let sym = self.create_or_lookup_symbol(py, x);
+        self.reuse(py, sym)
     }
 
-    fn sym2string(&mut self, py: Python<'_>, sym: SymbolU32) -> Py<PyString> {
+    // reuse a string we have in our symbol table
+    fn reuse(&mut self, py: Python<'_>, sym: SymbolU32) -> Py<PyString> {
         self.py_strings[sym.to_usize()].clone_ref(py)
     }
 
-    fn str2sym(&mut self, py: Python<'_>, x: &str) -> SymbolU32 {
+    fn create_or_lookup_symbol(&mut self, py: Python<'_>, x: &str) -> SymbolU32 {
         use Ordering::*;
 
         let sym = self.string_interner.get_or_intern(x);
@@ -125,5 +130,100 @@ impl Converter {
         }
 
         sym
+    }
+}
+
+struct AccountFactory {
+    accounts: HashMap<AccountKey, Py<PyList>>,
+}
+
+impl AccountFactory {
+    pub(crate) fn new() -> Self {
+        AccountFactory {
+            accounts: HashMap::new(),
+        }
+    }
+
+    fn account_key(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::Account,
+        string: &mut StringFactory,
+    ) -> AccountKey {
+        let string = RefCell::new(string);
+        let account_type = string
+            .borrow_mut()
+            .create_or_lookup_symbol(py, x.account_type().as_ref());
+        let subaccount = x.names().map(|name| {
+            string
+                .borrow_mut()
+                .create_or_lookup_symbol(py, name.as_ref())
+        });
+
+        once(account_type).chain(subaccount).collect::<AccountKey>()
+    }
+
+    fn create_or_reuse(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::Account,
+        string: &mut StringFactory,
+    ) -> Py<PyList> {
+        use hash_map::Entry::*;
+
+        let key = self.account_key(py, x, string);
+        // if we've got this account, then just clone a new ref, otherwise create a PyList
+        match self.accounts.entry(key) {
+            Occupied(account) => account.get().clone_ref(py),
+            Vacant(entry) => {
+                let string = RefCell::new(string);
+                let account_type = string
+                    .borrow_mut()
+                    .create_or_lookup_symbol(py, x.account_type().as_ref());
+                let subaccount = x.names().map(|name| {
+                    string
+                        .borrow_mut()
+                        .create_or_lookup_symbol(py, name.as_ref())
+                });
+
+                entry
+                    .insert(
+                        PyList::new(
+                            py,
+                            once(account_type)
+                                .chain(subaccount)
+                                .map(|sym| string.borrow_mut().reuse(py, sym))
+                                .collect::<Vec<_>>(),
+                        )
+                        .into(),
+                    )
+                    .clone_ref(py)
+            }
+        }
+    }
+}
+
+/// Uniquely identifies an account.
+struct AccountKey(SmallVec<SymbolU32, 5>);
+
+impl PartialEq for AccountKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl Eq for AccountKey {}
+
+impl Hash for AccountKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for sym in self.0.iter() {
+            sym.hash(state);
+        }
+    }
+}
+
+impl FromIterator<SymbolU32> for AccountKey {
+    fn from_iter<T: IntoIterator<Item = SymbolU32>>(iter: T) -> Self {
+        AccountKey(iter.into_iter().collect())
     }
 }
