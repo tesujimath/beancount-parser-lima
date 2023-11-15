@@ -39,12 +39,14 @@ where
         }) => {
             use DirectiveVariant as V;
 
+            let mut c = Converter::new();
+
             sources.write(error_w, warnings).unwrap();
 
             directives
                 .into_iter()
                 .filter_map(|d| match d.variant() {
-                    V::Transaction(x) => Some(transaction(py, d.date(), x)),
+                    V::Transaction(x) => Some(c.transaction(py, d.date(), x)),
                     _ => None,
                 })
                 .collect::<PyResult<Vec<Py<PyAny>>>>()
@@ -66,5 +68,6 @@ create_exception!(
     "Parse error"
 );
 
+mod conversions;
+use conversions::Converter;
 mod types;
-use types::*;

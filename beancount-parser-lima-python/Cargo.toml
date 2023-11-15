@@ -15,4 +15,5 @@ crate-type = ["cdylib"]
 beancount-parser-lima = { path = "../beancount-parser-lima" }
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
 rust_decimal = "1.29.1"
+string-interner = "0.14.0"
 time = "0.3.28"
