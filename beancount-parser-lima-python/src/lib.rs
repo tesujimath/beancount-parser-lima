@@ -1,4 +1,5 @@
-use beancount_parser_lima::{BeancountParser, BeancountSources, DirectiveVariant, ParseResult};
+use ::beancount_parser_lima as lima;
+use lima::{BeancountParser, BeancountSources, DirectiveVariant, ParseResult};
 use pyo3::{create_exception, exceptions::PyException, prelude::*};
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
@@ -51,7 +52,7 @@ where
                 })
                 .collect::<PyResult<Vec<Py<PyAny>>>>()
         }
-        Err(beancount_parser_lima::ParseError { errors, warnings }) => {
+        Err(lima::ParseError { errors, warnings }) => {
             let n_errors = errors.len();
 
             sources.write(error_w, errors).unwrap();

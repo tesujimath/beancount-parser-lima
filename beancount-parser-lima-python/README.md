@@ -8,15 +8,11 @@ The Python bindings are a simplification of the Rust interface, mainly because z
 
 The main downside with Python compared with Rust is that zero-copy is not possible.  Each value returned to Python must be a Python object allocated on the heap.  It is simply not possible to return pointers to data structures owned by Rust.  The performance goal therefore is to minimize the number of such allocations.
 
-Several mechanisms for reducing allocations may be employed.
+Several mechanisms for reducing allocations are employed.
 
-*Not implemented in the initial release*
+1. Strings are interned and those having the same value are mapped onto a single Python string object.
 
-1. Most strings are interned and those having the same value are mapped onto a single Python string object.
-
-2. Other commonly used objects such as `datetime.date` are also interned, and same-valued instances mapped onto a single Python object.
-
-3. The lists which hold account names are also reused.
+2. The lists which hold account names are also reused.
 
 ### Example
 
@@ -40,8 +36,6 @@ Only a single Python string to hold the currency `"NZD"` is allocated.  It will 
 Similarly only a single Python string is used to hold the four instances of `"Assets"` (with a reference count of five), and a single Python string holds the value `"Bank"` (also with a reference count of five).
 
 A single list is allocated with contents `["Assets", "Bank", "Current"]`, and this has a reference count of four (three returned values plus the master copy in the account table).  A separate list has the contents `["Assets", "Bank", "Savings"]`, using the same Python string objects as the other list for the first two values in the list.
-
-String values which are expected to be unique (or mostly so), such as narrations, are not interned.
 
 ## Development Shell
 

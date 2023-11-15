@@ -3,8 +3,12 @@ requires = ["maturin>=0.13,<0.14"]
 build-backend = "maturin"
 
 [project]
-name = "beancount-parser-lima-python"
+name = "beancount-parser-lima"
+version = "0.1.0"
+description = "Python bindings for beancount-parser-lima"
+readme = "README.md"
 requires-python = ">=3.7"
+license = "Either of Apache License v2.0 or MIT License at your option"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",

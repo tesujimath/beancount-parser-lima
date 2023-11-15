@@ -1,10 +1,12 @@
+use std::cmp::Ordering;
+
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
     types::{PyDate, PyString},
     IntoPy, Py, PyAny, PyResult, Python,
 };
-use string_interner::StringInterner;
+use string_interner::{StringInterner, Symbol};
 use time::Date;
 
 /// Convert from Rust to Python while interning strings, dates, Subaccount lists.
@@ -14,12 +16,15 @@ use time::Date;
 /// object, which we must avoid.
 pub(crate) struct Converter {
     string_interner: StringInterner,
+    py_strings: Vec<Py<PyString>>,
 }
 
 impl Converter {
     pub(crate) fn new() -> Self {
         Converter {
             string_interner: StringInterner::new(),
+            // the StringInterner never produces symbol zero, so:
+            py_strings: Vec::new(),
         }
     }
 
@@ -67,6 +72,28 @@ impl Converter {
     }
 
     pub(crate) fn string(&mut self, py: Python<'_>, s: &str) -> Py<PyString> {
-        PyString::new(py, s).into()
+        use Ordering::*;
+
+        let sym = self.string_interner.get_or_intern(s);
+        let i_sym = sym.to_usize();
+        println!("interned {} as {:?} with index {}", s, sym, i_sym);
+
+        match i_sym.cmp(&self.py_strings.len()) {
+            Less => (),
+            Equal => {
+                self.py_strings.push(PyString::new(py, s).into());
+            }
+            Greater => {
+                // impossible
+                panic!(
+                    "unexpected symbol {:?} with index {} from string_interner with vec len {}",
+                    sym,
+                    i_sym,
+                    self.py_strings.len()
+                );
+            }
+        }
+
+        self.py_strings[i_sym].clone_ref(py)
     }
 }
