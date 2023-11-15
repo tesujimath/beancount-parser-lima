@@ -155,7 +155,7 @@ fn extract_options<'a>(options: &'a Options) -> Box<dyn Iterator<Item = Primitiv
         option("title", string(options.title(), Decoration::None))
             .chain(AccountType::iter().flat_map(|account_type| {
                 option(
-                    format!("name_{}", account_type.to_string().to_lowercase()),
+                    format!("name_{}", account_type.as_ref().to_lowercase()),
                     string_as_ref(options.account_type_name(account_type), Decoration::None),
                 )
             }))

@@ -3,7 +3,7 @@
 
 use pyo3::{
     pyclass,
-    types::{PyDate, PyString},
+    types::{PyDate, PyList, PyString},
     Py,
 };
 
@@ -33,7 +33,8 @@ pub(crate) struct Transaction {
 #[pyclass]
 pub(crate) struct Posting {
     // flag: Option<Spanned<Flag>>,
-    // account: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account: Py<PyList>,
     // amount: Option<Decimal>,
     #[pyo3(get)]
     pub(crate) currency: Option<Py<PyString>>,

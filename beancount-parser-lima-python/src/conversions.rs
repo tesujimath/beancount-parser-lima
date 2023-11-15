@@ -1,12 +1,12 @@
-use std::cmp::Ordering;
+use std::{cell::RefCell, cmp::Ordering, iter::once};
 
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
-    types::{PyDate, PyString},
+    types::{PyDate, PyList, PyString},
     IntoPy, Py, PyAny, PyResult, Python,
 };
-use string_interner::{StringInterner, Symbol};
+use string_interner::{symbol::SymbolU32, StringInterner, Symbol};
 use time::Date;
 
 /// Convert from Rust to Python while interning strings, dates, Subaccount lists.
@@ -64,24 +64,54 @@ impl Converter {
     }
 
     pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> Posting {
+        let account = self.account(py, x.account());
         let currency = x
             .currency()
             .map(|currency| self.string(py, currency.item().as_ref()));
 
-        Posting { currency }
+        Posting { account, currency }
     }
 
-    pub(crate) fn string(&mut self, py: Python<'_>, s: &str) -> Py<PyString> {
+    pub(crate) fn account(&mut self, py: Python<'_>, x: &lima::Account) -> Py<PyList> {
+        let rc = RefCell::new(self);
+        let account_type = rc.borrow_mut().str2sym(py, x.account_type().as_ref());
+        let subaccount = x.names().map(|name| {
+            // let mut c = rc.borrow_mut();
+
+            rc.borrow_mut().str2sym(py, name.as_ref())
+        });
+
+        PyList::new(
+            py,
+            once(account_type)
+                .chain(subaccount)
+                .map(|sym| rc.borrow_mut().sym2string(py, sym))
+                .collect::<Vec<_>>(),
+        )
+        .into()
+    }
+
+    pub(crate) fn string(&mut self, py: Python<'_>, x: &str) -> Py<PyString> {
+        let sym = self.str2sym(py, x);
+        self.sym2string(py, sym)
+    }
+
+    fn sym2string(&mut self, py: Python<'_>, sym: SymbolU32) -> Py<PyString> {
+        self.py_strings[sym.to_usize()].clone_ref(py)
+    }
+
+    fn str2sym(&mut self, py: Python<'_>, x: &str) -> SymbolU32 {
         use Ordering::*;
 
-        let sym = self.string_interner.get_or_intern(s);
+        let sym = self.string_interner.get_or_intern(x);
         let i_sym = sym.to_usize();
-        println!("interned {} as {:?} with index {}", s, sym, i_sym);
+        println!("interned {} as {:?} with index {}", x, sym, i_sym);
 
+        // allocate a new PyString if we don't already have it
         match i_sym.cmp(&self.py_strings.len()) {
             Less => (),
             Equal => {
-                self.py_strings.push(PyString::new(py, s).into());
+                self.py_strings.push(PyString::new(py, x).into());
             }
             Greater => {
                 // impossible
@@ -94,6 +124,6 @@ impl Converter {
             }
         }
 
-        self.py_strings[i_sym].clone_ref(py)
+        sym
     }
 }

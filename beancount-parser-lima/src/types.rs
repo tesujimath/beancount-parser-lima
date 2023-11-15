@@ -15,7 +15,7 @@ use std::{
     mem::swap,
     ops::Deref,
 };
-use strum_macros::{Display, EnumIter, EnumString};
+use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 use time::Date;
 
 /// Error or warning, according to the marker type with which it is instantiated.
@@ -198,13 +198,19 @@ impl ErrorOrWarningKind for WarningKind {
 }
 
 /// Top-level account type, the prefix of any fully-qualified [Account].
-#[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, Display, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, IntoStaticStr, Debug)]
 pub enum AccountType {
     Assets,
     Liabilities,
     Equity,
     Income,
     Expenses,
+}
+
+impl AsRef<str> for AccountType {
+    fn as_ref(&self) -> &'static str {
+        self.into()
+    }
 }
 
 /// A flag on a [Posting] or [Transaction].
@@ -912,7 +918,7 @@ impl<'a> ElementType for Account<'a> {
 
 impl<'a> Display for Account<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.account_type)?;
+        write!(f, "{}", self.account_type.as_ref())?;
         format(f, self.names(), plain, ":", Some(":"))
     }
 }

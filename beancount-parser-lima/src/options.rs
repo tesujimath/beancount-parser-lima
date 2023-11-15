@@ -785,7 +785,7 @@ impl Display for AccountTypeNamesError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use AccountTypeNamesErrorKind::*;
         match &self.0 {
-            NameInUse(t) => write!(f, "account type name in use for {}", t),
+            NameInUse(t) => write!(f, "account type name in use for {}", t.as_ref()),
         }
     }
 }
