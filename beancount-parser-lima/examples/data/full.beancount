@@ -65,4 +65,8 @@ popmeta drink:
   #car
   Assets:Bank:Current                           -125.00 NZD
   ofxid: "0.12-3456-1234567-01.31May2023.3"
-  Expenses:Car:Fuel    10 GBP
+  Expenses:Car:Fuel
+
+2023-05-31 * "Z Energy ;" #petrol
+  Assets:Bank:Current                           -130.00 NZD
+  Expenses:Car:Fuel

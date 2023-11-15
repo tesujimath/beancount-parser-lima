@@ -9,7 +9,7 @@ use std::{
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
-    types::{PyDate, PyList, PyString},
+    types::{PyDate, PyDateAccess, PyList, PyString},
     IntoPy, Py, PyAny, PyResult, Python,
 };
 use smallvec::SmallVec;
@@ -24,6 +24,7 @@ use time::Date;
 pub(crate) struct Converter {
     string: StringFactory,
     account: AccountFactory,
+    date: DateFactory,
 }
 
 impl Converter {
@@ -31,14 +32,13 @@ impl Converter {
         Converter {
             string: StringFactory::new(),
             account: AccountFactory::new(),
+            date: DateFactory::new(),
         }
     }
 
     pub(crate) fn directive(&mut self, py: Python<'_>, date: &Date) -> Directive {
         Directive {
-            date: PyDate::new(py, date.year(), date.month() as u8, date.day())
-                .unwrap()
-                .into(),
+            date: self.date.create_or_reuse(py, date),
         }
     }
 
@@ -226,4 +226,42 @@ impl FromIterator<SymbolU32> for AccountKey {
     fn from_iter<T: IntoIterator<Item = SymbolU32>>(iter: T) -> Self {
         AccountKey(iter.into_iter().collect())
     }
+}
+
+struct DateFactory {
+    cached_date: Option<Py<PyDate>>,
+}
+
+impl DateFactory {
+    pub(crate) fn new() -> Self {
+        DateFactory { cached_date: None }
+    }
+
+    // reuse the cached date if it matches, otherwise discard and create a new one.
+    fn create_or_reuse(&mut self, py: Python<'_>, x: &Date) -> Py<PyDate> {
+        let cached_date = self.cached_date.take();
+
+        self.cached_date = match cached_date {
+            Some(cached_date) => {
+                let py_date = cached_date.as_ref(py);
+                if py_date.get_year() == x.year()
+                    && py_date.get_month() == x.month() as u8
+                    && py_date.get_day() == x.day()
+                {
+                    Some(cached_date)
+                } else {
+                    Some(create_date(py, x))
+                }
+            }
+            None => Some(create_date(py, x)),
+        };
+
+        self.cached_date.as_ref().unwrap().clone_ref(py)
+    }
+}
+
+fn create_date(py: Python<'_>, x: &Date) -> Py<PyDate> {
+    PyDate::new(py, x.year(), x.month() as u8, x.day())
+        .unwrap()
+        .into()
 }
