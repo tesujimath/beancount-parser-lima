@@ -20,7 +20,8 @@ pub(crate) struct Directive {
 #[derive(Debug)]
 #[pyclass(extends=Directive)]
 pub(crate) struct Transaction {
-    // flag: Py<PyString>,
+    #[pyo3(get)]
+    pub(crate) flag: Py<PyString>,
     // payee: Option<Py<PyString>>,
     #[pyo3(get)]
     pub(crate) narration: Option<Py<PyString>>,
@@ -32,7 +33,8 @@ pub(crate) struct Transaction {
 #[derive(Clone, Debug)]
 #[pyclass]
 pub(crate) struct Posting {
-    // flag: Option<Spanned<Flag>>,
+    #[pyo3(get)]
+    pub(crate) flag: Option<Py<PyString>>,
     #[pyo3(get)]
     pub(crate) account: Py<PyList>,
     // amount: Option<Decimal>,

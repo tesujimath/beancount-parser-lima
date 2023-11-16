@@ -48,6 +48,7 @@ impl Converter {
         date: &Date,
         x: &lima::Transaction<'_>,
     ) -> PyResult<Py<PyAny>> {
+        let flag = self.flag(py, x.flag().item());
         let narration = x
             .narration()
             .map(|narration| self.string.create_or_reuse(py, narration.item()));
@@ -60,6 +61,7 @@ impl Converter {
             py,
             (
                 Transaction {
+                    flag,
                     narration,
                     postings,
                 },
@@ -70,6 +72,7 @@ impl Converter {
     }
 
     pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> Posting {
+        let flag = x.flag().map(|flag| self.flag(py, flag.item()));
         let account = self
             .account
             .create_or_reuse(py, x.account(), &mut self.string);
@@ -77,7 +80,31 @@ impl Converter {
             .currency()
             .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref()));
 
-        Posting { account, currency }
+        Posting {
+            flag,
+            account,
+            currency,
+        }
+    }
+
+    pub(crate) fn flag(&mut self, py: Python<'_>, x: &lima::Flag) -> Py<PyString> {
+        use lima::Flag::*;
+
+        let mut buf = [0; 2];
+        let s = match x {
+            Asterisk => '*'.encode_utf8(&mut buf),
+            Exclamation => '*'.encode_utf8(&mut buf),
+            Ampersand => '*'.encode_utf8(&mut buf),
+            Hash => '*'.encode_utf8(&mut buf),
+            Question => '*'.encode_utf8(&mut buf),
+            Percent => '*'.encode_utf8(&mut buf),
+            Letter(x) => {
+                '\''.encode_utf8(&mut buf);
+                x.char().encode_utf8(&mut buf[1..]);
+                std::str::from_utf8(&buf).unwrap()
+            }
+        };
+        self.string.create_or_reuse(py, s)
     }
 }
 

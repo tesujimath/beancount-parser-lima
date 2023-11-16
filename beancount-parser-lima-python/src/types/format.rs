@@ -27,10 +27,7 @@ fn fmt_transaction(
     date: &Py<PyDate>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    // write!(f, "{} {}", date, self.flag)?;
-    write!(f, "{}", date)?;
-    // write!(f, "Transaction")?;
-
+    write!(f, "{} {}", date, x.flag)?;
     // format(f, &self.payee, double_quoted, " ", Some(" "))?;
     format(f, &x.narration, double_quoted, " ", Some(" "))?;
     // we prefer to show tags and links inline rather then line by line in metadata
@@ -51,14 +48,14 @@ impl Posting {
 }
 
 fn fmt_posting(x: &Posting, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
-    // simple_format(f, self.flag, None)?;
+    simple_format(f, x.flag.as_ref(), None)?;
 
     format(
         f,
         x.account.as_ref(py),
         plain,
-        ":",  // TODO if self.flag.is_some() { " " } else { "" },
-        None, // TODO if self.flag.is_some() { " " } else { "" },
+        ":",
+        x.flag.as_ref().and(Some(" ")),
     )?;
     // write!(
     //     f,
