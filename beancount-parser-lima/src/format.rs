@@ -1,6 +1,11 @@
+//! Formatting routines for display of Beancount entities.
+//! Only really public for the sake of the `beancount-parser-lima-python` crate.
+
 use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
 
+/// Format the given container, with optional prefix, applying `mapper` to each element,
+/// and with the given `separator`.
 pub fn format<C, T, M, D>(
     f: &mut Formatter<'_>,
     container: C,
@@ -30,7 +35,7 @@ where
     Ok(())
 }
 
-/// Simple format with no mapper or separator
+/// Simple format with no mapper or separator.
 pub fn simple_format<C, T>(
     f: &mut Formatter<'_>,
     container: C,
@@ -84,7 +89,14 @@ fn pad_if(condition: bool) -> &'static str {
     }
 }
 
+/// A single space.
 pub const SPACE: &str = " ";
+
+/// A single newline.
 pub const NEWLINE: &str = "\n";
+
+/// Standard indent.
 pub const INDENT: &str = "  ";
+
+/// Newline followed by indent.
 pub const NEWLINE_INDENT: &str = "\n  ";

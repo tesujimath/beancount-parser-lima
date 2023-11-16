@@ -575,7 +575,7 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span {
 
 #[cfg(test)]
 pub use lexer::bare_lex;
-mod format;
+pub mod format;
 mod lexer;
 pub use options::Options;
 mod options;

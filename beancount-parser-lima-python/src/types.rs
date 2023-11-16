@@ -42,3 +42,5 @@ pub(crate) struct Posting {
     // price_annotation: Option<Spanned<ScopedAmount<'a>>>,
     // metadata: Metadata<'a>,
 }
+
+mod format;
