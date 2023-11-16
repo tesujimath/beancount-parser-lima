@@ -80,6 +80,7 @@ impl Converter {
         let account = self
             .account
             .create_or_reuse(py, x.account(), &mut self.string);
+        let amount = x.amount().map(|amount| amount.value());
         let currency = x
             .currency()
             .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref()));
@@ -87,6 +88,7 @@ impl Converter {
         Posting {
             flag,
             account,
+            amount,
             currency,
         }
     }

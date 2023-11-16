@@ -6,6 +6,7 @@ use pyo3::{
     types::{PyDate, PyList, PyString},
     Py,
 };
+use rust_decimal::Decimal;
 
 /// Beancount directive base class.
 #[derive(Debug)]
@@ -38,7 +39,8 @@ pub(crate) struct Posting {
     pub(crate) flag: Option<Py<PyString>>,
     #[pyo3(get)]
     pub(crate) account: Py<PyList>,
-    // amount: Option<Decimal>,
+    #[pyo3(get)]
+    pub(crate) amount: Option<Decimal>,
     #[pyo3(get)]
     pub(crate) currency: Option<Py<PyString>>,
     // cost_spec: Option<Spanned<CostSpec<'a>>>,

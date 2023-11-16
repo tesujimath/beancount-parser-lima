@@ -64,7 +64,7 @@ fn fmt_posting(x: &Posting, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
     //     &self.account
     // )?;
 
-    // simple_format(f, &self.amount, Some(" "))?;
+    simple_format(f, x.amount.as_ref(), Some(" "))?;
     simple_format(f, x.currency.as_ref(), Some(" "))
     // simple_format(f, &self.cost_spec, Some(" "))?;
     // simple_format(f, &self.price_annotation, Some(" "))?;
