@@ -96,7 +96,7 @@ impl Converter {
     pub(crate) fn flag(&mut self, py: Python<'_>, x: &lima::Flag) -> Py<PyString> {
         use lima::Flag::*;
 
-        let mut buf = [0; 2];
+        let mut buf = [0; 8]; // two unicode characters, more than we need for an ASCII flag mpoe.g. 'A
         let s = match x {
             Asterisk => '*'.encode_utf8(&mut buf),
             Exclamation => '*'.encode_utf8(&mut buf),
@@ -105,9 +105,9 @@ impl Converter {
             Question => '*'.encode_utf8(&mut buf),
             Percent => '*'.encode_utf8(&mut buf),
             Letter(x) => {
-                '\''.encode_utf8(&mut buf);
-                x.char().encode_utf8(&mut buf[1..]);
-                std::str::from_utf8(&buf).unwrap()
+                let quote_len = '\''.encode_utf8(&mut buf).len();
+                let char_len = x.char().encode_utf8(&mut buf[quote_len..]).len();
+                std::str::from_utf8(&buf[..quote_len + char_len]).unwrap()
             }
         };
         self.string.create_or_reuse(py, s)
