@@ -22,7 +22,8 @@ pub(crate) struct Directive {
 pub(crate) struct Transaction {
     #[pyo3(get)]
     pub(crate) flag: Py<PyString>,
-    // payee: Option<Py<PyString>>,
+    #[pyo3(get)]
+    pub(crate) payee: Option<Py<PyString>>,
     #[pyo3(get)]
     pub(crate) narration: Option<Py<PyString>>,
     #[pyo3(get)]

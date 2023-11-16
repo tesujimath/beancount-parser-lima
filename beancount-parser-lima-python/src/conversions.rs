@@ -49,6 +49,9 @@ impl Converter {
         x: &lima::Transaction<'_>,
     ) -> PyResult<Py<PyAny>> {
         let flag = self.flag(py, x.flag().item());
+        let payee = x
+            .payee()
+            .map(|payee| self.string.create_or_reuse(py, payee.item()));
         let narration = x
             .narration()
             .map(|narration| self.string.create_or_reuse(py, narration.item()));
@@ -62,6 +65,7 @@ impl Converter {
             (
                 Transaction {
                     flag,
+                    payee,
                     narration,
                     postings,
                 },

@@ -28,7 +28,7 @@ fn fmt_transaction(
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
     write!(f, "{} {}", date, x.flag)?;
-    // format(f, &self.payee, double_quoted, " ", Some(" "))?;
+    format(f, &x.payee, double_quoted, " ", Some(" "))?;
     format(f, &x.narration, double_quoted, " ", Some(" "))?;
     // we prefer to show tags and links inline rather then line by line in metadata
     // metadata.fmt_tags_links_inline(f)?;
