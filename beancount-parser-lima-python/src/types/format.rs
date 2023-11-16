@@ -1,8 +1,5 @@
 use super::*;
-use ::beancount_parser_lima::format::{
-    double_quoted, format, plain, simple_format, NEWLINE_INDENT,
-};
-use beancount_parser_lima::format::NEWLINE;
+use lazy_format::lazy_format;
 use pyo3::{pymethods, PyRef, Python};
 use std::{
     borrow::Borrow,
@@ -84,3 +81,100 @@ where
         (self.0)(f)
     }
 }
+
+/// Format the given container, with optional prefix, applying `mapper` to each element,
+/// and with the given `separator`.
+fn format<C, T, M, D>(
+    f: &mut Formatter<'_>,
+    container: C,
+    mapper: M,
+    separator: &'static str,
+    prefix: Option<&'static str>,
+) -> fmt::Result
+where
+    C: IntoIterator<Item = T>,
+    M: Fn(T) -> D,
+    D: Display,
+{
+    let mut container = container.into_iter();
+    if let Some(item) = container.by_ref().next() {
+        if let Some(prefix) = prefix {
+            f.write_str(prefix)?;
+        }
+
+        mapper(item).fmt(f)?;
+    }
+
+    for item in container {
+        f.write_str(separator)?;
+        mapper(item).fmt(f)?;
+    }
+
+    Ok(())
+}
+
+/// Simple format with no mapper or separator.
+fn simple_format<C, T>(
+    f: &mut Formatter<'_>,
+    container: C,
+    prefix: Option<&'static str>,
+) -> fmt::Result
+where
+    C: IntoIterator<Item = T>,
+    T: Display,
+{
+    format(f, container, plain, "", prefix)
+}
+
+/// Format plain.
+fn plain<S>(s: S) -> impl Display
+where
+    S: Display,
+{
+    lazy_format!("{s}")
+}
+
+/// Format in single quotes.
+fn single_quoted<S>(s: S) -> impl Display
+where
+    S: Display,
+{
+    lazy_format!("'{s}'")
+}
+
+/// Format in double quotes.
+fn double_quoted<S>(s: S) -> impl Display
+where
+    S: Display,
+{
+    lazy_format!("\"{s}\"")
+}
+
+/// Format key/value.
+fn key_value<K, V>(kv: (K, V)) -> impl Display
+where
+    K: Display,
+    V: Display,
+{
+    lazy_format!("{}: {}", kv.0, kv.1)
+}
+
+fn pad_if(condition: bool) -> &'static str {
+    if condition {
+        " "
+    } else {
+        ""
+    }
+}
+
+/// A single space.
+const SPACE: &str = " ";
+
+/// A single newline.
+const NEWLINE: &str = "\n";
+
+/// Standard indent.
+const INDENT: &str = "  ";
+
+/// Newline followed by indent.
+const NEWLINE_INDENT: &str = "\n  ";
