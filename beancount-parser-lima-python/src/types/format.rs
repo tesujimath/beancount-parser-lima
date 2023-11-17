@@ -54,12 +54,6 @@ fn fmt_posting(x: &Posting, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
         ":",
         x.flag.as_ref().and(Some(" ")),
     )?;
-    // write!(
-    //     f,
-    //     "{}{}",
-    //     "", // TODO if self.flag.is_some() { " " } else { "" },
-    //     &self.account
-    // )?;
 
     simple_format(f, x.amount.as_ref(), Some(" "))?;
     simple_format(f, x.currency.as_ref(), Some(" "))

@@ -540,6 +540,7 @@ impl<'a> ElementType for Directive<'a> {
             Document(_) => "document",
             Note(_) => "note",
             Event(_) => "event",
+            Query(_) => "query",
         }
     }
 }
@@ -559,6 +560,7 @@ impl<'a> Display for Directive<'a> {
             Document(x) => x.fmt(f, self.date.item, &self.metadata),
             Note(x) => x.fmt(f, self.date.item, &self.metadata),
             Event(x) => x.fmt(f, self.date.item, &self.metadata),
+            Query(x) => x.fmt(f, self.date.item, &self.metadata),
         }
     }
 }
@@ -576,7 +578,7 @@ pub enum DirectiveVariant<'a> {
     Document(Document<'a>),
     Note(Note<'a>),
     Event(Event<'a>),
-    // TODO Query
+    Query(Query<'a>),
     // TODO Custom
 }
 
@@ -891,6 +893,32 @@ impl<'a> Event<'a> {
     /// Field accessor.
     pub fn description(&self) -> &Spanned<&str> {
         &self.description
+    }
+}
+
+/// A Beancount query directive, without the common [Directive] fields.
+#[derive(Clone, Debug)]
+pub struct Query<'a> {
+    pub(crate) name: Spanned<&'a str>,
+    pub(crate) content: Spanned<&'a str>,
+}
+
+impl<'a> Query<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} query \"{}\" \"{}\"", date, self.name, self.content)?;
+        // we prefer to show tags and links inline rather then line by line in metadata
+        metadata.fmt_tags_links_inline(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    /// Field accessor.
+    pub fn name(&self) -> &Spanned<&str> {
+        &self.name
+    }
+
+    /// Field accessor.
+    pub fn content(&self) -> &Spanned<&str> {
+        &self.content
     }
 }
 

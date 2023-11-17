@@ -11,8 +11,8 @@ use beancount_parser_lima::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
     ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
-    ParseResult, Posting, Price, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount, Tag,
-    Transaction,
+    ParseResult, Posting, Price, Query, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount,
+    Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -64,6 +64,8 @@ where
                     Note(x) => note(x, d),
 
                     Event(x) => event(x, d),
+
+                    Query(x) => query(x, d),
                 }
             })) {
                 p.write(&io::stdout(), &options).unwrap();
@@ -449,6 +451,24 @@ fn event<'a>(x: &'a Event, d: &'a Directive) -> Box<dyn Iterator<Item = Primitiv
             )))
             .chain(string(x.event_type(), Decoration::DoubleQuote))
             .chain(string(x.description(), Decoration::DoubleQuote))
+            .chain(tags_links_inline(m))
+            .spaced()
+            .chain(keys_values(m))
+            .chain(newline()),
+    )
+}
+
+fn query<'a>(x: &'a Query, d: &'a Directive) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    let m = d.metadata();
+
+    Box::new(
+        date(d.date())
+            .chain(once(Primitive::Str(
+                Cow::Borrowed("query"),
+                Decoration::None,
+            )))
+            .chain(string(x.name(), Decoration::DoubleQuote))
+            .chain(string(x.content(), Decoration::DoubleQuote))
             .chain(tags_links_inline(m))
             .spaced()
             .chain(keys_values(m))
