@@ -101,7 +101,7 @@ where
             document(),
             note(),
             event(),
-            // TODO query
+            query(),
             // TODO custom
         ))
         .labelled("directive")
@@ -561,7 +561,7 @@ where
     )
 }
 
-/// Matches a event, including metadata, over several lines.
+/// Matches an event, including metadata, over several lines.
 pub(crate) fn event<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -587,6 +587,34 @@ where
                     event_type,
                     description,
                 }),
+            }
+        },
+    )
+}
+
+/// Matches a query, including metadata, over several lines.
+pub(crate) fn query<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    group((
+        date().map_with(spanned_extra),
+        just(Token::Query),
+        string().map_with(spanned_extra),
+        string().map_with(spanned_extra),
+        tags_links(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata())
+    .validate(
+        |((date, _, name, content, (tags, links)), mut metadata), _span, emitter| {
+            metadata.merge_tags(&tags, emitter);
+            metadata.merge_links(&links, emitter);
+
+            Directive {
+                date,
+                metadata,
+                variant: DirectiveVariant::Query(Query { name, content }),
             }
         },
     )
