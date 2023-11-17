@@ -143,7 +143,8 @@ pub enum Token<'a> {
     #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link))]
     Link(super::Link<'a>),
 
-    // TODO only in trailing colon context
+    // A key is only supposed to be matched in a trailing colon context, but Logos doesn't support that,
+    // so we work around it using parsers::keyword(), which is able to hijack a keyword out of another token.
     #[regex(r"(?&key)", |lex| Key::try_from(lex.slice()))]
     Key(super::Key<'a>),
 

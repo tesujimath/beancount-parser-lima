@@ -1093,12 +1093,57 @@ where
     select_ref!(Token::Link(link) => link)
 }
 
-/// Matches a Key
+/// Matches a Key.
+/// Note that we may have to hijack another token and use it as a key,
+/// since keywords do get used as metadata keys.
 fn key<'src, I>() -> impl Parser<'src, I, Key<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Key(key) => *key)
+    let key = select_ref!(Token::Key(key) => *key);
+
+    choice((
+        key,
+        keyword()
+            .try_map(|s, span| Key::try_from(s).map_err(|e| Rich::custom(span, e.to_string()))),
+    ))
+}
+
+/// Matches a keyword which has already been parsed as a token.
+fn keyword<'src, I>() -> impl Parser<'src, I, &'src str, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    let true_ = select_ref!(Token::True => "TRUE");
+    let false_ = select_ref!(Token::False=> "FALSE");
+    let null = select_ref!(Token::Null => "NULL");
+    let currency = select_ref!(Token::Currency(currency) => currency.as_ref());
+    let txn = select_ref!(Token::Txn => "txn");
+    let balance = select_ref!(Token::Balance => "balance");
+    let open = select_ref!(Token::Open => "open");
+    let close = select_ref!(Token::Close => "close");
+    let commodity = select_ref!(Token::Commodity => "commodity");
+    let pad = select_ref!(Token::Pad => "pad");
+    let event = select_ref!(Token::Event => "event");
+    let query = select_ref!(Token::Query => "query");
+    let custom = select_ref!(Token::Custom => "custom");
+    let price = select_ref!(Token::Price => "price");
+    let note = select_ref!(Token::Note => "note");
+    let document = select_ref!(Token::Document => "document");
+    let pushtag = select_ref!(Token::Pushtag => "pushtag");
+    let poptag = select_ref!(Token::Poptag => "poptag");
+    let pushmeta = select_ref!(Token::Pushmeta => "pushmeta");
+    let popmeta = select_ref!(Token::Popmeta => "popmeta");
+    let option = select_ref!(Token::Option => "option");
+    let options = select_ref!(Token::Options => "options");
+    let plugin = select_ref!(Token::Plugin => "plugin");
+    let include = select_ref!(Token::Include => "include");
+
+    choice((
+        true_, false_, null, currency, txn, balance, open, close, commodity, pad, event, query,
+        custom, price, note, document, pushtag, poptag, pushmeta, popmeta, option, options, plugin,
+        include,
+    ))
 }
 
 /// Matches a Currency
