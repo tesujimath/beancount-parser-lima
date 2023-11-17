@@ -289,6 +289,16 @@ impl<'a> From<RecoveryToken> for Token<'a> {
     }
 }
 
+// TODO remove this temporary diagnostic
+pub fn dump_tokens(s: &str) {
+    for (tok, span) in lex(SourceId::default(), s) {
+        match tok {
+            Token::Error(e) => println!("{:?} at {:?}", e, span),
+            tok => println!("{:?}", tok),
+        }
+    }
+}
+
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
 /// and forcing a final `Eol` in case missing.
 ///
