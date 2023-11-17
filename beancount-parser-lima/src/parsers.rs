@@ -50,10 +50,40 @@ where
 {
     use Declaration::*;
 
-    choice((directive().map(Directive), pragma(source_path).map(Pragma)))
-        .map_with(spanned_extra)
-        .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
+    choice((
+        directive().map(Directive),
+        pragma(source_path).map(Pragma),
+        ignored_line().map(|_| IgnoredLine),
+    ))
+    .map_with(spanned_extra)
+    .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
 }
+
+/// Matches any line starting with any of *:!&#?% which is ignored.
+pub(crate) fn ignored_line<'src, I>() -> impl Parser<'src, I, (), Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    use Token::*;
+
+    one_of_ref(&[
+        Asterisk,
+        Colon,
+        DedicatedFlag(Flag::Exclamation),
+        DedicatedFlag(Flag::Ampersand),
+        Hash,
+        DedicatedFlag(Flag::Question),
+        DedicatedFlag(Flag::Percent),
+    ])
+    .then(
+        any_ref()
+            .and_is(just(Eol).not_ref())
+            .repeated()
+            .then(just(Eol)),
+    )
+    .ignored()
+}
+/// Matches any line starting with any of *:!&#?% which is ignored.
 
 /// Matches a [Directive].
 pub(crate) fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>

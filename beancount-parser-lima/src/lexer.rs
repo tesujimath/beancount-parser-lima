@@ -154,6 +154,10 @@ pub enum Token<'a> {
     #[regex(r"(?&comment_to_eol)?\n")]
     Eol,
 
+    // lower priority than any real token
+    #[regex(r"[^ \t]+", priority = 0)]
+    Unrecognized(&'a str),
+
     // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`
     Indent,
 
@@ -236,6 +240,8 @@ impl<'a> Display for Token<'a> {
             EolThenIndent => write!(f, "\\n{}", INDENT),
             Eol => write!(f, "\\n"),
             Indent => write!(f, "{}", INDENT),
+
+            Unrecognized(s) => write!(f, "UNRECOGNIZED({})", s),
 
             Error(e) => write!(f, "ERROR {}", e),
         }
