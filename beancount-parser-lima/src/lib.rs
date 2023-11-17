@@ -467,7 +467,7 @@ struct PragmaProcessor<'s, 't> {
     remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     // tags and meta key/values for pragma push/pop
     tags: HashSet<Spanned<&'t Tag<'t>>>,
-    meta_key_values: HashMap<Spanned<&'t Key<'t>>, Spanned<MetaValue<'t>>>,
+    meta_key_values: HashMap<Spanned<Key<'t>>, Spanned<MetaValue<'t>>>,
     options: Options<'t>,
     // errors, for collection when the iterator is exhausted
     errors: Vec<Error>,
