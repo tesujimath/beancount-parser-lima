@@ -1094,11 +1094,11 @@ where
 }
 
 /// Matches a Key
-fn key<'src, I>() -> impl Parser<'src, I, &'src Key<'src>, Extra<'src>>
+fn key<'src, I>() -> impl Parser<'src, I, Key<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Key(key) => key)
+    select_ref!(Token::Key(key) => *key)
 }
 
 /// Matches a Currency
@@ -1202,7 +1202,7 @@ impl<'a> Metadata<'a> {
 
     pub(crate) fn merge_key_values<E>(
         &mut self,
-        key_values: &HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+        key_values: &HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
         emitter: &mut E,
     ) where
         E: Emit<ParserError<'a>>,

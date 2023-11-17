@@ -589,7 +589,7 @@ pub(crate) enum Pragma<'a> {
     Pushtag(Spanned<&'a Tag<'a>>),
     Poptag(Spanned<&'a Tag<'a>>),
     Pushmeta(MetaKeyValue<'a>),
-    Popmeta(Spanned<&'a Key<'a>>),
+    Popmeta(Spanned<Key<'a>>),
     Include(&'a str),
     Option(BeancountOption<'a>),
     // TODO (probably not) plugin
@@ -1360,7 +1360,7 @@ impl<'a> Display for Posting<'a> {
 /// of a directive are subsumed into the metadata element of the directive.
 #[derive(Clone, Default, Debug)]
 pub struct Metadata<'a> {
-    pub(crate) key_values: HashMap<Spanned<&'a Key<'a>>, Spanned<MetaValue<'a>>>,
+    pub(crate) key_values: HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
     pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
     pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
 }
@@ -1369,7 +1369,7 @@ impl<'a> Metadata<'a> {
     /// Field accessor.
     pub fn key_values(
         &self,
-    ) -> impl ExactSizeIterator<Item = (&Spanned<&Key>, &Spanned<MetaValue>)> {
+    ) -> impl ExactSizeIterator<Item = (&Spanned<Key>, &Spanned<MetaValue>)> {
         self.key_values.iter()
     }
 
@@ -1409,7 +1409,7 @@ impl<'a> Display for Metadata<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct MetaKeyValue<'a> {
-    pub(crate) key: Spanned<&'a Key<'a>>,
+    pub(crate) key: Spanned<Key<'a>>,
     pub(crate) value: Spanned<MetaValue<'a>>,
 }
 
