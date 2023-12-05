@@ -46,9 +46,18 @@ where
 
             directives
                 .into_iter()
-                .filter_map(|d| match d.variant() {
-                    V::Transaction(x) => Some(c.transaction(py, d.date(), x)),
-                    _ => None,
+                .map(|d| match d.variant() {
+                    V::Transaction(x) => c.transaction(py, d.date(), d.metadata(), x),
+                    V::Price(x) => c.price(py, d.date(), d.metadata(), x),
+                    V::Balance(x) => c.balance(py, d.date(), d.metadata(), x),
+                    V::Open(x) => c.open(py, d.date(), d.metadata(), x),
+                    V::Close(x) => c.close(py, d.date(), d.metadata(), x),
+                    V::Commodity(x) => c.commodity(py, d.date(), d.metadata(), x),
+                    V::Pad(x) => c.pad(py, d.date(), d.metadata(), x),
+                    V::Document(x) => c.document(py, d.date(), d.metadata(), x),
+                    V::Note(x) => c.note(py, d.date(), d.metadata(), x),
+                    V::Event(x) => c.event(py, d.date(), d.metadata(), x),
+                    V::Query(x) => c.query(py, d.date(), d.metadata(), x),
                 })
                 .collect::<PyResult<Vec<Py<PyAny>>>>()
         }

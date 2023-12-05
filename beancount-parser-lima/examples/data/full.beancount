@@ -25,10 +25,14 @@
 
 pushtag #essential
 
+pushmeta price: "expensive"
+
 2023-05-29 * "New World Gardens North East Va ;" ^newworld.co.nz
   Assets:Bank:Current                        -30 -9.65 NZD
   ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
   Expenses:Groceries
+
+popmeta price:
 
 poptag #essential
 
@@ -47,6 +51,11 @@ pushmeta drink: "alcoholic"
   Assets:Bank:Current                           -25.00 NZD
   ofxid: "0.12-3456-1234567-01.31May2023.3"
   Expenses:Entertainment:Drinks-and-snacks
+  #mytag1
+  ^mylink1
+  related-account: Expenses:Groceries
+  just-use-a-tag: #mytag
+  key-for-link: ^mylink
 
 2023-05-31 document Expenses:Entertainment:Drinks-and-snacks "2023-05-31-emersons-receipt.png" #beer
   assessment: "worth-it"
@@ -70,3 +79,6 @@ popmeta drink:
 2023-05-31 'Z "Z Energy ;" "Rather expensive" #petrol
   'B Assets:Bank:Current                           -130.00 NZD
   ! Expenses:Car:Fuel
+
+2028-01-01 query "fictional SQL" "SELECT money FROM accounts;" #for-testing
+  status: "bogus"

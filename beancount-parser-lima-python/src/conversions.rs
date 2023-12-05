@@ -3,14 +3,14 @@ use std::{
     cmp::Ordering,
     collections::{hash_map, HashMap},
     hash::Hash,
-    iter::{once, FromIterator},
+    iter::{once, ExactSizeIterator, FromIterator},
 };
 
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
-    types::{PyDate, PyDateAccess, PyList, PyString},
-    IntoPy, Py, PyAny, PyResult, Python,
+    types::{PyDate, PyDateAccess, PyDict, PyList, PyString},
+    IntoPy, Py, PyAny, PyErr, PyResult, Python,
 };
 use smallvec::SmallVec;
 use string_interner::{symbol::SymbolU32, StringInterner, Symbol};
@@ -36,16 +36,23 @@ impl Converter {
         }
     }
 
-    pub(crate) fn directive(&mut self, py: Python<'_>, date: &Date) -> Directive {
-        Directive {
+    pub(crate) fn directive(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+    ) -> PyResult<Directive> {
+        Ok(Directive {
             date: self.date.create_or_reuse(py, date),
-        }
+            metadata: self.metadata(py, metadata)?,
+        })
     }
 
     pub(crate) fn transaction(
         &mut self,
         py: Python<'_>,
         date: &Date,
+        metadata: &lima::Metadata,
         x: &lima::Transaction<'_>,
     ) -> PyResult<Py<PyAny>> {
         let flag = self.flag(py, x.flag().item());
@@ -58,7 +65,7 @@ impl Converter {
         let postings = x
             .postings()
             .map(|p| self.posting(py, p))
-            .collect::<Vec<_>>();
+            .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Py::new(
             py,
@@ -69,13 +76,13 @@ impl Converter {
                     narration,
                     postings,
                 },
-                self.directive(py, date),
+                self.directive(py, date, metadata)?,
             ),
         )?
         .into_py(py))
     }
 
-    pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> Posting {
+    pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> PyResult<Posting> {
         let flag = x.flag().map(|flag| self.flag(py, flag.item()));
         let account = self
             .account
@@ -84,12 +91,360 @@ impl Converter {
         let currency = x
             .currency()
             .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref()));
+        let cost_spec = x
+            .cost_spec()
+            .map(|cost_spec| self.cost_spec(py, cost_spec.item()));
+        let price_annotation = x
+            .price_annotation()
+            .map(|price_annotation| self.scoped_amount(py, price_annotation.item()));
+        let metadata = self.metadata(py, x.metadata())?;
 
-        Posting {
+        Ok(Posting {
             flag,
             account,
             amount,
             currency,
+            cost_spec,
+            price_annotation,
+            metadata,
+        })
+    }
+
+    pub(crate) fn price(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Price<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let currency = self
+            .string
+            .create_or_reuse(py, x.currency().item().as_ref());
+        let amount = self.amount(py, x.amount().item());
+
+        Ok(Py::new(
+            py,
+            (
+                Price { currency, amount },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn balance(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Balance<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+        let atol = self.amount_with_tolerance(py, x.atol());
+
+        Ok(Py::new(
+            py,
+            (
+                Balance { account, atol },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn open(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Open<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+
+        let currencies = PyList::new(
+            py,
+            x.currencies()
+                .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref())),
+        )
+        .into();
+
+        let booking = x
+            .booking()
+            .map(|booking| self.string.create_or_reuse(py, booking.item().as_ref()));
+
+        Ok(Py::new(
+            py,
+            (
+                Open {
+                    account,
+                    currencies,
+                    booking,
+                },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn close(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Close<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+
+        Ok(Py::new(py, (Close { account }, self.directive(py, date, metadata)?))?.into_py(py))
+    }
+
+    pub(crate) fn commodity(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Commodity<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let currency = self
+            .string
+            .create_or_reuse(py, x.currency().item().as_ref());
+
+        Ok(Py::new(
+            py,
+            (Commodity { currency }, self.directive(py, date, metadata)?),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn pad(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Pad<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+        let source = self
+            .account
+            .create_or_reuse(py, x.source(), &mut self.string);
+
+        Ok(Py::new(
+            py,
+            (Pad { account, source }, self.directive(py, date, metadata)?),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn document(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Document<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+        let path = self.string.create_or_reuse(py, x.path().item().as_ref());
+
+        Ok(Py::new(
+            py,
+            (
+                Document { account, path },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn note(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Note<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let account = self
+            .account
+            .create_or_reuse(py, x.account(), &mut self.string);
+        let comment = self.string.create_or_reuse(py, x.comment().item().as_ref());
+
+        Ok(Py::new(
+            py,
+            (
+                Note { account, comment },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn event(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Event<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let event_type = self
+            .string
+            .create_or_reuse(py, x.event_type().item().as_ref());
+        let description = self
+            .string
+            .create_or_reuse(py, x.description().item().as_ref());
+
+        Ok(Py::new(
+            py,
+            (
+                Event {
+                    event_type,
+                    description,
+                },
+                self.directive(py, date, metadata)?,
+            ),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn query(
+        &mut self,
+        py: Python<'_>,
+        date: &Date,
+        metadata: &lima::Metadata,
+        x: &lima::Query<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        let name = self.string.create_or_reuse(py, x.name().item().as_ref());
+        let content = self.string.create_or_reuse(py, x.content().item().as_ref());
+
+        Ok(Py::new(
+            py,
+            (Query { name, content }, self.directive(py, date, metadata)?),
+        )?
+        .into_py(py))
+    }
+
+    pub(crate) fn metadata(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::Metadata<'_>,
+    ) -> Result<Option<Metadata>, PyErr> {
+        let key_values = x.key_values();
+        let tags = x.tags();
+        let links = x.links();
+
+        if key_values.len() == 0 && tags.len() == 0 && links.len() == 0 {
+            Ok(None)
+        } else {
+            let key_values = if key_values.len() == 0 {
+                None
+            } else {
+                let key_value_dict = PyDict::new(py);
+                for (k, v) in key_values {
+                    key_value_dict.set_item(
+                        self.string.create_or_reuse(py, k.item().as_ref()),
+                        self.meta_value(py, v.item())?,
+                    )?
+                }
+                Some(key_value_dict.into())
+            };
+
+            let tags = if tags.len() == 0 {
+                None
+            } else {
+                Some(
+                    PyList::new(
+                        py,
+                        tags.map(|tag| self.string.create_or_reuse(py, tag.item().as_ref())),
+                    )
+                    .into(),
+                )
+            };
+
+            let links = if links.len() == 0 {
+                None
+            } else {
+                Some(
+                    PyList::new(
+                        py,
+                        links.map(|link| self.string.create_or_reuse(py, link.item().as_ref())),
+                    )
+                    .into(),
+                )
+            };
+
+            Ok(Some(Metadata {
+                key_values,
+                tags,
+                links,
+            }))
+        }
+    }
+
+    pub(crate) fn meta_value(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::MetaValue<'_>,
+    ) -> PyResult<Py<PyAny>> {
+        use lima::MetaValue::*;
+        use lima::SimpleValue::*;
+
+        let meta_value = MetaValue {};
+
+        match x {
+            Simple(String(x)) => {
+                let value = self.string.create_or_reuse(py, x);
+                Ok(Py::new(py, (MetaValueString { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Currency(x)) => {
+                let value = self.string.create_or_reuse(py, x.as_ref());
+                Ok(Py::new(py, (MetaValueCurrency { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Account(x)) => {
+                let value = self.account.create_or_reuse(py, x, &mut self.string);
+                Ok(Py::new(py, (MetaValueAccount { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Tag(x)) => {
+                let value = self.string.create_or_reuse(py, x.as_ref());
+                Ok(Py::new(py, (MetaValueTag { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Link(x)) => {
+                let value = self.string.create_or_reuse(py, x.as_ref());
+                Ok(Py::new(py, (MetaValueLink { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Date(x)) => {
+                let value = self.date.create_or_reuse(py, x);
+                Ok(Py::new(py, (MetaValueDate { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(Bool(x)) => {
+                let value = *x;
+                Ok(Py::new(py, (MetaValueBool { value }, meta_value))?.into_py(py))
+            }
+
+            Simple(None) => Ok(Py::new(py, (MetaValueNone, meta_value))?.into_py(py)),
+
+            Simple(Expr(x)) => {
+                let value = x.value();
+                Ok(Py::new(py, (MetaValueExpr { value }, meta_value))?.into_py(py))
+            }
+
+            Amount(x) => {
+                let value = self.amount(py, x);
+                Ok(Py::new(py, (MetaValueAmount { value }, meta_value))?.into_py(py))
+            }
         }
     }
 
@@ -111,6 +466,81 @@ impl Converter {
             }
         };
         self.string.create_or_reuse(py, s)
+    }
+
+    pub(crate) fn amount(&mut self, py: Python<'_>, x: &lima::Amount) -> Amount {
+        let number = x.number().item().value();
+        let currency = self
+            .string
+            .create_or_reuse(py, x.currency().item().as_ref());
+        Amount { number, currency }
+    }
+
+    pub(crate) fn amount_with_tolerance(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::AmountWithTolerance,
+    ) -> AmountWithTolerance {
+        let amount = self.amount(py, x.amount());
+        let tolerance = x.tolerance().map(|tolerance| *tolerance.item());
+        AmountWithTolerance { amount, tolerance }
+    }
+
+    pub(crate) fn cost_spec(&mut self, py: Python<'_>, x: &lima::CostSpec<'_>) -> CostSpec {
+        let per_unit = x.per_unit().map(|per_unit| per_unit.item().value());
+        let total = x.total().map(|total| total.item().value());
+        let currency = x
+            .currency()
+            .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref()));
+        let date = x.date().map(|date| self.date.create_or_reuse(py, date));
+
+        let label = x
+            .label()
+            .map(|label| self.string.create_or_reuse(py, label.item().as_ref()));
+        let merge = x.merge();
+
+        CostSpec {
+            per_unit,
+            total,
+            currency,
+            date,
+            label,
+            merge,
+        }
+    }
+
+    pub(crate) fn scoped_amount(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::ScopedAmount<'_>,
+    ) -> ScopedAmount {
+        use lima::ScopedAmount::*;
+        use lima::ScopedExprValue::*;
+
+        let per_unit = match x {
+            BareAmount(PerUnit(expr)) => Some(expr.value()),
+            CurrencyAmount(PerUnit(expr), _) => Some(expr.value()),
+            _ => None,
+        };
+
+        let total = match x {
+            BareAmount(Total(expr)) => Some(expr.value()),
+            CurrencyAmount(Total(expr), _) => Some(expr.value()),
+            _ => None,
+        };
+
+        let currency = match x {
+            BareCurrency(currency) => Some(*currency),
+            CurrencyAmount(_, currency) => Some(*currency),
+            _ => None,
+        }
+        .map(|currency| self.string.create_or_reuse(py, currency.as_ref()));
+
+        ScopedAmount {
+            per_unit,
+            total,
+            currency,
+        }
     }
 }
 
@@ -143,7 +573,6 @@ impl StringFactory {
 
         let sym = self.string_interner.get_or_intern(x);
         let i_sym = sym.to_usize();
-        println!("interned {} as {:?} with index {}", x, sym, i_sym);
 
         // allocate a new PyString if we don't already have it
         match i_sym.cmp(&self.py_strings.len()) {

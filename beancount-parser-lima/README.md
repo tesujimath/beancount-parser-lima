@@ -22,13 +22,15 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 <img src="https://raw.githubusercontent.com/tesujimath/beancount-parser-lima/master/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
 
-## Roadmap
+## Roadmap and Status
 
 - create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it will necessarily become that!)
 
 - improve API in the light of experience, i.e. when it gets some use 😅
 
 - address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
+
+`beancount-parser-lima v0.2.0` is able to parse the [example.beancount](https://github.com/beancount/beancount/blob/master/examples/example.beancount) file from the official [Beancount repo](https://github.com/beancount/beancount).
 
 ## Uncertainties / TODOs
 

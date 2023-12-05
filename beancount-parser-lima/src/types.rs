@@ -296,7 +296,9 @@ impl TryFrom<char> for FlagLetter {
 }
 
 /// The booking method for an account.
-#[derive(EnumString, EnumIter, PartialEq, Eq, Default, Clone, Copy, Display, Debug)]
+#[derive(
+    EnumString, EnumIter, IntoStaticStr, PartialEq, Eq, Default, Clone, Copy, Display, Debug,
+)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum Booking {
     #[default]
@@ -307,6 +309,12 @@ pub enum Booking {
     Fifo,
     Lifo,
     Hifo,
+}
+
+impl AsRef<str> for Booking {
+    fn as_ref(&self) -> &'static str {
+        self.into()
+    }
 }
 
 impl ElementType for Booking {
@@ -1348,7 +1356,7 @@ impl<'a> Display for Posting<'a> {
         simple_format(f, &self.amount, Some(" "))?;
         simple_format(f, self.currency, Some(" "))?;
         simple_format(f, &self.cost_spec, Some(" "))?;
-        simple_format(f, &self.price_annotation, Some(" "))?;
+        simple_format(f, &self.price_annotation, Some(" @ "))?;
 
         self.metadata.fmt(f)
     }
@@ -1468,7 +1476,7 @@ impl<'a> Display for SimpleValue<'a> {
             Tag(x) => x.fmt(f),
             Link(x) => x.fmt(f),
             Date(x) => x.fmt(f),
-            Bool(x) => x.fmt(f),
+            Bool(x) => f.write_str(if *x { "TRUE" } else { "FALSE" }),
             None => Ok(()),
             Expr(x) => x.fmt(f),
         }
@@ -1999,31 +2007,41 @@ impl<'a> ElementType for CostSpec<'a> {
 
 impl<'a> Display for CostSpec<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut prefix = "";
+        let space = " ";
+
+        f.write_str("{")?;
+
         if let Some(per_unit) = &self.per_unit {
-            write!(f, "{} ", per_unit)?;
+            write!(f, "{}{}", prefix, per_unit)?;
+            prefix = space;
         }
 
         if let Some(total) = &self.total {
-            write!(f, "# {} ", total)?;
+            write!(f, "{}# {}", prefix, total)?;
+            prefix = space;
         }
 
         if let Some(currency) = &self.currency {
-            write!(f, "{} ", currency)?;
+            write!(f, "{}{}", prefix, currency)?;
+            prefix = space;
         }
 
         if let Some(date) = &self.date {
-            write!(f, "{} ", date)?;
+            write!(f, "{}{}", prefix, date)?;
+            prefix = space;
         }
 
         if let Some(label) = &self.label {
-            write!(f, "\"{}\" ", label)?;
+            write!(f, "{}\"{}\"", prefix, label)?;
+            prefix = space;
         }
 
         if self.merge {
-            f.write_str("* ")?;
+            write!(f, "{}*", prefix)?;
         }
 
-        Ok(())
+        f.write_str("}")
     }
 }
 

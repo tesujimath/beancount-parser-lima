@@ -42,6 +42,9 @@
                 # for Python bindings
                 maturin
                 python3
+
+                # Python devtools
+                pyright
               ];
             };
           }
