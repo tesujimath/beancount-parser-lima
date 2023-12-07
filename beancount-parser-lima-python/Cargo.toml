@@ -1,6 +1,6 @@
 [package]
 name = "beancount-parser-lima-python"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Python bindings for beancount-parser-lima"
@@ -12,7 +12,8 @@ name = "beancount_parser_lima"
 crate-type = ["cdylib"]
 
 [dependencies]
-beancount-parser-lima = { path = "../beancount-parser-lima" }
+beancount-parser-lima = "0.2.0"
+#beancount-parser-lima = { path = "../beancount-parser-lima" }
 lazy_format = "2.0.0"
 pyo3 = { version = "0.20.0", features = ["extension-module", "rust_decimal"] }
 rust_decimal = "1.29.1"
