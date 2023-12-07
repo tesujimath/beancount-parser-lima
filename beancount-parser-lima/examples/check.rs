@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::{collections::HashMap, io};
 
 use beancount_parser_lima::{
-    BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, ParseError, ParseResult,
-    Posting, Spanned,
+    BeancountParser, BeancountSources, Directive, DirectiveVariant, Error, ParseError,
+    ParseSuccess, Posting, Spanned,
 };
 
 /// This is a non-comprehensive example of reporting semantic errors in context.
@@ -35,7 +35,7 @@ where
     W: Write + Copy,
 {
     match parser.parse() {
-        Ok(ParseResult {
+        Ok(ParseSuccess {
             directives,
             options: _,
             mut warnings,

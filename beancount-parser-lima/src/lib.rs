@@ -14,7 +14,7 @@
 //! # use std::path::PathBuf;
 //!
 //!use beancount_parser_lima::{
-//!    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseResult,
+//!    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseSuccess,
 //!};
 //!
 //!fn main() {
@@ -29,7 +29,7 @@
 //!    W: Write + Copy,
 //!{
 //!    match parser.parse() {
-//!        Ok(ParseResult {
+//!        Ok(ParseSuccess {
 //!            directives,
 //!            options: _,
 //!            mut warnings,
@@ -307,7 +307,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 /// # use std::io::{self, Write};
 /// # use std::path::PathBuf;
 ///
-/// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseResult};
+/// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess};
 ///
 /// fn main() {
 ///     let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
@@ -321,7 +321,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 ///     W: Write + Copy,
 /// {
 ///     match parser.parse() {
-///         Ok(ParseResult {
+///         Ok(ParseSuccess {
 ///             directives,
 ///             options: _,
 ///             warnings,
@@ -353,8 +353,8 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
     chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
 >;
 
-/// The result of parsing all the files, containing date-ordered `Directive`s, `Options`, and any `Warning`s.
-pub struct ParseResult<'t> {
+/// A successful parsing all the files, containing date-ordered `Directive`s, `Options`, and any `Warning`s.
+pub struct ParseSuccess<'t> {
     pub directives: Vec<Spanned<Directive<'t>>>,
     pub options: Options<'t>,
     pub warnings: Vec<Warning>,
@@ -393,7 +393,7 @@ where
     }
 
     /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
-    pub fn parse(&'t self) -> Result<ParseResult<'t>, ParseError>
+    pub fn parse(&'t self) -> Result<ParseSuccess<'t>, ParseError>
     where
         's: 't,
     {
@@ -408,7 +408,7 @@ where
         errors.append(&mut pragma_errors);
 
         if errors.is_empty() {
-            Ok(ParseResult {
+            Ok(ParseSuccess {
                 directives,
                 options,
                 warnings,

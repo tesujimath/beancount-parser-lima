@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use beancount_parser_lima::{
-    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseResult,
+    BeancountParser, BeancountSources, DirectiveVariant, ParseError, ParseSuccess,
 };
 
 /// This is an example of rpeorting semantic errors by the application.
@@ -32,7 +32,7 @@ where
     W: Write + Copy,
 {
     match parser.parse() {
-        Ok(ParseResult {
+        Ok(ParseSuccess {
             directives,
             options: _,
             mut warnings,

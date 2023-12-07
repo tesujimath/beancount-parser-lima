@@ -9,7 +9,7 @@ use std::alloc::System;
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 use beancount_parser_lima::{
-    BeancountParser, BeancountSources, Directive, ParseError, ParseResult,
+    BeancountParser, BeancountSources, Directive, ParseError, ParseSuccess,
 };
 
 fn main() {
@@ -46,7 +46,7 @@ fn parse<W>(
     }
 
     match parser.parse() {
-        Ok(ParseResult {
+        Ok(ParseSuccess {
             directives,
             options: _,
             warnings,

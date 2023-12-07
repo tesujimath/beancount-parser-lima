@@ -11,7 +11,7 @@ use beancount_parser_lima::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
     ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
-    ParseResult, Posting, Price, Query, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount,
+    ParseSuccess, Posting, Price, Query, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount,
     Tag, Transaction,
 };
 
@@ -36,7 +36,7 @@ where
     W: Write + Copy,
 {
     match parser.parse() {
-        Ok(ParseResult {
+        Ok(ParseSuccess {
             directives,
             options,
             warnings,

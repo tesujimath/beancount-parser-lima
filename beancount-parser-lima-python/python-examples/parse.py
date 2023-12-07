@@ -8,9 +8,18 @@ def main():
         sys.stderr.write("usage: parse.py <beancount-file>\n")
         sys.exit(1)
 
-    for directive in lima.parse(sys.argv[1]):
-        print(directive)
-        print()
+    sources = lima.BeancountSources(sys.argv[1])
+    result = sources.parse()
+
+    if isinstance(result, lima.ParseSuccess):
+        for directive in result.directives:
+            print(directive)
+            print()
+
+        sources.write(result.warnings)
+    else:
+        sources.write(result.errors)
+        sources.write(result.warnings)
 
 if __name__ == '__main__':
     main()

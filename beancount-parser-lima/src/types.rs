@@ -19,7 +19,7 @@ use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 use time::Date;
 
 /// Error or warning, according to the marker type with which it is instantiated.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ErrorOrWarning<K>
 where
     K: ErrorOrWarningKind,
@@ -33,16 +33,16 @@ where
 }
 
 /// Marker type for [ErrorOrWarning] error.
-#[derive(Debug)]
-pub struct ErrorKind();
+#[derive(Clone, Debug)]
+pub struct ErrorKind;
 
 /// The type of errors returned by the parser.
 /// All that can usefully be done with these is write them via `BeancountSources`.
 pub type Error = ErrorOrWarning<ErrorKind>;
 
 /// Marker type for [ErrorOrWarning] warning.
-#[derive(Debug)]
-pub struct WarningKind();
+#[derive(Clone, Debug)]
+pub struct WarningKind;
 
 /// The type of warnings returned by the parser.
 /// All that can usefully be done with these is write them via `BeancountSources`.
