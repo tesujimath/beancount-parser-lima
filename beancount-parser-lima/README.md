@@ -30,7 +30,7 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 - address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
 
-`beancount-parser-lima v0.2.0` is able to parse the [example.beancount](https://github.com/beancount/beancount/blob/master/examples/example.beancount) file from the official [Beancount repo](https://github.com/beancount/beancount).
+`beancount-parser-lima v0.2.1` is able to parse the [example.beancount](https://github.com/beancount/beancount/blob/master/examples/example.beancount) file from the official [Beancount repo](https://github.com/beancount/beancount).
 
 ## Uncertainties / TODOs
 
