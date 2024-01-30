@@ -67,6 +67,7 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
         Ok(lima::ParseSuccess {
             directives,
             options: _,
+            plugins: _,
             warnings,
         }) => {
             use lima::DirectiveVariant as V;

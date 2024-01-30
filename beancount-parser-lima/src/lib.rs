@@ -353,10 +353,11 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
     chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
 >;
 
-/// A successful parsing all the files, containing date-ordered `Directive`s, `Options`, and any `Warning`s.
+/// A successful parsing all the files, containing date-ordered `Directive`s, `Options`, `Plugin`s, and any `Warning`s.
 pub struct ParseSuccess<'t> {
     pub directives: Vec<Spanned<Directive<'t>>>,
     pub options: Options<'t>,
+    pub plugins: Vec<Plugin<'t>>,
     pub warnings: Vec<Warning>,
 }
 
@@ -404,13 +405,14 @@ where
             .by_ref()
             .sort(|d| *d.item().date().item())
             .collect::<Vec<_>>();
-        let (options, mut pragma_errors) = p.result();
+        let (options, plugins, mut pragma_errors) = p.result();
         errors.append(&mut pragma_errors);
 
         if errors.is_empty() {
             Ok(ParseSuccess {
                 directives,
                 options,
+                plugins,
                 warnings,
             })
         } else {
@@ -469,6 +471,7 @@ struct PragmaProcessor<'s, 't> {
     tags: HashSet<Spanned<&'t Tag<'t>>>,
     meta_key_values: HashMap<Spanned<Key<'t>>, Spanned<MetaValue<'t>>>,
     options: Options<'t>,
+    plugins: Vec<Plugin<'t>>,
     // errors, for collection when the iterator is exhausted
     errors: Vec<Error>,
 }
@@ -490,12 +493,13 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
             tags: HashSet::new(),
             meta_key_values: HashMap::new(),
             options,
+            plugins: Vec::new(),
             errors: Vec::new(),
         }
     }
 
-    fn result(self) -> (Options<'t>, Vec<Error>) {
-        (self.options, self.errors)
+    fn result(self) -> (Options<'t>, Vec<Plugin<'t>>, Vec<Error>) {
+        (self.options, self.plugins, self.errors)
     }
 }
 
@@ -551,6 +555,8 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                     self.errors.push(e);
                                 }
                             }
+
+                            Plugin(plugin) => self.plugins.push(plugin),
                         }
 
                         // having silently consumed a pragma, go on to the next declaration

@@ -116,24 +116,33 @@ pub(crate) fn pragma<'src, I>(
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use Pragma::*;
-
     choice((
         just(Token::Pushtag)
             .ignore_then(tag())
-            .map_with(|tag, e| Pushtag(spanned(tag, e.span()))),
+            .map_with(|tag, e| Pragma::Pushtag(spanned(tag, e.span()))),
         just(Token::Poptag)
             .ignore_then(tag())
-            .map_with(|tag, e| Poptag(spanned(tag, e.span()))),
+            .map_with(|tag, e| Pragma::Poptag(spanned(tag, e.span()))),
         just(Token::Pushmeta)
             .ignore_then(meta_key_value())
-            .map(Pushmeta),
+            .map(Pragma::Pushmeta),
         just(Token::Popmeta)
             .ignore_then(key())
             .then_ignore(just(Token::Colon))
-            .map_with(|key, e| Popmeta(spanned(key, e.span()))),
-        just(Token::Include).ignore_then(string()).map(Include),
+            .map_with(|key, e| Pragma::Popmeta(spanned(key, e.span()))),
+        just(Token::Include)
+            .ignore_then(string())
+            .map(Pragma::Include),
         option(source_path).map(Pragma::Option),
+        just(Token::Plugin)
+            .ignore_then(string().map_with(spanned_extra))
+            .then(string().map_with(spanned_extra).or_not())
+            .map(|(module_name, config)| {
+                Pragma::Plugin(Plugin {
+                    module_name,
+                    config,
+                })
+            }),
     ))
     .then_ignore(just(Token::Eol))
     .labelled("directive") // yeah, pragma is not a user-facing concept

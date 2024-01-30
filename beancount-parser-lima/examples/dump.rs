@@ -49,6 +49,7 @@ fn parse<W>(
         Ok(ParseSuccess {
             directives,
             options: _,
+            plugins: _,
             warnings,
         }) => {
             let mut directives_as_strings = Vec::new();

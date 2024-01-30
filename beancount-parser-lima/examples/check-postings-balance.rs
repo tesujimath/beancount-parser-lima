@@ -35,6 +35,7 @@ where
         Ok(ParseSuccess {
             directives,
             options: _,
+            plugins: _,
             mut warnings,
         }) => {
             let mut errors = Vec::new();

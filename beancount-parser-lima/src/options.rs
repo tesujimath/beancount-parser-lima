@@ -37,6 +37,7 @@ pub(crate) enum BeancountOptionVariant<'a> {
     RenderCommas(bool),
     LongStringMaxlines(usize),
     BookingMethod(Booking),
+    PluginProcessingMode(PluginProcessingMode),
     Assimilated,
 }
 
@@ -143,6 +144,10 @@ impl<'a> BeancountOption<'a> {
 
             "booking_method" => parse_booking(value.item).map(BookingMethod),
 
+            "plugin_processing_mode" => {
+                parse_plugin_processing_mode(value.item).map(PluginProcessingMode)
+            }
+
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
@@ -197,6 +202,11 @@ fn parse_booking(value: &str) -> Result<Booking, BeancountOptionError> {
     Booking::try_from(value).map_err(|e| BadValueErrorKind::Booking(e).wrap())
 }
 
+fn parse_plugin_processing_mode(value: &str) -> Result<PluginProcessingMode, BeancountOptionError> {
+    PluginProcessingMode::try_from(value)
+        .map_err(|e| BadValueErrorKind::PluginProcessingMode(e).wrap())
+}
+
 // case insenstive parsing
 fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
     if value.eq_ignore_ascii_case("true") {
@@ -237,6 +247,7 @@ enum BadValueErrorKind {
     AccountName(AccountNameError),
     Currency(CurrencyError),
     Booking(strum::ParseError),
+    PluginProcessingMode(strum::ParseError),
     Decimal(rust_decimal::Error),
     Bool,
     MissingColon,
@@ -256,6 +267,13 @@ impl Display for BadValueErrorKind {
             Booking(_e) => format(
                 f,
                 crate::types::Booking::iter(),
+                plain,
+                ", ",
+                Some("Expected one of "),
+            ),
+            PluginProcessingMode(_e) => format(
+                f,
+                self::PluginProcessingMode::iter(),
                 plain,
                 ", ",
                 Some("Expected one of "),
@@ -352,6 +370,7 @@ pub struct Options<'a> {
     operating_currency: HashMap<Currency<'a>, Source>,
     render_commas: OptionallySourced<bool>,
     booking_method: OptionallySourced<Booking>,
+    plugin_processing_mode: OptionallySourced<PluginProcessingMode>,
     parser_options: ParserOptions<'a>,
 }
 
@@ -378,6 +397,7 @@ impl<'a> Options<'a> {
             operating_currency: HashMap::new(),
             render_commas: unsourced(false),
             booking_method: unsourced(Booking::Strict),
+            plugin_processing_mode: unsourced(PluginProcessingMode::Default),
             parser_options,
         }
     }
@@ -448,6 +468,10 @@ impl<'a> Options<'a> {
             LongStringMaxlines(_) => Ok(()),
 
             BookingMethod(value) => Self::update(&mut self.booking_method, value, source),
+
+            PluginProcessingMode(value) => {
+                Self::update(&mut self.plugin_processing_mode, value, source)
+            }
 
             // this value contains nothing
             Assimilated => Ok(()),
@@ -608,6 +632,10 @@ impl<'a> Options<'a> {
 
     pub fn booking_method(&self) -> Booking {
         self.booking_method.item
+    }
+
+    pub fn plugin_processing_mode(&self) -> PluginProcessingMode {
+        self.plugin_processing_mode.item
     }
 }
 

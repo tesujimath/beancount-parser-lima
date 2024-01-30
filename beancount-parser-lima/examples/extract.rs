@@ -11,8 +11,8 @@ use beancount_parser_lima::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
     Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
     ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
-    ParseSuccess, Posting, Price, Query, ScopedAmount, ScopedExprValue, SimpleValue, Subaccount,
-    Tag, Transaction,
+    ParseSuccess, Plugin, PluginProcessingMode, Posting, Price, Query, ScopedAmount,
+    ScopedExprValue, SimpleValue, Subaccount, Tag, Transaction,
 };
 
 /// This example is really a test that there is sufficient public access to parser output types.
@@ -39,35 +39,39 @@ where
         Ok(ParseSuccess {
             directives,
             options,
+            plugins,
             warnings,
         }) => {
-            for p in extract_options(&options).chain(directives.iter().flat_map(|d| {
-                use DirectiveVariant::*;
+            for p in extract_options(&options)
+                .chain(extract_plugins(&plugins))
+                .chain(directives.iter().flat_map(|d| {
+                    use DirectiveVariant::*;
 
-                match d.variant() {
-                    Transaction(x) => transaction(x, d),
+                    match d.variant() {
+                        Transaction(x) => transaction(x, d),
 
-                    Price(x) => price(x, d),
+                        Price(x) => price(x, d),
 
-                    Balance(x) => balance(x, d),
+                        Balance(x) => balance(x, d),
 
-                    Open(x) => open(x, d),
+                        Open(x) => open(x, d),
 
-                    Close(x) => close(x, d),
+                        Close(x) => close(x, d),
 
-                    Commodity(x) => commodity(x, d),
+                        Commodity(x) => commodity(x, d),
 
-                    Pad(x) => pad(x, d),
+                        Pad(x) => pad(x, d),
 
-                    Document(x) => document(x, d),
+                        Document(x) => document(x, d),
 
-                    Note(x) => note(x, d),
+                        Note(x) => note(x, d),
 
-                    Event(x) => event(x, d),
+                        Event(x) => event(x, d),
 
-                    Query(x) => query(x, d),
-                }
-            })) {
+                        Query(x) => query(x, d),
+                    }
+                }))
+            {
                 p.write(&io::stdout(), &options).unwrap();
             }
             println!();
@@ -91,6 +95,7 @@ enum Primitive<'a> {
     Decimal(Decimal),
     Date(Date),
     Booking(Booking),
+    PluginProcessingMode(PluginProcessingMode),
     Bool(bool),
     Spliced(Vec<Primitive<'a>>),
 }
@@ -138,6 +143,8 @@ impl<'a> Primitive<'a> {
             Date(x) => write!(w, "{}", x),
 
             Booking(x) => write!(w, "\"{}\"", x),
+
+            PluginProcessingMode(x) => write!(w, "\"{}\"", x),
 
             Bool(x) => write!(w, "{}", x),
 
@@ -237,6 +244,10 @@ fn extract_options<'a>(options: &'a Options) -> Box<dyn Iterator<Item = Primitiv
             .chain(bare_option(
                 "booking_method",
                 booking(&options.booking_method()),
+            ))
+            .chain(bare_option(
+                "plugin_processing_mode",
+                plugin_processing_mode(&options.plugin_processing_mode()),
             )),
     )
 }
@@ -268,6 +279,21 @@ where
             .chain(value)
             .chain(newline()),
     )
+}
+
+fn extract_plugins<'a>(plugins: &'a [Plugin<'a>]) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    Box::new(plugins.iter().flat_map(|plugin| {
+        string("plugin", Decoration::None)
+            .chain(string(plugin.module_name(), Decoration::DoubleQuote))
+            .chain(
+                plugin
+                    .config()
+                    .into_iter()
+                    .flat_map(|config| string(config.item(), Decoration::DoubleQuote)),
+            )
+            .spaced()
+            .chain(newline())
+    }))
 }
 
 fn transaction<'a>(
@@ -645,6 +671,10 @@ fn date<'a>(x: &Date) -> impl Iterator<Item = Primitive<'a>> {
 
 fn booking<'a>(x: &Booking) -> impl Iterator<Item = Primitive<'a>> {
     once(Primitive::Booking(*x))
+}
+
+fn plugin_processing_mode<'a>(x: &PluginProcessingMode) -> impl Iterator<Item = Primitive<'a>> {
+    once(Primitive::PluginProcessingMode(*x))
 }
 
 fn bool<'a>(x: bool) -> impl Iterator<Item = Primitive<'a>> {

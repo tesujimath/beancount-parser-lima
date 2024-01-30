@@ -43,7 +43,6 @@ Yeah, Beancount is complicated, and I may have made some mistakes here.  Current
 This is an incomplete list of what is currently unsupported.
 
 - custom directive
-- plugins
 
 ### Unsupported Options
 
@@ -53,7 +52,6 @@ This is an incomplete list of what is currently unsupported.
 - `experiment_explicit_tolerances`
 - `insert_pythonpath`
 - `plugin`
-- `plugin_processing_mode`
 - `tolerance`
 - `use_legacy_fixed_tolerances`
 

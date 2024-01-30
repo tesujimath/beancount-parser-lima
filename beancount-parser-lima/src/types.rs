@@ -323,6 +323,16 @@ impl ElementType for Booking {
     }
 }
 
+#[derive(
+    EnumString, EnumIter, IntoStaticStr, PartialEq, Eq, Default, Clone, Copy, Display, Debug,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum PluginProcessingMode {
+    #[default]
+    Default,
+    Raw,
+}
+
 /// Identifies a source file.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
 pub struct SourceId(u32);
@@ -600,7 +610,7 @@ pub(crate) enum Pragma<'a> {
     Popmeta(Spanned<Key<'a>>),
     Include(&'a str),
     Option(BeancountOption<'a>),
-    // TODO (probably not) plugin
+    Plugin(Plugin<'a>),
 }
 
 /// A Beancount transaction directive, without the common [Directive] fields.
@@ -927,6 +937,35 @@ impl<'a> Query<'a> {
     /// Field accessor.
     pub fn content(&self) -> &Spanned<&str> {
         &self.content
+    }
+}
+
+/// A Beancount plugin pragma.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Plugin<'a> {
+    pub(crate) module_name: Spanned<&'a str>,
+    pub(crate) config: Option<Spanned<&'a str>>,
+}
+
+impl<'a> Plugin<'a> {
+    /// Field accessor.
+    pub fn module_name(&self) -> &Spanned<&str> {
+        &self.module_name
+    }
+
+    /// Field accessor.
+    pub fn config(&self) -> Option<&Spanned<&str>> {
+        self.config.as_ref()
+    }
+}
+
+impl<'a> Display for Plugin<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "plugin \"{}\"", self.module_name)?;
+        if let Some(config) = &self.config {
+            write!(f, " \"{}\"", config)?;
+        }
+        writeln!(f)
     }
 }
 
