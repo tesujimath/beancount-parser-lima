@@ -14,13 +14,14 @@ use strum::IntoEnumIterator;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct BeancountOption<'a> {
-    source: Source,
+    name: Spanned<Cow<'a, str>>,
+    value: Spanned<Cow<'a, str>>,
     variant: BeancountOptionVariant<'a>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) enum BeancountOptionVariant<'a> {
-    Title(Cow<'a, str>),
+    Title(&'a str),
     AccountTypeName(AccountType, AccountTypeName<'a>),
     AccountPreviousBalances(Subaccount<'a>),
     AccountPreviousEarnings(Subaccount<'a>),
@@ -70,61 +71,62 @@ impl<'a> BeancountOption<'a> {
         use BeancountOptionVariant::*;
 
         match name.item.as_ref() {
-            "title" => Ok(Title(value.item)),
+            // TODO "title" => Ok(Title(value.item)),
+            "name_assets" => parse_account_type_name(value.item.as_ref())
+                .map(|n| AccountTypeName(AccountType::Assets, n)),
 
-            "name_assets" => {
-                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Assets, n))
-            }
-
-            "name_liabilities" => parse_account_type_name(value.item)
+            "name_liabilities" => parse_account_type_name(value.item.as_ref())
                 .map(|n| AccountTypeName(AccountType::Liabilities, n)),
 
-            "name_equity" => {
-                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Equity, n))
-            }
+            "name_equity" => parse_account_type_name(value.item.as_ref())
+                .map(|n| AccountTypeName(AccountType::Equity, n)),
 
-            "name_income" => {
-                parse_account_type_name(value.item).map(|n| AccountTypeName(AccountType::Income, n))
-            }
+            "name_income" => parse_account_type_name(value.item.as_ref())
+                .map(|n| AccountTypeName(AccountType::Income, n)),
 
-            "name_expenses" => parse_account_type_name(value.item)
+            "name_expenses" => parse_account_type_name(value.item.as_ref())
                 .map(|n| AccountTypeName(AccountType::Expenses, n)),
 
             "account_previous_balances" => {
-                parse_subaccount(value.item).map(AccountPreviousBalances)
+                parse_subaccount(value.item.as_ref()).map(AccountPreviousBalances)
             }
 
             "account_previous_earnings" => {
-                parse_subaccount(value.item).map(AccountPreviousEarnings)
+                parse_subaccount(value.item.as_ref()).map(AccountPreviousEarnings)
             }
 
             "account_previous_conversions" => {
-                parse_subaccount(value.item).map(AccountPreviousConversions)
+                parse_subaccount(value.item.as_ref()).map(AccountPreviousConversions)
             }
 
-            "account_current_earnings" => parse_subaccount(value.item).map(AccountCurrentEarnings),
+            "account_current_earnings" => {
+                parse_subaccount(value.item.as_ref()).map(AccountCurrentEarnings)
+            }
 
             "account_current_conversions" => {
-                parse_subaccount(value.item).map(AccountCurrentConversions)
+                parse_subaccount(value.item.as_ref()).map(AccountCurrentConversions)
             }
 
-            "account_unrealized_gains" => parse_subaccount(value.item).map(AccountUnrealizedGains),
+            "account_unrealized_gains" => {
+                parse_subaccount(value.item.as_ref()).map(AccountUnrealizedGains)
+            }
 
-            "account_rounding" => parse_subaccount(value.item).map(AccountRounding),
+            "account_rounding" => parse_subaccount(value.item.as_ref()).map(AccountRounding),
 
-            "conversion_currency" => parse_currency(value.item).map(ConversionCurrency),
+            "conversion_currency" => parse_currency(value.item.as_ref()).map(ConversionCurrency),
 
-            "inferred_tolerance_default" => {
-                parse_inferred_tolerance_default(value.item).map(|(currency_or_any, tolerance)| {
+            "inferred_tolerance_default" => parse_inferred_tolerance_default(value.item.as_ref())
+                .map(|(currency_or_any, tolerance)| {
                     InferredToleranceDefault(currency_or_any, tolerance)
-                })
-            }
+                }),
 
             "inferred_tolerance_multiplier" => Decimal::try_from(value.item.as_ref())
                 .map(InferredToleranceMultiplier)
                 .map_err(|e| BadValueErrorKind::Decimal(e).wrap()),
 
-            "infer_tolerance_from_cost" => parse_bool(value.item).map(InferToleranceFromCost),
+            "infer_tolerance_from_cost" => {
+                parse_bool(value.item.as_ref()).map(InferToleranceFromCost)
+            }
 
             "documents" => Ok(source_path
                 .parent()
@@ -133,9 +135,9 @@ impl<'a> BeancountOption<'a> {
                 }))
             .map(Documents),
 
-            "operating_currency" => parse_currency(value.item).map(OperatingCurrency),
+            "operating_currency" => parse_currency(value.item.as_ref()).map(OperatingCurrency),
 
-            "render_commas" => parse_bool(value.item).map(RenderCommas),
+            "render_commas" => parse_bool(value.item.as_ref()).map(RenderCommas),
 
             "long_string_maxlines" => value
                 .item
@@ -143,25 +145,23 @@ impl<'a> BeancountOption<'a> {
                 .map(LongStringMaxlines)
                 .map_err(|e| BadValueErrorKind::ParseIntError(e).wrap()),
 
-            "booking_method" => parse_booking(value.item).map(BookingMethod),
+            "booking_method" => parse_booking(value.item.as_ref()).map(BookingMethod),
 
             "plugin_processing_mode" => {
-                parse_plugin_processing_mode(value.item).map(PluginProcessingMode)
+                parse_plugin_processing_mode(value.item.as_ref()).map(PluginProcessingMode)
             }
 
             _ => Err(UnknownOption),
         }
         .map(|variant| BeancountOption {
-            source: Source {
-                name: name.span,
-                value: value.span,
-            },
+            name,
+            value,
             variant,
         })
     }
 }
 
-fn parse_subaccount(colon_separated: Cow<'_, str>) -> Result<Subaccount, BeancountOptionError> {
+fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOptionError> {
     colon_separated
         .split(':')
         .map(AccountName::try_from)
@@ -169,17 +169,17 @@ fn parse_subaccount(colon_separated: Cow<'_, str>) -> Result<Subaccount, Beancou
         .map_err(|e| BadValueErrorKind::AccountName(e).wrap())
 }
 
-fn parse_account_type_name(value: Cow<'_, str>) -> Result<AccountTypeName, BeancountOptionError> {
+fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {
     AccountTypeName::try_from(value.as_ref())
         .map_err(|e| BadValueErrorKind::AccountTypeName(e).wrap())
 }
 
-fn parse_currency(value: Cow<'_, str>) -> Result<Currency, BeancountOptionError> {
+fn parse_currency(value: &str) -> Result<Currency, BeancountOptionError> {
     Currency::try_from(value.as_ref()).map_err(|e| BadValueErrorKind::Currency(e).wrap())
 }
 
 fn parse_inferred_tolerance_default(
-    value: Cow<'_, str>,
+    value: &str,
 ) -> Result<(CurrencyOrAny, Decimal), BeancountOptionError> {
     use BadValueErrorKind as Bad;
 
@@ -200,19 +200,17 @@ fn parse_inferred_tolerance_default(
     }
 }
 
-fn parse_booking(value: Cow<'_, str>) -> Result<Booking, BeancountOptionError> {
+fn parse_booking(value: &str) -> Result<Booking, BeancountOptionError> {
     Booking::try_from(value.as_ref()).map_err(|e| BadValueErrorKind::Booking(e).wrap())
 }
 
-fn parse_plugin_processing_mode(
-    value: Cow<'_, str>,
-) -> Result<PluginProcessingMode, BeancountOptionError> {
+fn parse_plugin_processing_mode(value: &str) -> Result<PluginProcessingMode, BeancountOptionError> {
     PluginProcessingMode::try_from(value.as_ref())
         .map_err(|e| BadValueErrorKind::PluginProcessingMode(e).wrap())
 }
 
 // case insenstive parsing
-fn parse_bool(value: Cow<'_, str>) -> Result<bool, BeancountOptionError> {
+fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
     if value.eq_ignore_ascii_case("true") {
         Ok(true)
     } else if value.eq_ignore_ascii_case("false") {
@@ -320,7 +318,11 @@ impl<'a> ParserOptions<'a> {
     ) -> Result<BeancountOption<'a>, ParserOptionsError> {
         use BeancountOptionVariant::*;
 
-        let BeancountOption { source, variant } = opt;
+        let BeancountOption {
+            name,
+            value,
+            variant,
+        } = opt;
 
         match variant {
             AccountTypeName(account_type, account_type_name) => self
@@ -330,13 +332,18 @@ impl<'a> ParserOptions<'a> {
                 .map(|_| Assimilated),
 
             LongStringMaxlines(n) => {
-                self.long_string_maxlines = optionally_sourced(n, source);
+                self.long_string_maxlines =
+                    optionally_sourced(n, Source::from_name_value(&name, &value));
                 Ok(Assimilated)
             }
 
             _ => Ok(variant),
         }
-        .map(|variant| BeancountOption { source, variant })
+        .map(|variant| BeancountOption {
+            name,
+            value,
+            variant,
+        })
     }
 
     pub(crate) fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
@@ -358,7 +365,7 @@ impl std::error::Error for ParserOptionsError {}
 /// All options read in from `option` pragmas, excluding those for internal processing only.
 #[derive(Debug)]
 pub struct Options<'a> {
-    title: OptionallySourced<Cow<'a, str>>,
+    title: OptionallySourced<&'a str>,
     account_previous_balances: OptionallySourced<Subaccount<'a>>,
     account_previous_earnings: OptionallySourced<Subaccount<'a>>,
     account_previous_conversions: OptionallySourced<Subaccount<'a>>,
@@ -381,24 +388,24 @@ pub struct Options<'a> {
 impl<'a> Options<'a> {
     pub(crate) fn new(parser_options: ParserOptions<'a>) -> Self {
         Options {
-            title: unsourced(Cow::Borrowed("Beancount")),
+            title: unsourced("Beancount"),
             account_previous_balances: unsourced(
-                parse_subaccount(Cow::Borrowed("Opening-Balances")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Opening-Balances")).unwrap(),
             ),
             account_previous_earnings: unsourced(
-                parse_subaccount(Cow::Borrowed("Earnings:Previous")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Earnings:Previous")).unwrap(),
             ),
             account_previous_conversions: unsourced(
-                parse_subaccount(Cow::Borrowed("Conversions:Previous")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Conversions:Previous")).unwrap(),
             ),
             account_current_earnings: unsourced(
-                parse_subaccount(Cow::Borrowed("Earnings:Current")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Earnings:Current")).unwrap(),
             ),
             account_current_conversions: unsourced(
-                parse_subaccount(Cow::Borrowed("Conversions:Current")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Conversions:Current")).unwrap(),
             ),
             account_unrealized_gains: unsourced(
-                parse_subaccount(Cow::Borrowed("Earnings:Unrealized")).unwrap(),
+                parse_subaccount(&Cow::Borrowed("Earnings:Unrealized")).unwrap(),
             ),
             account_rounding: None,
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
@@ -418,80 +425,126 @@ impl<'a> Options<'a> {
         use BeancountOptionVariant::*;
         use OptionError::*;
 
-        let BeancountOption { source, variant } = opt;
+        let BeancountOption {
+            name,
+            value,
+            variant,
+        } = opt;
         match variant {
-            Title(value) => Self::update(&mut self.title, value, source),
+            Title(x) => Self::update(
+                &mut self.title,
+                x.as_ref(),
+                Source::from_name_value(&name, &value),
+            ),
 
             // already assimilated into ParserOptions
             AccountTypeName(_, _) => Ok(()),
 
-            AccountPreviousBalances(value) => {
-                Self::update(&mut self.account_previous_balances, value, source)
-            }
-            AccountPreviousEarnings(value) => {
-                Self::update(&mut self.account_previous_earnings, value, source)
-            }
-            AccountPreviousConversions(value) => {
-                Self::update(&mut self.account_previous_conversions, value, source)
-            }
+            AccountPreviousBalances(x) => Self::update(
+                &mut self.account_previous_balances,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
+            AccountPreviousEarnings(x) => Self::update(
+                &mut self.account_previous_earnings,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
+            AccountPreviousConversions(x) => Self::update(
+                &mut self.account_previous_conversions,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            AccountCurrentEarnings(value) => {
-                Self::update(&mut self.account_current_earnings, value, source)
-            }
+            AccountCurrentEarnings(x) => Self::update(
+                &mut self.account_current_earnings,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            AccountCurrentConversions(value) => {
-                Self::update(&mut self.account_current_conversions, value, source)
-            }
+            AccountCurrentConversions(x) => Self::update(
+                &mut self.account_current_conversions,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            AccountUnrealizedGains(value) => {
-                Self::update(&mut self.account_unrealized_gains, value, source)
-            }
+            AccountUnrealizedGains(x) => Self::update(
+                &mut self.account_unrealized_gains,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            AccountRounding(value) => {
-                Self::update_optional(&mut self.account_rounding, value, source)
-            }
+            AccountRounding(x) => Self::update_optional(
+                &mut self.account_rounding,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            ConversionCurrency(value) => Self::update(&mut self.conversion_currency, value, source),
+            ConversionCurrency(x) => Self::update(
+                &mut self.conversion_currency,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
             InferredToleranceDefault(currency_or_any, tolerance) => Self::update_hashmap(
                 &mut self.inferred_tolerance_default,
                 currency_or_any,
                 tolerance,
-                source,
+                Source::from_name_value(&name, &value),
             ),
 
-            InferredToleranceMultiplier(value) => {
-                Self::update(&mut self.inferred_tolerance_multiplier, value, source)
-            }
+            InferredToleranceMultiplier(x) => Self::update(
+                &mut self.inferred_tolerance_multiplier,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            InferToleranceFromCost(value) => {
-                Self::update(&mut self.infer_tolerance_from_cost, value, source)
-            }
+            InferToleranceFromCost(x) => Self::update(
+                &mut self.infer_tolerance_from_cost,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            Documents(path) => Self::update_unit_hashmap(&mut self.documents, path, source),
+            Documents(path) => Self::update_unit_hashmap(
+                &mut self.documents,
+                path,
+                Source::from_name_value(&name, &value),
+            ),
 
-            OperatingCurrency(value) => {
-                Self::update_unit_hashmap(&mut self.operating_currency, value, source)
-            }
+            OperatingCurrency(x) => Self::update_unit_hashmap(
+                &mut self.operating_currency,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            RenderCommas(value) => Self::update(&mut self.render_commas, value, source),
+            RenderCommas(x) => Self::update(
+                &mut self.render_commas,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
             // already assimilated into ParserOptions
             LongStringMaxlines(_) => Ok(()),
 
-            BookingMethod(value) => Self::update(&mut self.booking_method, value, source),
+            BookingMethod(x) => Self::update(
+                &mut self.booking_method,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
-            PluginProcessingMode(value) => {
-                Self::update(&mut self.plugin_processing_mode, value, source)
-            }
+            PluginProcessingMode(x) => Self::update(
+                &mut self.plugin_processing_mode,
+                x,
+                Source::from_name_value(&name, &value),
+            ),
 
             // this value contains nothing
             Assimilated => Ok(()),
         }
         .map_err(|ref e| match e {
-            DuplicateOption(span) => Error::new("invalid option", "duplicate", source.name)
+            DuplicateOption(span) => Error::new("invalid option", "duplicate", name.span)
                 .related_to_named_span("option", *span),
-            DuplicateValue(span) => Error::new("invalid option", "duplicate value", source.value)
+            DuplicateValue(span) => Error::new("invalid option", "duplicate value", value.span)
                 .related_to_named_span("option value", *span),
         })
     }
@@ -693,6 +746,15 @@ fn optionally_sourced<T>(item: T, source: Source) -> OptionallySourced<T> {
 pub(crate) struct Source {
     pub(crate) name: Span,
     pub(crate) value: Span,
+}
+
+impl Source {
+    fn from_name_value(name: &Spanned<Cow<'_, str>>, value: &Spanned<Cow<'_, str>>) -> Self {
+        Source {
+            name: name.span,
+            value: value.span,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
