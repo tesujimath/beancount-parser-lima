@@ -4,12 +4,12 @@ use crate::{
     types::*,
     ConcreteInput,
 };
-use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
+use chumsky::{input::ValueInput, label::LabelError, prelude::*};
 use either::Either;
 use rust_decimal::Decimal;
 use std::{
+    borrow::Cow,
     collections::{hash_map, HashMap, HashSet},
-    ops::Deref,
     path::Path,
 };
 use time::Date;
@@ -17,10 +17,10 @@ use time::Date;
 /// Matches all the includes in the file, ignoring everything else.
 pub(crate) fn includes<'src, I>() -> impl Parser<'src, I, Vec<String>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     (just(Token::Include).ignore_then(string()).map(Some))
-        .or(any_ref().map(|_| None))
+        .or(any().map(|_| None))
         .repeated()
         .collect::<Vec<_>>()
         .map(|includes| {
@@ -36,7 +36,7 @@ pub(crate) fn file<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     declaration(source_path).repeated().collect::<Vec<_>>()
 }
@@ -46,7 +46,7 @@ pub(crate) fn declaration<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, Spanned<Declaration<'src>>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Declaration::*;
 
@@ -56,18 +56,18 @@ where
         ignored_line().map(|_| IgnoredLine),
     ))
     .map_with(spanned_extra)
-    .recover_with(skip_then_retry_until(any_ref().ignored(), end()))
+    .recover_with(skip_then_retry_until(any().ignored(), end()))
 }
 
 /// Matches any line starting with any of *:!&#?% which is ignored.
 pub(crate) fn ignored_line<'src, I>() -> impl Parser<'src, I, (), Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Token::*;
 
     group((
-        one_of_ref(&[
+        one_of(&[
             Asterisk,
             Colon,
             DedicatedFlag(Flag::Exclamation),
@@ -76,7 +76,7 @@ where
             DedicatedFlag(Flag::Question),
             DedicatedFlag(Flag::Percent),
         ]),
-        (any_ref().and_is(just(Eol).not_ref()))
+        (any().and_is(just(Eol).not()))
             .repeated()
             .collect::<Vec<_>>(),
         just(Eol),
@@ -87,7 +87,7 @@ where
 /// Matches a [Directive].
 pub(crate) fn directive<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     choice((
         transaction().labelled("transaction").as_context(),
@@ -114,7 +114,7 @@ pub(crate) fn pragma<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, Pragma<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     choice((
         just(Token::Pushtag)
@@ -154,7 +154,7 @@ pub(crate) fn option<'src, I>(
     source_path: &'src Path,
 ) -> impl Parser<'src, I, BeancountOption<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     just(Token::Option)
         .ignore_then(string().map_with(|name, e| spanned(name, e.span())))
@@ -162,9 +162,11 @@ where
         .try_map_with(|(name, value), e| {
             use BeancountOptionError::*;
 
+            let name_span = name.span;
+            let value_span = value.span;
             let opt = BeancountOption::parse(name, value, source_path).map_err(|e| match e {
-                UnknownOption => Rich::custom(name.span, e.to_string()),
-                BadValue(_) => Rich::custom(value.span, e.to_string()),
+                UnknownOption => Rich::custom(name_span, e.to_string()),
+                BadValue(_) => Rich::custom(value_span, e.to_string()),
             });
 
             if let Ok(opt) = opt {
@@ -172,7 +174,7 @@ where
                 parser_state
                     .options
                     .assimilate(opt)
-                    .map_err(|e| Rich::custom(value.span, e.to_string()))
+                    .map_err(|e| Rich::custom(value_span, e.to_string()))
             } else {
                 opt
             }
@@ -197,7 +199,7 @@ where
 /// Matches a transaction, including metadata and postings, over several lines.
 pub(crate) fn transaction<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         transaction_header_line(),
@@ -235,16 +237,16 @@ fn transaction_header_line<'src, I>() -> impl Parser<
     (
         Spanned<Date>,
         Spanned<Flag>,
-        (Option<Spanned<&'src str>>, Option<Spanned<&'src str>>),
         (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
+            Option<Spanned<Cow<'src, str>>>,
+            Option<Spanned<Cow<'src, str>>>,
         ),
+        (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>),
     ),
     Extra<'src>,
 >
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -267,7 +269,7 @@ where
 /// Matches a price directive, including metadata, over several lines.
 pub(crate) fn price<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -296,7 +298,7 @@ where
 /// Matches a balance directive, including metadata, over several lines.
 pub(crate) fn balance<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -325,7 +327,7 @@ where
 /// Matches a open, including metadata, over several lines.
 pub(crate) fn open<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((open_header_line(), metadata())).validate(
         |((date, account, currencies, booking, (tags, links)), mut metadata), _span, emitter| {
@@ -352,17 +354,14 @@ fn open_header_line<'src, I>() -> impl Parser<
     (
         Spanned<Date>,
         Spanned<Account<'src>>,
-        HashSet<Spanned<&'src Currency<'src>>>,
+        HashSet<Spanned<Currency<'src>>>,
         Option<Spanned<Booking>>,
-        (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
-        ),
+        (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>),
     ),
     Extra<'src>,
 >
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -400,16 +399,17 @@ where
 /// Matches a [Account].
 fn account<'src, I>() -> impl Parser<'src, I, Account<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let account = select_ref!(Token::Account(acc) => acc);
+    let account = select!(Token::Account(acc) => acc);
 
     account.try_map_with(|candidate, e| {
         let span = e.span();
         let parser_state: &ParserState = e.state();
         let account_type_names = &parser_state.options.account_type_names;
+        let candidate_account_type_name = candidate.account_type_name;
         account_type_names
-            .get(&candidate.account_type_name)
+            .get(&candidate_account_type_name)
             .map(|account_type| Account {
                 account_type,
                 candidate,
@@ -418,7 +418,7 @@ where
                 span,
                 format!(
                     "unknown account type {}, must be one of {}",
-                    &candidate.account_type_name, account_type_names
+                    candidate_account_type_name, account_type_names
                 ),
             ))
     })
@@ -427,15 +427,17 @@ where
 /// Matches a [Booking].
 fn booking<'src, I>() -> impl Parser<'src, I, Booking, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    string().try_map(|s, span| Booking::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
+    string().try_map(|s, span| {
+        Booking::try_from(s.as_ref()).map_err(|e| Rich::custom(span, e.to_string()))
+    })
 }
 
 /// Matches a close, including metadata, over several lines.
 pub(crate) fn close<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -462,7 +464,7 @@ where
 /// Matches a commodity, including metadata, over several lines.
 pub(crate) fn commodity<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -489,7 +491,7 @@ where
 /// Matches a pad, including metadata, over several lines.
 pub(crate) fn pad<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -517,7 +519,7 @@ where
 /// Matches a document, including metadata, over several lines.
 pub(crate) fn document<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -545,7 +547,7 @@ where
 /// Matches a note, including metadata, over several lines.
 pub(crate) fn note<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -573,7 +575,7 @@ where
 /// Matches an event, including metadata, over several lines.
 pub(crate) fn event<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -604,7 +606,7 @@ where
 /// Matches a query, including metadata, over several lines.
 pub(crate) fn query<'src, I>() -> impl Parser<'src, I, Directive<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         date().map_with(spanned_extra),
@@ -632,7 +634,7 @@ where
 /// Matches the `txn` keyword or a flag.
 pub(crate) fn txn<'src, I>() -> impl Parser<'src, I, Flag, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     choice((just(Token::Txn).to(Flag::default()), flag()))
 }
@@ -640,9 +642,9 @@ where
 /// Matches any flag, dedicated or overloaded
 pub(crate) fn flag<'src, I>() -> impl Parser<'src, I, Flag, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let dedicated_flag = select_ref!(Token::DedicatedFlag(flag) => *flag);
+    let dedicated_flag = select!(Token::DedicatedFlag(flag) => flag);
 
     choice((
         dedicated_flag,
@@ -654,7 +656,7 @@ where
 /// Matches a [Posting] complete with [Metadata] over several lines.
 fn posting<'src, I>() -> impl Parser<'src, I, Posting<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     just(Token::Indent)
         .ignore_then(
@@ -689,7 +691,7 @@ where
 /// Matches [Metadata], over several lines.
 fn metadata<'src, I>() -> impl Parser<'src, I, Metadata<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Metadatum::*;
 
@@ -745,14 +747,14 @@ where
 /// A single instance of [Metadata]
 enum Metadatum<'a> {
     KeyValue(Spanned<MetaKeyValue<'a>>),
-    Tag(Spanned<&'a Tag<'a>>),
-    Link(Spanned<&'a Link<'a>>),
+    Tag(Spanned<Tag<'a>>),
+    Link(Spanned<Link<'a>>),
 }
 
 /// Matches a single Metadatum on a single line.
 fn meta_key_value<'src, I>() -> impl Parser<'src, I, MetaKeyValue<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     key()
         .map_with(spanned_extra)
@@ -763,7 +765,7 @@ where
 /// Matches a single Metadatum on a single line.
 fn metadatum_line<'src, I>() -> impl Parser<'src, I, Metadatum<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Metadatum::*;
 
@@ -783,7 +785,7 @@ where
 /// Matches a [MetaValue].
 pub(crate) fn meta_value<'src, I>() -> impl Parser<'src, I, MetaValue<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use MetaValue::*;
 
@@ -795,7 +797,7 @@ where
 /// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
 pub(crate) fn simple_value<'src, I>() -> impl Parser<'src, I, SimpleValue<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use SimpleValue::*;
 
@@ -814,7 +816,7 @@ where
 
 pub(crate) fn amount<'src, I>() -> impl Parser<'src, I, Amount<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         expr_value().map_with(spanned_extra),
@@ -826,7 +828,7 @@ where
 pub(crate) fn amount_with_tolerance<'src, I>(
 ) -> impl Parser<'src, I, AmountWithTolerance<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         amount().map_with(spanned_extra),
@@ -839,7 +841,7 @@ where
 
 pub(crate) fn loose_amount<'src, I>() -> impl Parser<'src, I, LooseAmount<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     group((
         expr_value().map_with(spanned_extra).or_not(),
@@ -850,7 +852,7 @@ where
 
 pub(crate) fn compound_amount<'src, I>() -> impl Parser<'src, I, ScopedAmount<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use ScopedAmount::*;
 
@@ -863,7 +865,7 @@ where
 
 pub(crate) fn compound_expr<'src, I>() -> impl Parser<'src, I, ScopedExprValue, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use ScopedExprValue::*;
 
@@ -876,7 +878,7 @@ where
 
 pub(crate) fn price_annotation<'src, I>() -> impl Parser<'src, I, ScopedAmount<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use ScopedAmount::*;
 
@@ -907,7 +909,7 @@ where
 /// For now we only match the new syntax of single braces.
 fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use self::ScopedAmount::*;
     use CostComp::*;
@@ -951,14 +953,14 @@ where
 enum CostComp<'a> {
     ScopedAmount(ScopedAmount<'a>),
     Date(Date),
-    Label(&'a str),
+    Label(Cow<'a, str>),
     Merge,
 }
 
 /// Matches one component of a [CostSpec].
 fn cost_comp<'src, I>() -> impl Parser<'src, I, CostComp<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use CostComp::*;
 
@@ -972,17 +974,10 @@ where
 
 /// Matches zero or more tags or links.
 /// Duplicates are errors.
-pub(crate) fn tags_links<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        HashSet<Spanned<&'src Tag<'src>>>,
-        HashSet<Spanned<&'src Link<'src>>>,
-    ),
-    Extra<'src>,
->
+pub(crate) fn tags_links<'src, I>(
+) -> impl Parser<'src, I, (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>), Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     choice((
         tag().map_with(spanned_extra).map(Either::Left),
@@ -1020,7 +1015,7 @@ where
 /// Matches a bool
 pub(crate) fn bool<'src, I>() -> impl Parser<'src, I, bool, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     choice((just(Token::True).to(true), just(Token::False).to(false)))
 }
@@ -1028,7 +1023,7 @@ where
 /// Match and evaluate an expression
 pub(crate) fn expr_value<'src, I>() -> impl Parser<'src, I, ExprValue, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     expr().map(ExprValue::from)
 }
@@ -1036,7 +1031,7 @@ where
 /// Match an expression
 pub(crate) fn expr<'src, I>() -> impl Parser<'src, I, Expr, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     use Token::*;
 
@@ -1048,7 +1043,7 @@ where
             .map(|x| Expr::Paren(Box::new(x)));
 
         // Match a bare number
-        let number = select_ref! { Number(x) => Expr::Value(*x) };
+        let number = select! { Number(x) => Expr::Value(x) };
 
         // Match a factor of an expression
         let factor = just(Minus)
@@ -1087,19 +1082,19 @@ where
 }
 
 /// Matches a Tag
-fn tag<'src, I>() -> impl Parser<'src, I, &'src Tag<'src>, Extra<'src>>
+fn tag<'src, I>() -> impl Parser<'src, I, Tag<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Tag(tag) => tag)
+    select!(Token::Tag(tag) => tag)
 }
 
 /// Matches a Link
-fn link<'src, I>() -> impl Parser<'src, I, &'src Link<'src>, Extra<'src>>
+fn link<'src, I>() -> impl Parser<'src, I, Link<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Link(link) => link)
+    select!(Token::Link(link) => link)
 }
 
 /// Matches a Key.
@@ -1107,9 +1102,9 @@ where
 /// since keywords do get used as metadata keys.
 fn key<'src, I>() -> impl Parser<'src, I, Key<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let key = select_ref!(Token::Key(key) => *key);
+    let key = select!(Token::Key(key) => key);
 
     choice((
         key,
@@ -1121,32 +1116,32 @@ where
 /// Matches a keyword which has already been parsed as a token.
 fn keyword<'src, I>() -> impl Parser<'src, I, &'src str, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let true_ = select_ref!(Token::True => "TRUE");
-    let false_ = select_ref!(Token::False=> "FALSE");
-    let null = select_ref!(Token::Null => "NULL");
-    let currency = select_ref!(Token::Currency(currency) => currency.as_ref());
-    let txn = select_ref!(Token::Txn => "txn");
-    let balance = select_ref!(Token::Balance => "balance");
-    let open = select_ref!(Token::Open => "open");
-    let close = select_ref!(Token::Close => "close");
-    let commodity = select_ref!(Token::Commodity => "commodity");
-    let pad = select_ref!(Token::Pad => "pad");
-    let event = select_ref!(Token::Event => "event");
-    let query = select_ref!(Token::Query => "query");
-    let custom = select_ref!(Token::Custom => "custom");
-    let price = select_ref!(Token::Price => "price");
-    let note = select_ref!(Token::Note => "note");
-    let document = select_ref!(Token::Document => "document");
-    let pushtag = select_ref!(Token::Pushtag => "pushtag");
-    let poptag = select_ref!(Token::Poptag => "poptag");
-    let pushmeta = select_ref!(Token::Pushmeta => "pushmeta");
-    let popmeta = select_ref!(Token::Popmeta => "popmeta");
-    let option = select_ref!(Token::Option => "option");
-    let options = select_ref!(Token::Options => "options");
-    let plugin = select_ref!(Token::Plugin => "plugin");
-    let include = select_ref!(Token::Include => "include");
+    let true_ = select!(Token::True => "TRUE");
+    let false_ = select!(Token::False=> "FALSE");
+    let null = select!(Token::Null => "NULL");
+    let currency = select!(Token::Currency(currency) => currency.into_str());
+    let txn = select!(Token::Txn => "txn");
+    let balance = select!(Token::Balance => "balance");
+    let open = select!(Token::Open => "open");
+    let close = select!(Token::Close => "close");
+    let commodity = select!(Token::Commodity => "commodity");
+    let pad = select!(Token::Pad => "pad");
+    let event = select!(Token::Event => "event");
+    let query = select!(Token::Query => "query");
+    let custom = select!(Token::Custom => "custom");
+    let price = select!(Token::Price => "price");
+    let note = select!(Token::Note => "note");
+    let document = select!(Token::Document => "document");
+    let pushtag = select!(Token::Pushtag => "pushtag");
+    let poptag = select!(Token::Poptag => "poptag");
+    let pushmeta = select!(Token::Pushmeta => "pushmeta");
+    let popmeta = select!(Token::Popmeta => "popmeta");
+    let option = select!(Token::Option => "option");
+    let options = select!(Token::Options => "options");
+    let plugin = select!(Token::Plugin => "plugin");
+    let include = select!(Token::Include => "include");
 
     choice((
         true_, false_, null, currency, txn, balance, open, close, commodity, pad, event, query,
@@ -1156,35 +1151,35 @@ where
 }
 
 /// Matches a Currency
-fn currency<'src, I>() -> impl Parser<'src, I, &'src Currency<'src>, Extra<'src>>
+fn currency<'src, I>() -> impl Parser<'src, I, Currency<'src>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Currency(currency) => currency)
+    select!(Token::Currency(currency) => currency)
 }
 
 /// Matches a Date
 fn date<'src, I>() -> impl Parser<'src, I, Date, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Date(date) => *date)
+    select!(Token::Date(date) => date)
 }
 
 /// Matches a Decimal
 fn decimal<'src, I>() -> impl Parser<'src, I, Decimal, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Number(x) => *x)
+    select!(Token::Number(x) => x)
 }
 
 /// Matches a string
-fn string<'src, I>() -> impl Parser<'src, I, &'src str, Extra<'src>>
+fn string<'src, I>() -> impl Parser<'src, I, Cow<'src, str>, Extra<'src>>
 where
-    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let string = select_ref!(Token::StringLiteral(s) => s.deref());
+    let string = select!(Token::StringLiteral(s) => s);
 
     string.map_with(|s, e| {
         let span = e.span();
@@ -1216,7 +1211,7 @@ where
 }
 
 impl<'a> Metadata<'a> {
-    pub(crate) fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<Tag<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {
@@ -1235,7 +1230,7 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<Link<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {

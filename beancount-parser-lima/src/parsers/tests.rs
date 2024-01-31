@@ -32,21 +32,21 @@ fn test_transaction(
 
     let expected_flag = spanned(expected_flag.0, sourced_span(expected_flag.1));
 
-    let expected_payee = expected_payee.map(|(s, range)| spanned(s, sourced_span(range)));
+    let expected_payee =
+        expected_payee.map(|(s, range)| spanned(Cow::Borrowed(s), sourced_span(range)));
 
-    let expected_narration = expected_narration.map(|(s, range)| spanned(s, sourced_span(range)));
+    let expected_narration =
+        expected_narration.map(|(s, range)| spanned(Cow::Borrowed(s), sourced_span(range)));
 
     let expected_tags = expected_tags
         .into_iter()
         .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
-        .collect::<Vec<_>>();
-    let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
+        .collect();
 
     let expected_links = expected_links
         .into_iter()
         .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
-        .collect::<Vec<_>>();
-    let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
+        .collect();
 
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -62,11 +62,11 @@ fn test_transaction(
     )
 }
 
-#[test_case("GBP", ScopedAmount::BareCurrency(&Currency::try_from("GBP").unwrap()))]
+#[test_case("GBP", ScopedAmount::BareCurrency(Currency::try_from("GBP").unwrap()))]
 #[test_case("456.78", ScopedAmount::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
 #[test_case("# 1456.98", ScopedAmount::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
-#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), &Currency::try_from("NZD").unwrap()))]
-#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), &Currency::try_from("USD").unwrap()))]
+#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap()))]
+#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
 fn test_compound_amount(s: &str, expected: ScopedAmount) {
     let source_id = SourceId::default();
     let tokens = bare_lex(source_id, s);
@@ -104,14 +104,12 @@ fn test_tags_links(
     let expected_tags = expected_tags
         .into_iter()
         .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
-        .collect::<Vec<_>>();
-    let expected_tags = expected_tags.iter().map(|s| s.as_ref()).collect();
+        .collect();
 
     let expected_links = expected_links
         .into_iter()
         .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
-        .collect::<Vec<_>>();
-    let expected_links = expected_links.iter().map(|s| s.as_ref()).collect();
+        .collect();
 
     let result = tags_links().parse(spanned_tokens).into_result();
 

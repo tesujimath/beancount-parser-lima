@@ -3,6 +3,7 @@ use super::types::*;
 use path_clean::PathClean;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::{
     collections::{hash_map, HashMap},
@@ -19,7 +20,7 @@ pub(crate) struct BeancountOption<'a> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) enum BeancountOptionVariant<'a> {
-    Title(&'a str),
+    Title(Cow<'a, str>),
     AccountTypeName(AccountType, AccountTypeName<'a>),
     AccountPreviousBalances(Subaccount<'a>),
     AccountPreviousEarnings(Subaccount<'a>),
@@ -61,14 +62,14 @@ impl<'a> TryFrom<&'a str> for CurrencyOrAny<'a> {
 
 impl<'a> BeancountOption<'a> {
     pub(crate) fn parse(
-        name: Spanned<&'a str>,
-        value: Spanned<&'a str>,
+        name: Spanned<Cow<'a, str>>,
+        value: Spanned<Cow<'a, str>>,
         source_path: &Path,
     ) -> Result<BeancountOption<'a>, BeancountOptionError> {
         use BeancountOptionError::*;
         use BeancountOptionVariant::*;
 
-        match name.item {
+        match name.item.as_ref() {
             "title" => Ok(Title(value.item)),
 
             "name_assets" => {
@@ -119,7 +120,7 @@ impl<'a> BeancountOption<'a> {
                 })
             }
 
-            "inferred_tolerance_multiplier" => Decimal::try_from(value.item)
+            "inferred_tolerance_multiplier" => Decimal::try_from(value.item.as_ref())
                 .map(InferredToleranceMultiplier)
                 .map_err(|e| BadValueErrorKind::Decimal(e).wrap()),
 
@@ -127,8 +128,8 @@ impl<'a> BeancountOption<'a> {
 
             "documents" => Ok(source_path
                 .parent()
-                .map_or(PathBuf::from(value.item), |parent| {
-                    parent.join(value.item).clean()
+                .map_or(PathBuf::from(value.item.as_ref()), |parent| {
+                    parent.join(value.item.as_ref()).clean()
                 }))
             .map(Documents),
 
@@ -160,7 +161,7 @@ impl<'a> BeancountOption<'a> {
     }
 }
 
-fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOptionError> {
+fn parse_subaccount(colon_separated: Cow<'_, str>) -> Result<Subaccount, BeancountOptionError> {
     colon_separated
         .split(':')
         .map(AccountName::try_from)
@@ -168,16 +169,17 @@ fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOption
         .map_err(|e| BadValueErrorKind::AccountName(e).wrap())
 }
 
-fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {
-    AccountTypeName::try_from(value).map_err(|e| BadValueErrorKind::AccountTypeName(e).wrap())
+fn parse_account_type_name(value: Cow<'_, str>) -> Result<AccountTypeName, BeancountOptionError> {
+    AccountTypeName::try_from(value.as_ref())
+        .map_err(|e| BadValueErrorKind::AccountTypeName(e).wrap())
 }
 
-fn parse_currency(value: &str) -> Result<Currency, BeancountOptionError> {
-    Currency::try_from(value).map_err(|e| BadValueErrorKind::Currency(e).wrap())
+fn parse_currency(value: Cow<'_, str>) -> Result<Currency, BeancountOptionError> {
+    Currency::try_from(value.as_ref()).map_err(|e| BadValueErrorKind::Currency(e).wrap())
 }
 
 fn parse_inferred_tolerance_default(
-    value: &str,
+    value: Cow<'_, str>,
 ) -> Result<(CurrencyOrAny, Decimal), BeancountOptionError> {
     use BadValueErrorKind as Bad;
 
@@ -198,17 +200,19 @@ fn parse_inferred_tolerance_default(
     }
 }
 
-fn parse_booking(value: &str) -> Result<Booking, BeancountOptionError> {
-    Booking::try_from(value).map_err(|e| BadValueErrorKind::Booking(e).wrap())
+fn parse_booking(value: Cow<'_, str>) -> Result<Booking, BeancountOptionError> {
+    Booking::try_from(value.as_ref()).map_err(|e| BadValueErrorKind::Booking(e).wrap())
 }
 
-fn parse_plugin_processing_mode(value: &str) -> Result<PluginProcessingMode, BeancountOptionError> {
-    PluginProcessingMode::try_from(value)
+fn parse_plugin_processing_mode(
+    value: Cow<'_, str>,
+) -> Result<PluginProcessingMode, BeancountOptionError> {
+    PluginProcessingMode::try_from(value.as_ref())
         .map_err(|e| BadValueErrorKind::PluginProcessingMode(e).wrap())
 }
 
 // case insenstive parsing
-fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
+fn parse_bool(value: Cow<'_, str>) -> Result<bool, BeancountOptionError> {
     if value.eq_ignore_ascii_case("true") {
         Ok(true)
     } else if value.eq_ignore_ascii_case("false") {
@@ -354,7 +358,7 @@ impl std::error::Error for ParserOptionsError {}
 /// All options read in from `option` pragmas, excluding those for internal processing only.
 #[derive(Debug)]
 pub struct Options<'a> {
-    title: OptionallySourced<&'a str>,
+    title: OptionallySourced<Cow<'a, str>>,
     account_previous_balances: OptionallySourced<Subaccount<'a>>,
     account_previous_earnings: OptionallySourced<Subaccount<'a>>,
     account_previous_conversions: OptionallySourced<Subaccount<'a>>,
@@ -377,17 +381,25 @@ pub struct Options<'a> {
 impl<'a> Options<'a> {
     pub(crate) fn new(parser_options: ParserOptions<'a>) -> Self {
         Options {
-            title: unsourced("Beancount"),
-            account_previous_balances: unsourced(parse_subaccount("Opening-Balances").unwrap()),
-            account_previous_earnings: unsourced(parse_subaccount("Earnings:Previous").unwrap()),
+            title: unsourced(Cow::Borrowed("Beancount")),
+            account_previous_balances: unsourced(
+                parse_subaccount(Cow::Borrowed("Opening-Balances")).unwrap(),
+            ),
+            account_previous_earnings: unsourced(
+                parse_subaccount(Cow::Borrowed("Earnings:Previous")).unwrap(),
+            ),
             account_previous_conversions: unsourced(
-                parse_subaccount("Conversions:Previous").unwrap(),
+                parse_subaccount(Cow::Borrowed("Conversions:Previous")).unwrap(),
             ),
-            account_current_earnings: unsourced(parse_subaccount("Earnings:Current").unwrap()),
+            account_current_earnings: unsourced(
+                parse_subaccount(Cow::Borrowed("Earnings:Current")).unwrap(),
+            ),
             account_current_conversions: unsourced(
-                parse_subaccount("Conversions:Current").unwrap(),
+                parse_subaccount(Cow::Borrowed("Conversions:Current")).unwrap(),
             ),
-            account_unrealized_gains: unsourced(parse_subaccount("Earnings:Unrealized").unwrap()),
+            account_unrealized_gains: unsourced(
+                parse_subaccount(Cow::Borrowed("Earnings:Unrealized")).unwrap(),
+            ),
             account_rounding: None,
             conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
             inferred_tolerance_default: HashMap::new(),
@@ -565,7 +577,7 @@ impl<'a> Options<'a> {
     }
 
     pub fn title(&self) -> &str {
-        self.title.item
+        self.title.item.as_ref()
     }
 
     pub fn account_previous_balances(&self) -> &Subaccount {
