@@ -139,7 +139,7 @@ fn fmt_open(
 ) -> fmt::Result {
     write!(f, "{} open ", date)?;
     fmt_account(&x.account, py, f)?;
-    format(f, x.currencies.as_ref(py), plain, " ", Some(" "))?;
+    format(f, x.currencies.as_ref(py), plain, ",", Some(" "))?;
     format(f, &x.booking, double_quoted, " ", Some(" "))?;
 
     fmt_optional_metadata_inline(metadata, py, f)
