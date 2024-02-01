@@ -15,6 +15,12 @@ plugin "a_mythical_plugin_with_config" "the config"
 2014-07-09 price HOOL 579.18 USD #watcha ^cool.co
   heat: "on"
 
+1972-05-28 open Assets:AccountsReceivable:Taxes    USD,CAD
+
+1972-05-28 open Assets:US:TD:Checking USD
+
+2016-03-01 open Assets:Bank:Unspecified
+
 2016-03-01 open Assets:Bank:Current NZD #money ^www.bank.com
 ;   check commodity == "NZD"
 
@@ -34,6 +40,10 @@ plugin "a_mythical_plugin_with_config" "the config"
 pushtag #essential
 
 pushmeta price: "expensive"
+
+2017-11-18 balance Assets:US:TD:Checking                           23954.04 USD
+
+2012-01-09 * "VISA DDA PUR 444500     WHOLEFDS -- VISA DDA PUR 444500     WHOLEFDS HOU 10236          NEW YORK      * NY"
 
 2023-05-29 * "New World Gardens North East Va ;" ^newworld.co.nz
   Assets:Bank:Current                        -30 -9.65 NZD

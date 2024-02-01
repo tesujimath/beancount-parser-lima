@@ -739,7 +739,7 @@ pub struct Open<'a> {
 impl<'a> Open<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} open {}", date, self.account)?;
-        format(f, &self.currencies, plain, " ", Some(" "))?;
+        format(f, &self.currencies, plain, ",", Some(" "))?;
         format(f, &self.booking, double_quoted, " ", Some(" "))?;
         // we prefer to show tags and links inline rather then line by line in metadata
         metadata.fmt_tags_links_inline(f)?;

@@ -339,32 +339,49 @@ where
         date().map_with(spanned_extra),
         just(Token::Open),
         account().map_with(spanned_extra),
-        currency()
-            .map_with(spanned_extra)
-            .repeated()
-            .collect::<Vec<_>>()
-            .validate(|currencies, _span, emitter| {
-                currencies
-                    .into_iter()
-                    .fold(HashSet::new(), |mut currencies, currency| {
-                        if currencies.contains(&currency) {
-                            emitter.emit(Rich::custom(
-                                currency.span,
-                                format!("duplicate currency {}", currency),
-                            ))
-                        } else {
-                            currencies.insert(currency);
-                        }
-
-                        currencies
-                    })
-            }),
+        currency_list(),
         booking().map_with(spanned_extra).or_not(),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
     .map(|(date, _, account, currency, booking, tags_links)| {
         (date, account, currency, booking, tags_links)
+    })
+}
+
+/// Matches zero or more currencies, comma-separated.
+fn currency_list<'src, I>(
+) -> impl Parser<'src, I, HashSet<Spanned<&'src Currency<'src>>>, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    group((
+        currency().map_with(spanned_extra),
+        (just(Token::Comma).ignore_then(currency().map_with(spanned_extra)))
+            .repeated()
+            .collect::<Vec<_>>(),
+    ))
+    .validate(|(first_currency, mut currencies), _span, emitter| {
+        currencies.push(first_currency);
+        currencies
+            .into_iter()
+            .fold(HashSet::new(), |mut currencies, currency| {
+                if currencies.contains(&currency) {
+                    emitter.emit(Rich::custom(
+                        currency.span,
+                        format!("duplicate currency {}", currency),
+                    ))
+                } else {
+                    currencies.insert(currency);
+                }
+
+                currencies
+            })
+    })
+    .or_not()
+    .map(|currencies| match currencies {
+        Some(currencies) => currencies,
+        None => HashSet::new(),
     })
 }
 
