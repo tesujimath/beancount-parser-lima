@@ -32,6 +32,33 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 `beancount-parser-lima v0.2.1` is able to parse the [example.beancount](https://github.com/beancount/beancount/blob/master/examples/example.beancount) file from the official [Beancount repo](https://github.com/beancount/beancount).
 
+## Examples
+
+### dump
+
+This simply parses a Beancount file and outputs the results of parsing, using the Display implementations for the parser output types.
+
+```
+cargo run --example dump -- ./examples/data/full.beancount
+```
+
+### check
+
+This is an example of reporting errors against source locations by the application rather than the parser.
+This is important as semantic errors are not the business of the core parser to detect and report.
+
+```
+cargo run --example check -- ./examples/data/full.beancount
+```
+
+### extract
+
+This is more of a sanity check than anything else, that applications are able to extract parsed values without relying on the Display trait used by `dump`.
+
+```
+cargo run --example extract -- ./examples/data/full.beancount
+```
+
 ## Uncertainties / TODOs
 
 Yeah, Beancount is complicated, and I may have made some mistakes here.  Current list of uncertainties, which is certainly not comprehensive.
