@@ -562,11 +562,6 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                         // having silently consumed a pragma, go on to the next declaration
                         self.next()
                     }
-
-                    Declaration::IgnoredLine => {
-                        // having silently ignored a line, go on to the next declaration
-                        self.next()
-                    }
                 }
             }
             None => match self.stacked.pop_front() {

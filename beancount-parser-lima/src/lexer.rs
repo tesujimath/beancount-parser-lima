@@ -11,6 +11,7 @@ use time::{Date, Month, Time};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(error = LexerError, skip r"[ \t]+")]
+#[logos(subpattern ignored_whole_line= r"([*:!&#?%][^\n]*\n)")] // rolled into end-of-line handling below
 #[logos(subpattern comment_to_eol= r"(;[^\n]*)")] // rolled into end-of-line handling below
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
@@ -149,10 +150,11 @@ pub enum Token<'a> {
     Key(super::Key<'a>),
 
     // end-of-line and indent, which is the only significant whitespace
-    #[regex(r"(?&comment_to_eol)?\n[ \t]+")]
+    // ignored_whole_line must be anchored immediately after a newline
+    #[regex(r"(?&comment_to_eol)?\n(?&ignored_whole_line)*[ \t]+")]
     EolThenIndent,
 
-    #[regex(r"(?&comment_to_eol)?\n")]
+    #[regex(r"(?&comment_to_eol)?\n(?&ignored_whole_line)*")]
     Eol,
 
     // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`

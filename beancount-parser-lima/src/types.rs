@@ -513,9 +513,6 @@ where
 pub(crate) enum Declaration<'a> {
     Directive(Directive<'a>),
     Pragma(Pragma<'a>),
-    // Any line starting with any of *:!&#?% is ignored, if it hasn't already been parsed.
-    // Thet is, we can't strip these out when lexing.
-    IgnoredLine,
 }
 
 /// A Beancount directive of a particular [DirectiveVariant].
