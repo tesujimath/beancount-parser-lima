@@ -1655,7 +1655,7 @@ impl<'a> Key<'a> {
     }
 
     pub(crate) fn is_valid_subsequent(c: &char) -> bool {
-        c.is_alphanumeric() || *c == '-'
+        c.is_alphanumeric() || *c == '-' || *c == '_'
     }
 }
 
@@ -1706,7 +1706,7 @@ impl Display for KeyError {
                     ", ",
                     Some("invalid characters "),
                 )?;
-                f.write_str(" for key - must be alphanumeric or '-'")
+                f.write_str(" for key - must be alphanumeric or '-' or '_'")
             }
         }
     }

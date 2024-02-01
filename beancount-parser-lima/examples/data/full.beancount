@@ -71,7 +71,7 @@ pushmeta drink: "alcoholic"
   Expenses:Entertainment:Drinks-and-snacks
   #mytag1
   ^mylink1
-  related-account: Expenses:Groceries
+  related_account: Expenses:Groceries
   just-use-a-tag: #mytag
   key-for-link: ^mylink
 
