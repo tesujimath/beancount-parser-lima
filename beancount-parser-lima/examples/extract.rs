@@ -590,6 +590,7 @@ fn account<'a>(x: &'a Account) -> impl Iterator<Item = Primitive<'a>> {
     account_type(x.account_type())
         .chain(
             x.names()
+                .iter()
                 .flat_map(|x| string_as_ref(x, Decoration::ColonPrefix)),
         )
         .spliced()

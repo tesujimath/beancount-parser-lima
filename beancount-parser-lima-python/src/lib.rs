@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::io::{self, prelude::*};
 use std::path::PathBuf;
+use types::Options;
 
 /// Python wrapper for BeancountSources
 #[derive(Debug)]
@@ -66,7 +67,7 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
     match parser.parse() {
         Ok(lima::ParseSuccess {
             directives,
-            options: _,
+            options,
             plugins: _,
             warnings,
         }) => {
@@ -91,6 +92,8 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
                 })
                 .collect::<PyResult<Vec<Py<PyAny>>>>()?;
 
+            let options = c.options(py, &options)?;
+
             let warnings = warnings.into_iter().map(Warning::new).collect::<Vec<_>>();
 
             Ok(Py::new(
@@ -98,6 +101,7 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
                 (
                     ParseSuccess {
                         directives,
+                        options,
                         warnings,
                     },
                     ParseResult {},
@@ -126,8 +130,9 @@ pub struct ParseResult {}
 pub struct ParseSuccess {
     #[pyo3(get)]
     pub(crate) directives: Vec<Py<PyAny>>,
-    // TODO options
-    // pub(crate) options: Options<'t>,
+    #[pyo3(get)]
+    pub(crate) options: Options,
+    // TODO plugins
     #[pyo3(get)]
     pub(crate) warnings: Vec<Warning>,
 }

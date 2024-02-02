@@ -15,7 +15,8 @@ def main():
         for directive in result.directives:
             print(directive)
             print()
-
+        print(result.options)
+        
         sources.write(result.warnings)
     else:
         sources.write(result.errors)

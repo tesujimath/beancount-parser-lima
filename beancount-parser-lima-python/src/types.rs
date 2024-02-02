@@ -3,7 +3,7 @@
 
 use pyo3::{
     pyclass,
-    types::{PyDate, PyDict, PyList, PyString},
+    types::{PyDate, PyDict, PyList, PySet, PyString},
     Py,
 };
 use rust_decimal::Decimal;
@@ -284,6 +284,53 @@ pub struct MetaValueNone;
 pub struct MetaValueExpr {
     #[pyo3(get)]
     pub(crate) value: Decimal,
+}
+
+/// All options read in from `option` pragmas, including those for internal processing only.
+#[derive(Clone, Debug)]
+#[pyclass(frozen)]
+pub(crate) struct Options {
+    #[pyo3(get)]
+    pub(crate) title: Py<PyString>,
+    #[pyo3(get)]
+    pub(crate) account_previous_balances: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_previous_earnings: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_previous_conversions: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_current_earnings: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_current_conversions: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_unrealized_gains: Py<PyList>,
+    #[pyo3(get)]
+    pub(crate) account_rounding: Option<Py<PyList>>,
+    #[pyo3(get)]
+    pub(crate) conversion_currency: Py<PyString>,
+    #[pyo3(get)]
+    pub(crate) inferred_tolerance_default: Py<PyDict>,
+    #[pyo3(get)]
+    pub(crate) inferred_tolerance_multiplier: Decimal,
+    #[pyo3(get)]
+    pub(crate) infer_tolerance_from_cost: bool,
+    #[pyo3(get)]
+    pub(crate) documents: Py<PySet>,
+    #[pyo3(get)]
+    pub(crate) operating_currency: Py<PySet>,
+    #[pyo3(get)]
+    pub(crate) render_commas: bool,
+    #[pyo3(get)]
+    pub(crate) booking_method: Py<PyString>,
+    #[pyo3(get)]
+    pub(crate) plugin_processing_mode: Py<PyString>,
+    // from ParserOptions:
+    #[pyo3(get)]
+    pub(crate) account_name_by_type: Py<PyDict>,
+    #[pyo3(get)]
+    pub(crate) account_type_by_name: Py<PyDict>,
+    #[pyo3(get)]
+    pub(crate) long_string_maxlines: usize,
 }
 
 mod format;

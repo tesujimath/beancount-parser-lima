@@ -639,6 +639,135 @@ impl Display for ScopedAmount {
     }
 }
 
+#[pymethods]
+impl Options {
+    fn __str__(self_: PyRef<'_, Self>, py: Python<'_>) -> String {
+        format!("{}", Fmt(|f| fmt_options(self_.borrow(), py, f)))
+    }
+}
+
+fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "title: {}", x.title)?;
+
+    fmt_account_option(
+        "account_previous_balances",
+        &x.account_previous_balances,
+        py,
+        f,
+    )?;
+
+    fmt_account_option(
+        "account_previous_earnings",
+        &x.account_previous_earnings,
+        py,
+        f,
+    )?;
+
+    fmt_account_option(
+        "account_previous_conversions",
+        &x.account_previous_conversions,
+        py,
+        f,
+    )?;
+
+    fmt_account_option(
+        "account_current_earnings",
+        &x.account_current_earnings,
+        py,
+        f,
+    )?;
+
+    fmt_account_option(
+        "account_current_conversions",
+        &x.account_current_conversions,
+        py,
+        f,
+    )?;
+
+    fmt_account_option(
+        "account_unrealized_gains",
+        &x.account_unrealized_gains,
+        py,
+        f,
+    )?;
+
+    if let Some(account_rounding) = x.account_rounding.as_ref() {
+        fmt_account_option("account_rounding", account_rounding, py, f)?;
+    }
+
+    write!(f, "\nconversion_currency: {}", x.conversion_currency)?;
+
+    format(
+        f,
+        x.inferred_tolerance_default.as_ref(py).iter(),
+        |(c, d)| format!("{}={}", c, d),
+        ",",
+        Some("\ninferred_tolerance_default: "),
+    )?;
+
+    write!(
+        f,
+        "\ninferred_tolerance_multiplier: {}",
+        x.inferred_tolerance_multiplier
+    )?;
+
+    write!(
+        f,
+        "\ninfer_tolerance_from_cost: {}",
+        x.infer_tolerance_from_cost
+    )?;
+
+    format(
+        f,
+        x.documents.as_ref(py).iter(),
+        plain,
+        ",",
+        Some("\ndocuments: "),
+    )?;
+
+    format(
+        f,
+        x.operating_currency.as_ref(py).iter(),
+        plain,
+        ",",
+        Some("\noperating_currency: "),
+    )?;
+
+    write!(f, "\nrender_commas: {}", x.render_commas)?;
+    write!(f, "\nbooking_method: {}", x.booking_method)?;
+    write!(f, "\nplugin_processing_mode: {}", x.plugin_processing_mode)?;
+
+    format(
+        f,
+        x.account_name_by_type.as_ref(py).iter(),
+        |(t, n)| format!("{}={}", t, n),
+        ",",
+        Some("\naccount_name_by_type: "),
+    )?;
+
+    format(
+        f,
+        x.account_type_by_name.as_ref(py).iter(),
+        |(n, t)| format!("{}={}", n, t),
+        ",",
+        Some("\naccount_type_by_name: "),
+    )?;
+
+    write!(f, "\nlong_string_maxlines: {}", x.long_string_maxlines)?;
+
+    Ok(())
+}
+
+fn fmt_account_option(
+    option_name: &str,
+    x: &Py<PyList>,
+    py: Python<'_>,
+    f: &mut Formatter<'_>,
+) -> fmt::Result {
+    write!(f, "\n{}: ", option_name)?;
+    fmt_account(x, py, f)
+}
+
 fn fmt_account(x: &Py<PyList>, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
     format(f, x.as_ref(py).iter(), plain, ":", None)
 }

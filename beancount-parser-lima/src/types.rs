@@ -980,8 +980,8 @@ impl<'a> Account<'a> {
     }
 
     /// Field accessor.
-    pub fn names(&self) -> impl ExactSizeIterator<Item = &AccountName> {
-        self.candidate.subaccount.iter()
+    pub fn names(&self) -> &Subaccount {
+        &self.candidate.subaccount
     }
 }
 

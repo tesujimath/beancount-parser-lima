@@ -338,6 +338,10 @@ impl<'a> ParserOptions<'a> {
     pub(crate) fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
         &self.account_type_names.name_by_type[account_type as usize]
     }
+
+    pub(crate) fn long_string_maxlines(&self) -> usize {
+        self.long_string_maxlines.item
+    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -610,6 +614,16 @@ impl<'a> Options<'a> {
                 .map(|d| d.0))
     }
 
+    /// return the tolerance defaults for all currencies, with None as the 'any' currency
+    pub fn inferred_tolerance_defaults(&self) -> impl Iterator<Item = (Option<Currency>, Decimal)> {
+        self.inferred_tolerance_default
+            .iter()
+            .map(|(c, d)| match c {
+                CurrencyOrAny::Currency(c) => (Some(*c), d.0),
+                CurrencyOrAny::Any => (None, d.0),
+            })
+    }
+
     pub fn inferred_tolerance_multiplier(&self) -> Decimal {
         self.inferred_tolerance_multiplier.item
     }
@@ -636,6 +650,10 @@ impl<'a> Options<'a> {
 
     pub fn plugin_processing_mode(&self) -> PluginProcessingMode {
         self.plugin_processing_mode.item
+    }
+
+    pub fn long_string_maxlines(&self) -> usize {
+        self.parser_options.long_string_maxlines.item
     }
 }
 

@@ -9,11 +9,12 @@ use std::{
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
-    types::{PyDate, PyDateAccess, PyDict, PyList, PyString},
+    types::{PyDate, PyDateAccess, PyDict, PyList, PySet, PyString},
     IntoPy, Py, PyAny, PyErr, PyResult, Python,
 };
 use smallvec::SmallVec;
 use string_interner::{symbol::SymbolU32, StringInterner, Symbol};
+use strum::IntoEnumIterator;
 use time::Date;
 
 /// Convert from Rust to Python while interning strings, dates, Subaccount lists.
@@ -542,6 +543,134 @@ impl Converter {
             currency,
         }
     }
+
+    pub(crate) fn options(&mut self, py: Python<'_>, x: &lima::Options<'_>) -> PyResult<Options> {
+        let title = self.string.create_or_reuse(py, x.title());
+        let account_previous_balances = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_previous_balances(),
+            &mut self.string,
+        );
+        let account_previous_earnings = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_previous_earnings(),
+            &mut self.string,
+        );
+        let account_previous_conversions = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_previous_conversions(),
+            &mut self.string,
+        );
+        let account_current_earnings = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_current_earnings(),
+            &mut self.string,
+        );
+        let account_current_conversions = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_current_conversions(),
+            &mut self.string,
+        );
+        let account_unrealized_gains = self.account.create_or_reuse_subaccount(
+            py,
+            x.account_unrealized_gains(),
+            &mut self.string,
+        );
+        let account_rounding = x.account_rounding().map(|account_rounding| {
+            self.account
+                .create_or_reuse_subaccount(py, account_rounding, &mut self.string)
+        });
+        let conversion_currency = self
+            .string
+            .create_or_reuse(py, x.conversion_currency().as_ref());
+
+        let inferred_tolerance_default = PyDict::new(py);
+        for (c, d) in x.inferred_tolerance_defaults() {
+            // let c = match c {
+            //     Some(c) => (Some(self.string.create_or_reuse(py, c.as_ref())), d),
+            //     None => (None, d),
+            // };
+            // inferred_tolerance_default.set_item(c, d)?;
+            inferred_tolerance_default
+                .set_item(c.map(|c| self.string.create_or_reuse(py, c.as_ref())), d)?
+        }
+        let inferred_tolerance_default = inferred_tolerance_default.into();
+
+        let inferred_tolerance_multiplier = x.inferred_tolerance_multiplier();
+        let infer_tolerance_from_cost = x.infer_tolerance_from_cost();
+
+        let documents = PySet::new(
+            py,
+            x.documents()
+                .map(|p| {
+                    self.string
+                        .create_or_reuse(py, p.to_string_lossy().as_ref())
+                })
+                .collect::<Vec<Py<PyString>>>()
+                .iter(),
+        )
+        .unwrap()
+        .into();
+
+        let operating_currency = PySet::new(
+            py,
+            x.operating_currency()
+                .map(|c| self.string.create_or_reuse(py, c.as_ref()))
+                .collect::<Vec<_>>()
+                .iter(),
+        )
+        .unwrap()
+        .into();
+        let render_commas = x.render_commas();
+        let booking_method = self.string.create_or_reuse(py, x.booking_method().as_ref());
+        let plugin_processing_mode = self
+            .string
+            .create_or_reuse(py, x.plugin_processing_mode().into());
+
+        let account_type_name = lima::AccountType::iter()
+            .map(|t| (t, x.account_type_name(t)))
+            .collect::<HashMap<lima::AccountType, &lima::AccountTypeName>>();
+
+        let account_name_by_type = PyDict::new(py);
+        let account_type_by_name = PyDict::new(py);
+        for (t, n) in account_type_name {
+            account_name_by_type.set_item(
+                self.string.create_or_reuse(py, t.as_ref()),
+                self.string.create_or_reuse(py, n.as_ref()),
+            )?;
+            account_type_by_name.set_item(
+                self.string.create_or_reuse(py, n.as_ref()),
+                self.string.create_or_reuse(py, t.as_ref()),
+            )?;
+        }
+        let account_name_by_type = account_name_by_type.into();
+        let account_type_by_name = account_type_by_name.into();
+
+        let long_string_maxlines = x.long_string_maxlines();
+
+        Ok(Options {
+            title,
+            account_previous_balances,
+            account_previous_earnings,
+            account_previous_conversions,
+            account_current_earnings,
+            account_current_conversions,
+            account_unrealized_gains,
+            account_rounding,
+            conversion_currency,
+            inferred_tolerance_default,
+            inferred_tolerance_multiplier,
+            infer_tolerance_from_cost,
+            documents,
+            operating_currency,
+            render_commas,
+            booking_method,
+            plugin_processing_mode,
+            account_name_by_type,
+            account_type_by_name,
+            long_string_maxlines,
+        })
+    }
 }
 
 struct StringFactory {
@@ -606,43 +735,44 @@ impl AccountFactory {
         }
     }
 
-    fn account_key(
+    fn composite_account_key(
         &mut self,
         py: Python<'_>,
-        x: &lima::Account,
+        account_type_sym: SymbolU32,
+        subaccount_names: &[lima::AccountName],
         string: &mut StringFactory,
     ) -> AccountKey {
         let string = RefCell::new(string);
-        let account_type = string
-            .borrow_mut()
-            .create_or_lookup_symbol(py, x.account_type().as_ref());
-        let subaccount = x.names().map(|name| {
+        let subaccount = subaccount_names.iter().map(|name| {
             string
                 .borrow_mut()
                 .create_or_lookup_symbol(py, name.as_ref())
         });
 
-        once(account_type).chain(subaccount).collect::<AccountKey>()
+        once(account_type_sym)
+            .chain(subaccount)
+            .collect::<AccountKey>()
     }
 
-    fn create_or_reuse(
+    fn composite_create_or_reuse<'a, 'src>(
         &mut self,
         py: Python<'_>,
-        x: &lima::Account,
+        account_type_sym: SymbolU32,
+        subaccount_names: &[lima::AccountName<'src>],
         string: &mut StringFactory,
-    ) -> Py<PyList> {
+    ) -> Py<PyList>
+    where
+        'src: 'a,
+    {
         use hash_map::Entry::*;
 
-        let key = self.account_key(py, x, string);
+        let key = self.composite_account_key(py, account_type_sym, subaccount_names, string);
         // if we've got this account, then just clone a new ref, otherwise create a PyList
         match self.accounts.entry(key) {
             Occupied(account) => account.get().clone_ref(py),
             Vacant(entry) => {
                 let string = RefCell::new(string);
-                let account_type = string
-                    .borrow_mut()
-                    .create_or_lookup_symbol(py, x.account_type().as_ref());
-                let subaccount = x.names().map(|name| {
+                let subaccount = subaccount_names.iter().map(|name| {
                     string
                         .borrow_mut()
                         .create_or_lookup_symbol(py, name.as_ref())
@@ -652,7 +782,7 @@ impl AccountFactory {
                     .insert(
                         PyList::new(
                             py,
-                            once(account_type)
+                            once(account_type_sym)
                                 .chain(subaccount)
                                 .map(|sym| string.borrow_mut().reuse(py, sym))
                                 .collect::<Vec<_>>(),
@@ -662,6 +792,27 @@ impl AccountFactory {
                     .clone_ref(py)
             }
         }
+    }
+
+    fn create_or_reuse(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::Account,
+        string: &mut StringFactory,
+    ) -> Py<PyList> {
+        let account_type = string.create_or_lookup_symbol(py, x.account_type().as_ref());
+        self.composite_create_or_reuse(py, account_type, x.names(), string)
+    }
+
+    fn create_or_reuse_subaccount(
+        &mut self,
+        py: Python<'_>,
+        x: &lima::Subaccount,
+        string: &mut StringFactory,
+    ) -> Py<PyList> {
+        // treat subaccounts just like accounts, but with a type named after the first component
+        let pseudo_account_type = string.create_or_lookup_symbol(py, x[0].as_ref());
+        self.composite_create_or_reuse(py, pseudo_account_type, &x[1..], string)
     }
 }
 
