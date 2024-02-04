@@ -16,6 +16,8 @@ def main():
             print(directive)
             print()
         print(result.options)
+
+        print("Assets account is called '%s'" % result.options.account_name_by_type["Assets"])
         
         sources.write(result.warnings)
     else:
