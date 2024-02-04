@@ -1101,9 +1101,9 @@ impl Display for AccountTypeNameError {
                     bad_chars,
                     single_quoted,
                     ", ",
-                    Some("invalid characters "),
+                    Some("invalid character "),
                 )?;
-                f.write_str(" - must be alphanumeric or '-'")
+                f.write_str(" in account name - must be alphanumeric or '-'")
             }
         }
     }
@@ -1165,8 +1165,8 @@ impl Display for AccountNameError {
                 bad_char
             ),
             Subsequent(bad_chars) => {
-                format(f, bad_chars, single_quoted, ", ", Some("invalid characters "))?;
-                f.write_str(" - must be alphanumeric or '-'")
+                format(f, bad_chars, single_quoted, ", ", Some("invalid character "))?;
+                f.write_str(" in account name - must be alphanumeric or '-'")
             }
         }
     }
