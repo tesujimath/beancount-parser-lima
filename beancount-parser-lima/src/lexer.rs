@@ -250,7 +250,7 @@ impl<'a> Display for Token<'a> {
 
 // Work-around for Logos issue #315.  See `attempt_recovery`.
 //
-// when adjusting any of these regexes, be sure to check whether `RecoveryToken` needs the same
+// when adjusting any of these regexes, be sure to make the same change in `Token`
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(error = LexerError)]
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[0-9'\._-]*[A-Z][A-Z0-9'\._-]*")]
