@@ -1,14 +1,17 @@
 use super::{end_of_input, types::*};
 use logos::Logos;
 use rust_decimal::Decimal;
+use smallvec::{smallvec, SmallVec};
 use std::{
     borrow::Cow,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
+    ops::Range,
     str::FromStr,
 };
 use time::{Date, Month, Time};
 
+// when adjusting any of these regexes, be sure to check whether `RecoveryToken` needs the same
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(error = LexerError, skip r"[ \t]+")]
 #[logos(subpattern ignored_whole_line= r"([*:!&#?%][^\n]*\n)")] // rolled into end-of-line handling below
@@ -245,6 +248,40 @@ impl<'a> Display for Token<'a> {
     }
 }
 
+// Work-around for Logos issue #315.  See `attempt_recovery`.
+//
+// when adjusting any of these regexes, be sure to check whether `RecoveryToken` needs the same
+#[derive(Logos, Clone, Debug, PartialEq, Eq)]
+#[logos(error = LexerError)]
+#[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[0-9'\._-]*[A-Z][A-Z0-9'\._-]*")]
+#[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
+#[logos(subpattern number = r"\d+(,\d{3})*(\.\d+)?")]
+enum RecoveryToken {
+    #[token("-")]
+    Minus,
+    #[token("/")]
+    Slash,
+
+    #[regex(r"(?&date)", |lex| parse_date(lex.slice()))]
+    Date(Date),
+
+    #[regex(r"(?&number)", |lex| parse_number(lex.slice()))]
+    Number(Decimal),
+}
+
+impl<'a> From<RecoveryToken> for Token<'a> {
+    fn from(value: RecoveryToken) -> Self {
+        use RecoveryToken::*;
+
+        match value {
+            Minus => Token::Minus,
+            Slash => Token::Slash,
+            Date(date) => Token::Date(date),
+            Number(decimal) => Token::Number(decimal),
+        }
+    }
+}
+
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
 /// and forcing a final `Eol` in case missing.
 ///
@@ -262,12 +299,40 @@ pub fn bare_lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
 fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
-        .map(|(tok, span)| match tok {
-            Ok(tok) => (tok, chumsky::span::Span::new(source_id, span)),
-            Err(e) => (Token::Error(e), chumsky::span::Span::new(source_id, span)),
+        .flat_map(|(lexeme, span)| match lexeme {
+            Ok(tok) => smallvec![(tok, chumsky::span::Span::new(source_id, span))],
+            Err(_e) => attempt_recovery(span.clone(), s)
+                .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
+                .collect::<SmallVec<_, 1>>(),
         })
         .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
         .finalize()
+}
+
+// This is a work-around for Logos issue #315.
+// Logos starts matching text like '/1.24' as a currency, and when it fails, it doesn't retry as slash followed by number.
+//
+// What we do is to attempt to lex the failed span using a subset of the original tokens, namely `RecoveryToken`.
+// The set of `RecoveryToken` has been chosen to match what is possible to find within a failed currency regex, since
+// that is where this problem arises.
+//
+// It may be necessary to extend `RecoveryToken` as and when further failures in lexing arise.
+// The long-term solution is the Logos rewrite, mentioned in that issue.
+fn attempt_recovery(
+    failed_span: Range<usize>,
+    s: &str,
+) -> impl Iterator<Item = (Token, Range<usize>)> {
+    let failed_token = &s[failed_span.start..failed_span.end];
+
+    RecoveryToken::lexer(failed_token)
+        .spanned()
+        .map(move |(lexeme, rel_span)| {
+            let span = failed_span.start + rel_span.start..failed_span.start + rel_span.end;
+            match lexeme {
+                Ok(tok) => (tok.into(), span),
+                Err(e) => (Token::Error(e), span),
+            }
+        })
 }
 
 struct EmptyLineFolder<'a> {
