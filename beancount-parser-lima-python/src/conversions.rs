@@ -671,6 +671,19 @@ impl Converter {
             long_string_maxlines,
         })
     }
+
+    pub(crate) fn plugin(&mut self, py: Python<'_>, x: &lima::Plugin<'_>) -> PyResult<Plugin> {
+        let module_name = self.string.create_or_reuse(py, x.module_name());
+        let config = x
+            .config()
+            .as_ref()
+            .map(|config| self.string.create_or_reuse(py, config.item()));
+
+        Ok(Plugin {
+            module_name,
+            config,
+        })
+    }
 }
 
 struct StringFactory {

@@ -68,7 +68,7 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
         Ok(lima::ParseSuccess {
             directives,
             options,
-            plugins: _,
+            plugins,
             warnings,
         }) => {
             use lima::DirectiveVariant as V;
@@ -93,6 +93,10 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
                 .collect::<PyResult<Vec<Py<PyAny>>>>()?;
 
             let options = c.options(py, &options)?;
+            let plugins = plugins
+                .iter()
+                .map(|x| c.plugin(py, x))
+                .collect::<PyResult<Vec<Plugin>>>()?;
 
             let warnings = warnings.into_iter().map(Warning::new).collect::<Vec<_>>();
 
@@ -102,6 +106,7 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
                     ParseSuccess {
                         directives,
                         options,
+                        plugins,
                         warnings,
                     },
                     ParseResult {},
@@ -132,7 +137,8 @@ pub struct ParseSuccess {
     pub(crate) directives: Vec<Py<PyAny>>,
     #[pyo3(get)]
     pub(crate) options: Options,
-    // TODO plugins
+    #[pyo3(get)]
+    pub(crate) plugins: Vec<Plugin>,
     #[pyo3(get)]
     pub(crate) warnings: Vec<Warning>,
 }
@@ -171,4 +177,6 @@ impl Warning {
 
 mod conversions;
 use conversions::Converter;
+
+use crate::types::Plugin;
 mod types;

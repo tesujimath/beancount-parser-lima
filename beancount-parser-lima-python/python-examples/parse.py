@@ -18,6 +18,10 @@ def main():
         print(result.options)
 
         print("Assets account is called '%s'" % result.options.account_name_by_type["Assets"])
+
+        for plugin in result.plugins:
+            print("plugin \"%s\"%s" % (plugin.module_name, (" with config \"%s\"" % plugin.config) if plugin.config is not None else " without config"))
+            # print(plugin)
         
         sources.write(result.warnings)
     else:

@@ -333,4 +333,14 @@ pub(crate) struct Options {
     pub(crate) long_string_maxlines: usize,
 }
 
+/// A Beancount plugin pragma.
+#[derive(Clone, Debug)]
+#[pyclass(frozen)]
+pub(crate) struct Plugin {
+    #[pyo3(get)]
+    pub(crate) module_name: Py<PyString>,
+    #[pyo3(get)]
+    pub(crate) config: Option<Py<PyString>>,
+}
+
 mod format;

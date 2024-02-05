@@ -785,6 +785,26 @@ where
     }
 }
 
+#[pymethods]
+impl Plugin {
+    fn __str__(&self, _py: Python<'_>) -> String {
+        self.to_string()
+    }
+}
+
+impl Display for Plugin {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "plugin \"{}\"", self.module_name)?;
+        if let Some(config) = self.config.as_ref() {
+            writeln!(f, " \"{}\"", config)?;
+        } else {
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// Format the given container, with optional prefix, applying `mapper` to each element,
 /// and with the given `separator`.
 fn format<C, T, M, D>(
