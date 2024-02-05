@@ -13,7 +13,7 @@ use time::{Date, Month, Time};
 #[logos(error = LexerError, skip r"[ \t]+")]
 #[logos(subpattern ignored_whole_line= r"([*:!&#?%][^\n]*\n)")] // rolled into end-of-line handling below
 #[logos(subpattern comment_to_eol= r"(;[^\n]*)")] // rolled into end-of-line handling below
-#[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[A-Z0-9'\._-]+")] // not all matches are valid so we lean on the validation provided by try_from
+#[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[0-9'\._-]*[A-Z][A-Z0-9'\._-]*")]
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
 #[logos(subpattern time = r"\d{1,2}:\d{2}(:\d{2})?")]
 #[logos(subpattern account_type = r"[\p{Lu}\p{Lo}][\p{L}\p{N}\-]*")]
