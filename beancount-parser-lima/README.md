@@ -37,6 +37,7 @@ The slightly strange name is because of a somewhat careless failure on my part t
 ### dump
 
 This simply parses a Beancount file and outputs the results of parsing, using the Display implementations for the parser output types.
+The special filename `STDIN` causes it to read instead from standard input and parse the resulting inline string.
 
 ```
 cargo run --example dump -- ./examples/data/full.beancount

@@ -83,6 +83,7 @@
 
 use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
+use either::Either::{self, Left, Right};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parsers::{file, includes, ParserState};
@@ -90,6 +91,7 @@ use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
+    env::current_dir,
     fmt::{self, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
@@ -113,69 +115,83 @@ pub use types::*;
 /// let result = beancount_parser.parse();
 /// ```
 pub struct BeancountSources {
-    // The source_id is the index in `content_paths`, and the first of these is the `root_path`.
-    path_content: Vec<(PathBuf, String, String)>,
-    path_errors: Vec<(PathBuf, anyhow::Error)>,
+    // The source_id is the index in `content`, and the first of these is the root source.
+    // To support parsing from inline strings, we allow for the path to be optional, but
+    // there can only ever be one of these, the root.
+    all_content: Vec<(Option<PathBuf>, String, String)>,
+    all_errors: Vec<(PathBuf, anyhow::Error)>,
+    current_dir: Option<PathBuf>,
 }
 
 impl BeancountSources {
-    pub fn new(root_path: PathBuf) -> Self {
-        let mut path_content = Vec::new();
-        let mut path_errors = Vec::new();
+    fn read_with_includes(root: Either<String, PathBuf>) -> Self {
+        let mut all_content = Vec::new();
+        let mut all_errors = Vec::new();
 
-        let mut pending_paths = VecDeque::from([root_path.clone()]);
+        let mut pending = VecDeque::from([root]);
         let mut all_paths = HashSet::new();
 
-        while !pending_paths.is_empty() {
-            let path = pending_paths.pop_front().unwrap();
-            all_paths.insert(path.clone());
+        let current_dir = current_dir().ok();
 
-            match read(&path) {
-                Ok(content) => {
-                    let source_id = SourceId::from(path_content.len());
-                    let source_id_string = path.to_string_lossy().into_owned();
-
-                    path_content.push((path, source_id_string, content));
-                    let (path, _, content) = path_content.last().unwrap();
-
-                    let tokens = Some(lex(source_id, content));
-                    let spanned_tokens = tokens
-                        .as_ref()
-                        .unwrap()
-                        .spanned(end_of_input(source_id, content))
-                        .with_context(source_id);
-
-                    // ignore any errors in parsing, we'll pick them up in the next pass
-                    if let Some(includes) = includes().parse(spanned_tokens).into_output() {
-                        for include in includes {
-                            let included_path =
-                                path.parent().map_or(PathBuf::from(&include), |parent| {
-                                    parent.join(include).clean()
-                                });
-                            if !all_paths.contains(included_path.as_path()) {
-                                pending_paths.push_back(included_path);
-                            } else {
-                                // TODO include cycle error
-                                writeln!(
-                                    &mut stderr(),
-                                    "warning: ignoring include cycle in {} for {}",
-                                    &path.display(),
-                                    &included_path.display()
-                                )
-                                .unwrap();
-                            }
+        while !pending.is_empty() {
+            let (path, content) = match pending.pop_front().unwrap() {
+                Left(content) => (None, Some(content)),
+                Right(path) => {
+                    all_paths.insert(path.clone());
+                    match read(&path) {
+                        Ok(content) => (Some(path), Some(content)),
+                        Err(e) => {
+                            all_errors.push((path, e));
+                            (None, None)
                         }
-                    };
+                    }
                 }
-                Err(e) => {
-                    path_errors.push((path, e));
-                }
+            };
+
+            if let Some(content) = content {
+                let source_id = SourceId::from(all_content.len());
+                let source_id_string = path.as_ref().map_or("inline".to_owned(), |path| {
+                    path.to_string_lossy().into_owned()
+                });
+
+                all_content.push((path, source_id_string, content));
+                let (path, source_id_string, content) = all_content.last().unwrap();
+
+                let tokens = Some(lex(source_id, content));
+                let spanned_tokens = tokens
+                    .as_ref()
+                    .unwrap()
+                    .spanned(end_of_input(source_id, content))
+                    .with_context(source_id);
+
+                // ignore any errors in parsing, we'll pick them up in the next pass
+                if let Some(includes) = includes().parse(spanned_tokens).into_output() {
+                    for include in includes {
+                        let included_path =
+                            path.as_ref().map_or(PathBuf::from(&include), |parent| {
+                                parent.join(include).clean()
+                            });
+                        if !all_paths.contains(included_path.as_path()) {
+                            pending.push_back(Right(included_path));
+                        } else {
+                            // TODO include cycle error
+                            writeln!(
+                                &mut stderr(),
+                                "warning: ignoring include cycle in {} for {}",
+                                source_id_string,
+                                &included_path.display()
+                            )
+                            .unwrap();
+                        }
+                    }
+                };
             }
         }
 
         Self {
-            path_content,
-            path_errors,
+            all_content,
+            all_errors,
+            current_dir,
         }
     }
 
@@ -227,45 +243,51 @@ impl BeancountSources {
         use chumsky::span::Span;
 
         let source_index: usize = span.context().into();
-        &self.path_content[source_index].1
-    }
-
-    /// Can't fail as SourceIds are constructed here
-    fn path(&self, source_id: SourceId) -> &Path {
-        let i: usize = source_id.into();
-        self.path_content[i].0.as_path()
+        &self.all_content[source_index].1
     }
 
     fn sources(&self) -> Vec<(String, &str)> {
-        self.path_content
+        self.all_content
             .iter()
             .map(|(_, source_id_string, content)| (source_id_string.to_string(), content.as_str()))
             .collect()
     }
 
-    fn content_iter(&self) -> impl Iterator<Item = (SourceId, &Path, &str)> {
-        self.path_content
+    fn content_iter(&self) -> impl Iterator<Item = (SourceId, Option<&Path>, &str)> {
+        self.all_content
             .iter()
             .enumerate()
             .map(|(i, (pathbuf, _, content))| {
-                (SourceId::from(i), pathbuf.as_path(), content.as_str())
+                (
+                    SourceId::from(i),
+                    pathbuf.as_ref().map(|pathbuf| pathbuf.as_path()),
+                    content.as_str(),
+                )
             })
     }
+}
 
-    /// Build a source_id lookup from path
-    fn source_id_lookup(&self) -> HashMap<&Path, SourceId> {
-        let mut lookup = HashMap::new();
+impl From<PathBuf> for BeancountSources {
+    fn from(source_path: PathBuf) -> Self {
+        Self::read_with_includes(Right(source_path))
+    }
+}
 
-        for (source_id, pathbuf) in self
-            .path_content
-            .iter()
-            .enumerate()
-            .map(|(i, (pathbuf, _, _))| (SourceId::from(i), pathbuf))
-        {
-            lookup.insert(pathbuf.as_path(), source_id);
-        }
+impl From<&Path> for BeancountSources {
+    fn from(source_path: &Path) -> Self {
+        Self::read_with_includes(Right(source_path.to_owned()))
+    }
+}
 
-        lookup
+impl From<String> for BeancountSources {
+    fn from(source_string: String) -> Self {
+        Self::read_with_includes(Left(source_string))
+    }
+}
+
+impl From<&str> for BeancountSources {
+    fn from(source_string: &str) -> Self {
+        Self::read_with_includes(Left(source_string.to_owned()))
     }
 }
 
@@ -273,11 +295,11 @@ impl std::fmt::Debug for BeancountSources {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "BeancountSources(",)?;
 
-        for (path, _, content) in &self.path_content {
-            writeln!(f, "    {} ok len {},", path.display(), content.len())?;
+        for (_path, source_id_string, content) in &self.all_content {
+            writeln!(f, "    {} ok len {},", source_id_string, content.len())?;
         }
 
-        for (path, error) in &self.path_errors {
+        for (path, error) in &self.all_errors {
             writeln!(f, "    {} {},", path.display(), error)?;
         }
 
@@ -354,6 +376,7 @@ type ConcreteInput<'t> = chumsky::input::WithContext<
 >;
 
 /// A successful parsing all the files, containing date-ordered `Directive`s, `Options`, `Plugin`s, and any `Warning`s.
+#[derive(Debug)]
 pub struct ParseSuccess<'t> {
     pub directives: Vec<Spanned<Directive<'t>>>,
     pub options: Options<'t>,
@@ -362,6 +385,7 @@ pub struct ParseSuccess<'t> {
 }
 
 /// The value returned when parsing fails.
+#[derive(Debug)]
 pub struct ParseError {
     pub errors: Vec<Error>,
     pub warnings: Vec<Warning>,

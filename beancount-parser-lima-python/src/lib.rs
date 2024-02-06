@@ -14,7 +14,7 @@ pub struct BeancountSources(lima::BeancountSources);
 impl BeancountSources {
     #[new]
     fn new(path: &str) -> BeancountSources {
-        let sources = lima::BeancountSources::new(PathBuf::from(path));
+        let sources = lima::BeancountSources::from(PathBuf::from(path));
         BeancountSources(sources)
     }
 

@@ -63,7 +63,7 @@ impl<'a> BeancountOption<'a> {
     pub(crate) fn parse(
         name: Spanned<&'a str>,
         value: Spanned<&'a str>,
-        source_path: &Path,
+        source_path: Option<&Path>,
     ) -> Result<BeancountOption<'a>, BeancountOptionError> {
         use BeancountOptionError::*;
         use BeancountOptionVariant::*;
@@ -126,7 +126,7 @@ impl<'a> BeancountOption<'a> {
             "infer_tolerance_from_cost" => parse_bool(value.item).map(InferToleranceFromCost),
 
             "documents" => Ok(source_path
-                .parent()
+                .and_then(|path| path.parent())
                 .map_or(PathBuf::from(value.item), |parent| {
                     parent.join(value.item).clean()
                 }))

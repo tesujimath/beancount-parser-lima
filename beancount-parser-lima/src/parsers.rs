@@ -33,7 +33,7 @@ where
 
 /// Matches the whole file.
 pub(crate) fn file<'src, I>(
-    source_path: &'src Path,
+    source_path: Option<&'src Path>,
 ) -> impl Parser<'src, I, Vec<Spanned<Declaration<'src>>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -43,7 +43,7 @@ where
 
 /// Matches a [Declaration], and returns with Span.
 pub(crate) fn declaration<'src, I>(
-    source_path: &'src Path,
+    source_path: Option<&'src Path>,
 ) -> impl Parser<'src, I, Spanned<Declaration<'src>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -82,7 +82,7 @@ where
 
 /// Matches a [Pragma].
 pub(crate) fn pragma<'src, I>(
-    source_path: &'src Path,
+    source_path: Option<&'src Path>,
 ) -> impl Parser<'src, I, Pragma<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -122,7 +122,7 @@ where
 
 /// Matches a [BeancountOption], failing if the option cannot be processed.
 pub(crate) fn option<'src, I>(
-    source_path: &'src Path,
+    source_path: Option<&'src Path>,
 ) -> impl Parser<'src, I, BeancountOption<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -130,7 +130,7 @@ where
     just(Token::Option)
         .ignore_then(string().map_with(|name, e| spanned(name, e.span())))
         .then(string().map_with(|value, e| spanned(value, e.span())))
-        .try_map_with(|(name, value), e| {
+        .try_map_with(move |(name, value), e| {
             use BeancountOptionError::*;
 
             let opt = BeancountOption::parse(name, value, source_path).map_err(|e| match e {

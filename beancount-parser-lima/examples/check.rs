@@ -24,7 +24,7 @@ fn main() {
     };
 
     let stderr = &io::stderr();
-    let sources = BeancountSources::new(flags.path);
+    let sources = BeancountSources::from(flags.path);
     let parser = BeancountParser::new(&sources);
 
     parse(&sources, &parser, stderr);

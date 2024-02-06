@@ -23,7 +23,14 @@ fn main() {
 
     let mut stderr = &io::stderr();
 
-    let sources = BeancountSources::new(flags.path);
+    let sources = if flags.path.to_str() == Some("STDIN") {
+        let mut source_string = String::new();
+        io::stdin().read_to_string(&mut source_string).unwrap();
+        BeancountSources::from(source_string)
+    } else {
+        BeancountSources::from(flags.path)
+    };
+
     let parser = BeancountParser::new(&sources);
     writeln!(stderr, "{:?}", &sources).unwrap();
 
