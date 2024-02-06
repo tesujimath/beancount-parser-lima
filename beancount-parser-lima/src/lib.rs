@@ -18,7 +18,7 @@
 //!};
 //!
 //!fn main() {
-//!    let sources = BeancountSources::new(PathBuf::from("examples/data/error-post-balancing.beancount"));
+//!    let sources = BeancountSources::from(PathBuf::from("examples/data/error-post-balancing.beancount"));
 //!    let parser = BeancountParser::new(&sources);
 //!
 //!    parse(&sources, &parser, &io::stderr());
@@ -32,6 +32,7 @@
 //!        Ok(ParseSuccess {
 //!            directives,
 //!            options: _,
+//!            plugins: _,
 //!            mut warnings,
 //!        }) => {
 //!            let mut errors = Vec::new();
@@ -109,7 +110,7 @@ pub use types::*;
 /// # use std::path::PathBuf;
 /// use beancount_parser_lima::{BeancountParser, BeancountSources};
 ///
-/// let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
+/// let sources = BeancountSources::from(PathBuf::from("examples/data/full.beancount"));
 /// let beancount_parser = BeancountParser::new(&sources);
 ///
 /// let result = beancount_parser.parse();
@@ -332,7 +333,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 /// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess};
 ///
 /// fn main() {
-///     let sources = BeancountSources::new(PathBuf::from("examples/data/full.beancount"));
+///     let sources = BeancountSources::from(PathBuf::from("examples/data/full.beancount"));
 ///     let parser = BeancountParser::new(&sources);
 ///
 ///     parse(&sources, &parser, &io::stderr());
@@ -346,6 +347,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 ///         Ok(ParseSuccess {
 ///             directives,
 ///             options: _,
+///             plugins: _,
 ///             warnings,
 ///         }) => {
 ///             for directive in directives {

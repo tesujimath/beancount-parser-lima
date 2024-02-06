@@ -39,7 +39,7 @@ The slightly strange name is because of a somewhat careless failure on my part t
 This simply parses a Beancount file and outputs the results of parsing, using the Display implementations for the parser output types.
 The special filename `STDIN` causes it to read instead from standard input and parse the resulting inline string.
 
-```
+```Shell
 cargo run --example dump -- ./examples/data/full.beancount
 ```
 
@@ -48,7 +48,7 @@ cargo run --example dump -- ./examples/data/full.beancount
 This is an example of reporting errors against source locations by the application rather than the parser.
 This is important as semantic errors are not the business of the core parser to detect and report.
 
-```
+```Shell
 cargo run --example check -- ./examples/data/full.beancount
 ```
 
@@ -56,7 +56,7 @@ cargo run --example check -- ./examples/data/full.beancount
 
 This is more of a sanity check than anything else, that applications are able to extract parsed values without relying on the Display trait used by `dump`.
 
-```
+```Shell
 cargo run --example extract -- ./examples/data/full.beancount
 ```
 
