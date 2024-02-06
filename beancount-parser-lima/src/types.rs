@@ -509,14 +509,14 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) enum Declaration<'a> {
     Directive(Directive<'a>),
     Pragma(Pragma<'a>),
 }
 
 /// A Beancount directive of a particular [DirectiveVariant].
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Directive<'a> {
     pub(crate) date: Spanned<Date>,
     pub(crate) metadata: Metadata<'a>,
@@ -581,7 +581,7 @@ impl<'a> Display for Directive<'a> {
 }
 
 /// A Beancount directive, without the fields common to all, which belong to [Directive].
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum DirectiveVariant<'a> {
     Transaction(Transaction<'a>),
     Price(Price<'a>),
@@ -611,7 +611,7 @@ pub(crate) enum Pragma<'a> {
 }
 
 /// A Beancount transaction directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Transaction<'a> {
     pub(crate) flag: Spanned<Flag>,
     pub(crate) payee: Option<Spanned<&'a str>>,
@@ -659,7 +659,7 @@ impl<'a> Transaction<'a> {
 }
 
 /// A Beancount price directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Price<'a> {
     pub(crate) currency: Spanned<&'a Currency<'a>>,
     pub(crate) amount: Spanned<Amount<'a>>,
@@ -694,7 +694,7 @@ impl<'a> ElementType for Price<'a> {
 }
 
 /// A Beancount balance directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Balance<'a> {
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) atol: Spanned<AmountWithTolerance<'a>>,
@@ -729,7 +729,7 @@ impl<'a> ElementType for Balance<'a> {
 }
 
 /// A Beancount open directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
@@ -763,7 +763,7 @@ impl<'a> Open<'a> {
 }
 
 /// A Beancount close directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Close<'a> {
     pub(crate) account: Spanned<Account<'a>>,
 }
@@ -783,7 +783,7 @@ impl<'a> Close<'a> {
 }
 
 /// A Beancount commodity directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Commodity<'a> {
     pub(crate) currency: Spanned<&'a Currency<'a>>,
 }
@@ -803,7 +803,7 @@ impl<'a> Commodity<'a> {
 }
 
 /// A Beancount pad directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Pad<'a> {
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) source: Spanned<Account<'a>>,
@@ -829,7 +829,7 @@ impl<'a> Pad<'a> {
 }
 
 /// A Beancount document directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Document<'a> {
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) path: Spanned<&'a str>,
@@ -856,7 +856,7 @@ impl<'a> Document<'a> {
 }
 
 /// A Beancount note directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Note<'a> {
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) comment: Spanned<&'a str>,
@@ -882,7 +882,7 @@ impl<'a> Note<'a> {
 }
 
 /// A Beancount event directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Event<'a> {
     pub(crate) event_type: Spanned<&'a str>,
     pub(crate) description: Spanned<&'a str>,
@@ -912,7 +912,7 @@ impl<'a> Event<'a> {
 }
 
 /// A Beancount query directive, without the common [Directive] fields.
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Query<'a> {
     pub(crate) name: Spanned<&'a str>,
     pub(crate) content: Spanned<&'a str>,
@@ -1324,7 +1324,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
 }
 
 /// A single posting within a [Transaction].
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Posting<'a> {
     pub(crate) flag: Option<Spanned<Flag>>,
     pub(crate) account: Spanned<Account<'a>>,
@@ -1402,7 +1402,7 @@ impl<'a> Display for Posting<'a> {
 ///
 /// Note that tags and links and key/values that may have been specified at the top-level
 /// of a directive are subsumed into the metadata element of the directive.
-#[derive(Clone, Default, Debug)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub(crate) key_values: HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
     pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
