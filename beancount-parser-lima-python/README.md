@@ -4,6 +4,18 @@ The Python bindings are a simplification of the Rust interface, mainly because z
 
 *Python bindings are a work-in-progress*
 
+## Installation and Usage
+
+A binary wheel is available on PyPI, so no local Rust development environment is required.
+
+```Shell
+$ python -m venv ~/virtualenvs/beancount-python-lima
+$ source ~/virtualenvs/beancount-python-lima/bin/activate
+(beancount-python-lima) $ pip install beancount-parser-lima
+
+(beancount-python-lima) $ python python-examples/parse.py ../beancount-parser-lima/examples/data/full.beancount
+```
+
 ## Performance
 
 The main downside with Python compared with Rust is that zero-copy is not possible.  Each value returned to Python must be a Python object allocated on the heap.  It is simply not possible to return pointers to data structures owned by Rust.  The performance goal therefore is to minimize the number of such allocations.
@@ -16,7 +28,7 @@ Several mechanisms for reducing allocations are employed.
 
 ### Example
 
-```
+```Text
 2023-05-01 * "EMERSON S TAPROOM"
   Assets:Bank:Current                           -25.00 NZD
   Expenses:Entertainment:Drinks-and-snacks
@@ -41,7 +53,7 @@ A single list is allocated with contents `["Assets", "Bank", "Current"]`, and th
 
 If you have a Rust toolchain and other required tools such as `maturin` installed (for which see `flake.nix`), the parser may be built and run locally as follows.
 
-```
+```Shell
 $ cd beancount-parser-lima-python
 $ python -m venv .venv
 $ maturin develop

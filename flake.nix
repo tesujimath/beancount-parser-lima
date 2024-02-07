@@ -42,6 +42,8 @@
                 # for Python bindings
                 maturin
                 python3
+                zig
+                twine
 
                 # Python devtools
                 pyright
