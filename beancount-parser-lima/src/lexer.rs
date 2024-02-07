@@ -523,3 +523,5 @@ impl From<strum::ParseError> for LexerError {
         Self::new(e.to_string())
     }
 }
+
+mod tests;
