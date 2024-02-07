@@ -15,6 +15,12 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
+[project.urls]
+Homepage = "https://github.com/tesujimath/beancount-parser-lima"
+Documentation = "https://github.com/tesujimath/beancount-parser-lima/blob/main/beancount-parser-lima-python/README.md"
+Repository = "https://github.com/tesujimath/beancount-parser-lima"
+Issues = "https://github.com/tesujimath/beancount-parser-lima/issues"
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
