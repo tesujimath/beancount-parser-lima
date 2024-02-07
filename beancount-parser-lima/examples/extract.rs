@@ -523,7 +523,7 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
                 .spaced(),
         )
         // pub(crate) amount: Option<Spanned<ExprValue>>,
-        // pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
+        // pub(crate) currency: Option<Spanned<Currency<'a>>>,
         // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
         // pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
         .chain(keys_values(m))

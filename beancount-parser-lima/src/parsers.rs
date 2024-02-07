@@ -207,10 +207,7 @@ fn transaction_header_line<'src, I>() -> impl Parser<
         Spanned<Date>,
         Spanned<Flag>,
         (Option<Spanned<&'src str>>, Option<Spanned<&'src str>>),
-        (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
-        ),
+        (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>),
     ),
     Extra<'src>,
 >
@@ -323,12 +320,9 @@ fn open_header_line<'src, I>() -> impl Parser<
     (
         Spanned<Date>,
         Spanned<Account<'src>>,
-        HashSet<Spanned<&'src Currency<'src>>>,
+        HashSet<Spanned<Currency<'src>>>,
         Option<Spanned<Booking>>,
-        (
-            HashSet<Spanned<&'src Tag<'src>>>,
-            HashSet<Spanned<&'src Link<'src>>>,
-        ),
+        (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>),
     ),
     Extra<'src>,
 >
@@ -350,8 +344,7 @@ where
 }
 
 /// Matches zero or more currencies, comma-separated.
-fn currency_list<'src, I>(
-) -> impl Parser<'src, I, HashSet<Spanned<&'src Currency<'src>>>, Extra<'src>>
+fn currency_list<'src, I>() -> impl Parser<'src, I, HashSet<Spanned<Currency<'src>>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -390,23 +383,32 @@ fn account<'src, I>() -> impl Parser<'src, I, Account<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let account = select_ref!(Token::Account(acc) => acc);
+    let s = select_ref!(Token::Account(s) => *s);
 
-    account.try_map_with(|candidate, e| {
+    s.try_map_with(|s, e| {
         let span = e.span();
+        let mut account = s.split(':');
+        let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())
+            .map_err(|e| Rich::custom(span, e.to_string()))?;
+        let subaccount = account
+            .map(AccountName::try_from)
+            .collect::<Result<Subaccount, _>>()
+            .map_err(|e| Rich::custom(span, e.to_string()))?;
+
+        // look up the account type name to see which account type it is currently mapped to
         let parser_state: &ParserState = e.state();
         let account_type_names = &parser_state.options.account_type_names;
         account_type_names
-            .get(&candidate.account_type_name)
+            .get(&account_type_name)
             .map(|account_type| Account {
                 account_type,
-                candidate,
+                subaccount,
             })
             .ok_or(Rich::custom(
                 span,
                 format!(
                     "unknown account type {}, must be one of {}",
-                    &candidate.account_type_name, account_type_names
+                    &account_type_name, account_type_names
                 ),
             ))
     })
@@ -733,8 +735,8 @@ where
 /// A single instance of [Metadata]
 enum Metadatum<'a> {
     KeyValue(Spanned<MetaKeyValue<'a>>),
-    Tag(Spanned<&'a Tag<'a>>),
-    Link(Spanned<&'a Link<'a>>),
+    Tag(Spanned<Tag<'a>>),
+    Link(Spanned<Link<'a>>),
 }
 
 /// Matches a single Metadatum on a single line.
@@ -960,15 +962,8 @@ where
 
 /// Matches zero or more tags or links.
 /// Duplicates are errors.
-pub(crate) fn tags_links<'src, I>() -> impl Parser<
-    'src,
-    I,
-    (
-        HashSet<Spanned<&'src Tag<'src>>>,
-        HashSet<Spanned<&'src Link<'src>>>,
-    ),
-    Extra<'src>,
->
+pub(crate) fn tags_links<'src, I>(
+) -> impl Parser<'src, I, (HashSet<Spanned<Tag<'src>>>, HashSet<Spanned<Link<'src>>>), Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -1075,19 +1070,29 @@ where
 }
 
 /// Matches a Tag
-fn tag<'src, I>() -> impl Parser<'src, I, &'src Tag<'src>, Extra<'src>>
+fn tag<'src, I>() -> impl Parser<'src, I, Tag<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Tag(tag) => tag)
+    let tag = select_ref!(Token::Tag(s) => *s);
+    tag.try_map(|s, span| {
+        TagOrLinkIdentifier::try_from(s)
+            .map(Tag)
+            .map_err(|e| Rich::custom(span, e.to_string()))
+    })
 }
 
 /// Matches a Link
-fn link<'src, I>() -> impl Parser<'src, I, &'src Link<'src>, Extra<'src>>
+fn link<'src, I>() -> impl Parser<'src, I, Link<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Link(link) => link)
+    let link = select_ref!(Token::Link(s) => *s);
+    link.try_map(|s, span| {
+        TagOrLinkIdentifier::try_from(s)
+            .map(Link)
+            .map_err(|e| Rich::custom(span, e.to_string()))
+    })
 }
 
 /// Matches a Key.
@@ -1097,10 +1102,11 @@ fn key<'src, I>() -> impl Parser<'src, I, Key<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    let key = select_ref!(Token::Key(key) => *key);
+    let key = select_ref!(Token::Key(s) => *s);
 
+    // TODO tidy this ugly
     choice((
-        key,
+        key.try_map(|s, span| Key::try_from(s).map_err(|e| Rich::custom(span, e.to_string()))),
         keyword()
             .try_map(|s, span| Key::try_from(s).map_err(|e| Rich::custom(span, e.to_string()))),
     ))
@@ -1114,7 +1120,7 @@ where
     let true_ = select_ref!(Token::True => "TRUE");
     let false_ = select_ref!(Token::False=> "FALSE");
     let null = select_ref!(Token::Null => "NULL");
-    let currency = select_ref!(Token::Currency(currency) => currency.as_ref());
+    let currency = select_ref!(Token::Currency(s) => *s);
     let txn = select_ref!(Token::Txn => "txn");
     let balance = select_ref!(Token::Balance => "balance");
     let open = select_ref!(Token::Open => "open");
@@ -1144,11 +1150,12 @@ where
 }
 
 /// Matches a Currency
-fn currency<'src, I>() -> impl Parser<'src, I, &'src Currency<'src>, Extra<'src>>
+fn currency<'src, I>() -> impl Parser<'src, I, Currency<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select_ref!(Token::Currency(currency) => currency)
+    let currency = select_ref!(Token::Currency(s) => *s);
+    currency.try_map(|s, span| Currency::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
 }
 
 /// Matches a Date
@@ -1204,7 +1211,7 @@ where
 }
 
 impl<'a> Metadata<'a> {
-    pub(crate) fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<&'a Tag<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_tags<E>(&mut self, tags: &HashSet<Spanned<Tag<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {
@@ -1223,7 +1230,7 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<&'a Link<'a>>>, emitter: &mut E)
+    pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<Link<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
     {

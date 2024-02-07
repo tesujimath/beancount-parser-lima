@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use crate::SourceId;
 
-use super::{lex, parse_candidate_account, Token, Token::*};
+use super::{lex, Token, Token::*};
 use rust_decimal_macros::dec;
 use time::format_description::well_known::Iso8601;
 
@@ -19,26 +19,6 @@ fn date(s: &str) -> Token {
 
 fn time(s: &str) -> Token {
     Time(time::Time::parse(s, &Iso8601::DEFAULT).unwrap())
-}
-
-fn account(s: &str) -> Token {
-    Account(parse_candidate_account(s).unwrap())
-}
-
-fn currency(s: &str) -> Token {
-    Currency(crate::Currency::try_from(s).unwrap())
-}
-
-fn tag(s: &str) -> Token {
-    Tag(crate::Tag::try_from(s).unwrap())
-}
-
-fn link(s: &str) -> Token {
-    Link(crate::Link::try_from(s).unwrap())
-}
-
-fn key(s: &str) -> Token {
-    Key(crate::Key::try_from(s).unwrap())
 }
 
 fn string_literal(s: &str) -> Token {
@@ -88,30 +68,30 @@ fn basic_tokens() {
             time("12:34"),
             Eol,
             Indent,
-            account("Assets:US:Bank:Checking"),
+            Account("Assets:US:Bank:Checking"),
             Eol,
             Indent,
-            account("Liabilities:US:Bank:Credit"),
+            Account("Liabilities:US:Bank:Credit"),
             Eol,
             Indent,
-            account("Other:Bank"),
+            Account("Other:Bank"),
             Eol,
             Indent,
-            currency("USD"),
-            currency("HOOL"),
-            currency("TEST_D"),
-            currency("TEST_3"),
-            currency("TEST-D"),
-            currency("TEST-3"),
-            currency("NT"),
-            currency("V"),
-            currency("V12"),
+            Currency("USD"),
+            Currency("HOOL"),
+            Currency("TEST_D"),
+            Currency("TEST_3"),
+            Currency("TEST-D"),
+            Currency("TEST-3"),
+            Currency("NT"),
+            Currency("V"),
+            Currency("V12"),
             Eol,
             Indent,
-            currency("/NQH21"),
-            currency("/6A"),
-            currency("/6J8"),
-            currency("ABC.TO"),
+            Currency("/NQH21"),
+            Currency("/6A"),
+            Currency("/6J8"),
+            Currency("ABC.TO"),
             Slash,
             number!(3.2),
             Eol,
@@ -131,13 +111,13 @@ fn basic_tokens() {
             number!(123.456789),
             Eol,
             Indent,
-            tag("sometag123"),
+            Tag("sometag123"),
             Eol,
             Indent,
-            link("sometag123"),
+            Link("sometag123"),
             Eol,
             Indent,
-            key("somekey"),
+            Key("somekey"),
             Colon,
             Eol,
         ],

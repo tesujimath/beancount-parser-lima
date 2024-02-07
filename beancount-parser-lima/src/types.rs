@@ -601,8 +601,8 @@ pub enum DirectiveVariant<'a> {
 pub(crate) enum Pragma<'a> {
     // we keep pushed tags with their span
     // since it may be useful downstream to know where these came from
-    Pushtag(Spanned<&'a Tag<'a>>),
-    Poptag(Spanned<&'a Tag<'a>>),
+    Pushtag(Spanned<Tag<'a>>),
+    Poptag(Spanned<Tag<'a>>),
     Pushmeta(MetaKeyValue<'a>),
     Popmeta(Spanned<Key<'a>>),
     Include(&'a str),
@@ -661,7 +661,7 @@ impl<'a> Transaction<'a> {
 /// A Beancount price directive, without the common [Directive] fields.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Price<'a> {
-    pub(crate) currency: Spanned<&'a Currency<'a>>,
+    pub(crate) currency: Spanned<Currency<'a>>,
     pub(crate) amount: Spanned<Amount<'a>>,
 }
 
@@ -677,7 +677,7 @@ impl<'a> Price<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<&Currency> {
+    pub fn currency(&self) -> &Spanned<Currency> {
         &self.currency
     }
 
@@ -732,7 +732,7 @@ impl<'a> ElementType for Balance<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Open<'a> {
     pub(crate) account: Spanned<Account<'a>>,
-    pub(crate) currencies: HashSet<Spanned<&'a Currency<'a>>>,
+    pub(crate) currencies: HashSet<Spanned<Currency<'a>>>,
     pub(crate) booking: Option<Spanned<Booking>>,
 }
 
@@ -752,7 +752,7 @@ impl<'a> Open<'a> {
     }
 
     /// Field accessor.
-    pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<&Currency>> {
+    pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<Currency>> {
         self.currencies.iter()
     }
 
@@ -785,7 +785,7 @@ impl<'a> Close<'a> {
 /// A Beancount commodity directive, without the common [Directive] fields.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Commodity<'a> {
-    pub(crate) currency: Spanned<&'a Currency<'a>>,
+    pub(crate) currency: Spanned<Currency<'a>>,
 }
 
 impl<'a> Commodity<'a> {
@@ -797,7 +797,7 @@ impl<'a> Commodity<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<&Currency> {
+    pub fn currency(&self) -> &Spanned<Currency> {
         &self.currency
     }
 }
@@ -970,7 +970,7 @@ impl<'a> Display for Plugin<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Account<'a> {
     pub(crate) account_type: AccountType,
-    pub(crate) candidate: &'a CandidateAccount<'a>,
+    pub(crate) subaccount: Subaccount<'a>,
 }
 
 impl<'a> Account<'a> {
@@ -981,7 +981,7 @@ impl<'a> Account<'a> {
 
     /// Field accessor.
     pub fn names(&self) -> &Subaccount {
-        &self.candidate.subaccount
+        &self.subaccount
     }
 }
 
@@ -1001,20 +1001,6 @@ impl<'a> Display for Account<'a> {
 /// The individual colon-separated components of an account, without the [AccountType] prefix.
 /// `SmallVec` stores a small number of these inline, before making use of the heap.
 pub type Subaccount<'a> = SmallVec<AccountName<'a>, 4>;
-
-/// A CandidateAccount is one where the account_type_name has not yet been resolved against current options.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct CandidateAccount<'a> {
-    pub(crate) account_type_name: AccountTypeName<'a>,
-    pub(crate) subaccount: Subaccount<'a>,
-}
-
-impl<'a> Display for CandidateAccount<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.account_type_name)?;
-        format(f, &self.subaccount, plain, ":", Some(":"))
-    }
-}
 
 /// A validated name for an account type.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
@@ -1329,7 +1315,7 @@ pub struct Posting<'a> {
     pub(crate) flag: Option<Spanned<Flag>>,
     pub(crate) account: Spanned<Account<'a>>,
     pub(crate) amount: Option<Spanned<ExprValue>>,
-    pub(crate) currency: Option<Spanned<&'a Currency<'a>>>,
+    pub(crate) currency: Option<Spanned<Currency<'a>>>,
     pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
     pub(crate) metadata: Metadata<'a>,
@@ -1352,7 +1338,7 @@ impl<'a> Posting<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<&Currency>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency>> {
         self.currency.as_ref()
     }
 
@@ -1405,8 +1391,8 @@ impl<'a> Display for Posting<'a> {
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct Metadata<'a> {
     pub(crate) key_values: HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
-    pub(crate) tags: HashSet<Spanned<&'a Tag<'a>>>,
-    pub(crate) links: HashSet<Spanned<&'a Link<'a>>>,
+    pub(crate) tags: HashSet<Spanned<Tag<'a>>>,
+    pub(crate) links: HashSet<Spanned<Link<'a>>>,
 }
 
 impl<'a> Metadata<'a> {
@@ -1418,12 +1404,12 @@ impl<'a> Metadata<'a> {
     }
 
     /// Field accessor.
-    pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<&Tag>> {
+    pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<Tag>> {
         self.tags.iter()
     }
 
     /// Field accessor.
-    pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<&Link>> {
+    pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<Link>> {
         self.links.iter()
     }
 
@@ -1485,10 +1471,10 @@ impl<'a> Display for MetaValue<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SimpleValue<'a> {
     String(&'a str),
-    Currency(&'a Currency<'a>),
+    Currency(Currency<'a>),
     Account(Account<'a>),
-    Tag(&'a Tag<'a>),
-    Link(&'a Link<'a>),
+    Tag(Tag<'a>),
+    Link(Link<'a>),
     Date(Date),
     Bool(bool),
     None,
@@ -1878,11 +1864,11 @@ impl Display for ScopedExprValue {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Amount<'a> {
     number: Spanned<ExprValue>,
-    currency: Spanned<&'a Currency<'a>>,
+    currency: Spanned<Currency<'a>>,
 }
 
 impl<'a> Amount<'a> {
-    pub(crate) fn new(amount: (Spanned<ExprValue>, Spanned<&'a Currency<'a>>)) -> Self {
+    pub(crate) fn new(amount: (Spanned<ExprValue>, Spanned<Currency<'a>>)) -> Self {
         Amount {
             number: amount.0,
             currency: amount.1,
@@ -1895,7 +1881,7 @@ impl<'a> Amount<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<&Currency> {
+    pub fn currency(&self) -> &Spanned<Currency> {
         &self.currency
     }
 }
@@ -1946,16 +1932,11 @@ impl<'a> Display for AmountWithTolerance<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct LooseAmount<'a> {
     number: Option<Spanned<ExprValue>>,
-    currency: Option<Spanned<&'a Currency<'a>>>,
+    currency: Option<Spanned<Currency<'a>>>,
 }
 
 impl<'a> LooseAmount<'a> {
-    pub(crate) fn new(
-        amount: (
-            Option<Spanned<ExprValue>>,
-            Option<Spanned<&'a Currency<'a>>>,
-        ),
-    ) -> Self {
+    pub(crate) fn new(amount: (Option<Spanned<ExprValue>>, Option<Spanned<Currency<'a>>>)) -> Self {
         LooseAmount {
             number: amount.0,
             currency: amount.1,
@@ -1968,7 +1949,7 @@ impl<'a> LooseAmount<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<&Currency>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency>> {
         self.currency.as_ref()
     }
 }
@@ -1976,9 +1957,9 @@ impl<'a> LooseAmount<'a> {
 /// An amount which specifies a total or per-unit `ScopedExprValue`, or simply just a `Currency`.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ScopedAmount<'a> {
-    BareCurrency(&'a Currency<'a>),
+    BareCurrency(Currency<'a>),
     BareAmount(ScopedExprValue),
-    CurrencyAmount(ScopedExprValue, &'a Currency<'a>),
+    CurrencyAmount(ScopedExprValue, Currency<'a>),
 }
 
 impl<'a> Display for ScopedAmount<'a> {
@@ -1997,7 +1978,7 @@ impl<'a> Display for ScopedAmount<'a> {
 pub struct CostSpec<'a> {
     per_unit: Option<Spanned<ExprValue>>,
     total: Option<Spanned<ExprValue>>,
-    currency: Option<Spanned<&'a Currency<'a>>>,
+    currency: Option<Spanned<Currency<'a>>>,
     date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
@@ -2015,7 +1996,7 @@ impl<'a> CostSpec<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<&Currency<'_>>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency<'_>>> {
         self.currency.as_ref()
     }
 
@@ -2086,7 +2067,7 @@ impl<'a> Display for CostSpec<'a> {
 pub(crate) struct CostSpecBuilder<'a> {
     per_unit: Option<Spanned<ExprValue>>,
     total: Option<Spanned<ExprValue>>,
-    currency: Option<Spanned<&'a Currency<'a>>>,
+    currency: Option<Spanned<Currency<'a>>>,
     date: Option<Spanned<Date>>,
     label: Option<Spanned<&'a str>>,
     merge: bool,
@@ -2121,7 +2102,7 @@ impl<'a> CostSpecBuilder<'a> {
         self
     }
 
-    pub(crate) fn currency(mut self, value: &'a Currency<'a>, span: Span) -> Self {
+    pub(crate) fn currency(mut self, value: Currency<'a>, span: Span) -> Self {
         if self.currency.is_none() {
             self.currency = Some(spanned(value, span));
         } else {

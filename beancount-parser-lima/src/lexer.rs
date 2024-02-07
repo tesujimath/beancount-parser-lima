@@ -33,8 +33,8 @@ pub enum Token<'a> {
     #[token("NULL")]
     Null,
 
-    #[regex(r#"(?&currency)"#, |lex| super::Currency::try_from(lex.slice()) )]
-    Currency(super::Currency<'a>),
+    #[regex(r#"(?&currency)"#, |lex| lex.slice() )]
+    Currency(&'a str),
 
     #[token("|")]
     Pipe,
@@ -125,8 +125,8 @@ pub enum Token<'a> {
     #[regex(r"(?&time)", |lex| parse_time(lex.slice()))]
     Time(Time),
 
-    #[regex(r"(?&account_type)(:(?&account_name))+", |lex| parse_candidate_account(lex.slice()))]
-    Account(super::CandidateAccount<'a>),
+    #[regex(r"(?&account_type)(:(?&account_name))+", |lex| lex.slice())]
+    Account(&'a str),
 
     #[regex(r"(?&string_literal)", |lex| {
         let len = lex.slice().len();
@@ -141,16 +141,16 @@ pub enum Token<'a> {
     #[regex(r"(?&number)", |lex| parse_number(lex.slice()))]
     Number(Decimal),
 
-    #[regex(r"#(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Tag))]
-    Tag(super::Tag<'a>),
+    #[regex(r"#(?&tag_or_link_identifier)", |lex| &lex.slice()[1..])]
+    Tag(&'a str),
 
-    #[regex(r"\^(?&tag_or_link_identifier)", |lex| TagOrLinkIdentifier::try_from(&lex.slice()[1..]).map(super::Link))]
-    Link(super::Link<'a>),
+    #[regex(r"\^(?&tag_or_link_identifier)", |lex| &lex.slice()[1..])]
+    Link(&'a str),
 
     // A key is only supposed to be matched in a trailing colon context, but Logos doesn't support that,
     // so we work around it using parsers::keyword(), which is able to hijack a keyword out of another token.
-    #[regex(r"(?&key)", |lex| Key::try_from(lex.slice()))]
-    Key(super::Key<'a>),
+    #[regex(r"(?&key)", |lex| lex.slice())]
+    Key(&'a str),
 
     // end-of-line and indent, which is the only significant whitespace
     // ignored_whole_line must be anchored immediately after a newline
@@ -415,18 +415,6 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
         .unwrap_or(0);
 
     Time::from_hms(hour, min, sec).or(Err(LexerError::new("time out of range")))
-}
-
-fn parse_candidate_account(s: &str) -> Result<CandidateAccount, LexerError> {
-    let mut account = s.split(':');
-    let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())?;
-    let subaccount = account
-        .map(AccountName::try_from)
-        .collect::<Result<Subaccount, _>>()?;
-    Ok(CandidateAccount {
-        account_type_name,
-        subaccount,
-    })
 }
 
 fn unescape_string_literal(s: &str) -> Result<Cow<str>, LexerError> {

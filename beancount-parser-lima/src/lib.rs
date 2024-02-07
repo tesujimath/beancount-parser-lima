@@ -494,7 +494,7 @@ struct PragmaProcessor<'s, 't> {
     stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     // tags and meta key/values for pragma push/pop
-    tags: HashSet<Spanned<&'t Tag<'t>>>,
+    tags: HashSet<Spanned<Tag<'t>>>,
     meta_key_values: HashMap<Spanned<Key<'t>>, Spanned<MetaValue<'t>>>,
     options: Options<'t>,
     plugins: Vec<Plugin<'t>>,
