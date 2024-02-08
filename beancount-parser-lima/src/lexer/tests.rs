@@ -387,6 +387,25 @@ Assets:A
 }
 
 #[test]
+fn account_names_with_numbers() {
+    lex_and_check(
+        r#"
+Assets:Vouchers:99Ranch
+Assets:99Test
+Assets:signals
+"#,
+        vec![
+            Account("Assets:Vouchers:99Ranch"),
+            Eol,
+            Account("Assets:99Test"),
+            Eol,
+            Account("Assets:signals"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
 fn account_names_with_dash() {
     lex_and_check(
         r#"
