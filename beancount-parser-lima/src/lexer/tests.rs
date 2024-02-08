@@ -38,7 +38,7 @@ fn lex_and_check(s: &str, expected: Vec<Token>) {
 fn basic_tokens() {
     lex_and_check(
         r#"
-    2013-05-18 2014-01-02 2014/01/02
+2013-05-18 2014-01-02 2014/01/02
     13:18 2013-05-18 12:34:56 2013-05-18 12:34
     Assets:US:Bank:Checking
     Liabilities:US:Bank:Credit
@@ -119,6 +119,141 @@ fn basic_tokens() {
             Indent,
             Key("somekey"),
             Colon,
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn keywords_as_key() {
+    lex_and_check(
+        r#"
+2013-05-18 open Assets:US:Bank:Checking
+    txn: "is a key not a keyword"
+    balance: "is a key not a keyword"
+    open: "is a key not a keyword"
+    close: "is a key not a keyword"
+    commodity: "is a key not a keyword"
+    pad: "is a key not a keyword"
+    event: "is a key not a keyword"
+    query: "is a key not a keyword"
+    custom: "is a key not a keyword"
+    price: "is a key not a keyword"
+    note: "is a key not a keyword"
+    document: "is a key not a keyword"
+    pushtag: "is a key not a keyword"
+    poptag: "is a key not a keyword"
+    pushmeta: "is a key not a keyword"
+    popmeta: "is a key not a keyword"
+    option: "is a key not a keyword"
+    options: "is a key not a keyword"
+    plugin: "is a key not a keyword"
+    include: "is a key not a keyword"
+"#,
+        vec![
+            date("2013-05-18"),
+            Open,
+            Account("Assets:US:Bank:Checking"),
+            Eol,
+            Indent,
+            Key("txn"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("balance"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("open"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("close"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("commodity"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("pad"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("event"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("query"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("custom"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("price"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("note"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("document"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("pushtag"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("poptag"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("pushmeta"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("popmeta"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("option"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("options"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("plugin"),
+            Colon,
+            string_literal("is a key not a keyword"),
+            Eol,
+            Indent,
+            Key("include"),
+            Colon,
+            string_literal("is a key not a keyword"),
             Eol,
         ],
     );

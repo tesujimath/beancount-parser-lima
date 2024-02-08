@@ -248,6 +248,9 @@ impl<'a> Display for Token<'a> {
     }
 }
 
+type RangedToken<'a> = (Token<'a>, Range<usize>);
+type SpannedToken<'a> = (Token<'a>, Span);
+
 // Work-around for Logos issue #315.  See `attempt_recovery`.
 //
 // when adjusting any of these regexes, be sure to make the same change in `Token`
@@ -299,12 +302,13 @@ pub fn bare_lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
 fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
-        .flat_map(|(lexeme, span)| match lexeme {
+        .flat_map(|(tok_or_error, span)| match tok_or_error {
             Ok(tok) => smallvec![(tok, chumsky::span::Span::new(source_id, span))],
             Err(_e) => attempt_recovery(span.clone(), s)
                 .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
                 .collect::<SmallVec<_, 1>>(),
         })
+        .keyword_then_colon_to_key()
         .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
         .finalize()
 }
@@ -318,22 +322,104 @@ fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> 
 //
 // It may be necessary to extend `RecoveryToken` as and when further failures in lexing arise.
 // The long-term solution is the Logos rewrite, mentioned in that issue.
-fn attempt_recovery(
-    failed_span: Range<usize>,
-    s: &str,
-) -> impl Iterator<Item = (Token, Range<usize>)> {
+fn attempt_recovery(failed_span: Range<usize>, s: &str) -> impl Iterator<Item = RangedToken> {
     let failed_token = &s[failed_span.start..failed_span.end];
 
     RecoveryToken::lexer(failed_token)
         .spanned()
-        .map(move |(lexeme, rel_span)| {
+        .map(move |(tok_or_error, rel_span)| {
             let span = failed_span.start + rel_span.start..failed_span.start + rel_span.end;
-            match lexeme {
+            match tok_or_error {
                 Ok(tok) => (tok.into(), span),
                 Err(e) => (Token::Error(e), span),
             }
         })
 }
+
+pub struct KeywordThenColonToKey<'a, I> {
+    iter: I,
+    pending_tok: Option<(SpannedToken<'a>, Option<&'static str>)>,
+}
+
+impl<'a, I> KeywordThenColonToKey<'a, I> {
+    fn new(iter: I) -> Self {
+        KeywordThenColonToKey {
+            iter,
+            pending_tok: None,
+        }
+    }
+
+    // for a token which is potentially a key return that key string
+    fn potential_key(tok: &Token) -> Option<&'static str> {
+        match tok {
+            Token::Txn => Some("txn"),
+            Token::Balance => Some("balance"),
+            Token::Open => Some("open"),
+            Token::Close => Some("close"),
+            Token::Commodity => Some("commodity"),
+            Token::Pad => Some("pad"),
+            Token::Event => Some("event"),
+            Token::Query => Some("query"),
+            Token::Custom => Some("custom"),
+            Token::Price => Some("price"),
+            Token::Note => Some("note"),
+            Token::Document => Some("document"),
+            Token::Pushtag => Some("pushtag"),
+            Token::Poptag => Some("poptag"),
+            Token::Pushmeta => Some("pushmeta"),
+            Token::Popmeta => Some("popmeta"),
+            Token::Option => Some("option"),
+            Token::Options => Some("options"),
+            Token::Plugin => Some("plugin"),
+            Token::Include => Some("include"),
+            _ => None,
+        }
+    }
+}
+
+impl<'a, I> Iterator for KeywordThenColonToKey<'a, I>
+where
+    I: Iterator<Item = SpannedToken<'a>>,
+{
+    type Item = SpannedToken<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pending_tok.is_none() {
+            if let Some(tok) = self.iter.next() {
+                let potential_key = Self::potential_key(&tok.0);
+                self.pending_tok = Some((tok, potential_key));
+            }
+        }
+
+        match self.pending_tok.take() {
+            Some((pending_tok, Some(potential_key))) => match self.iter.next() {
+                None => Some(pending_tok),
+                Some(colon @ (Token::Colon, _)) => {
+                    self.pending_tok = Some((colon, None));
+                    Some((Token::Key(potential_key), pending_tok.1))
+                }
+                Some(other_tok) => {
+                    let potential_key = Self::potential_key(&other_tok.0);
+                    self.pending_tok = Some((other_tok, potential_key));
+                    Some(pending_tok)
+                }
+            },
+            Some((pending_tok, None)) => Some(pending_tok),
+            None => None,
+        }
+    }
+}
+
+pub trait KeywordThenColonToKeyIteratorAdaptor<'a>:
+    Iterator<Item = SpannedToken<'a>> + Sized
+{
+    /// Iterator adapter for mapping keyword-then-colon to key.
+    fn keyword_then_colon_to_key(self) -> KeywordThenColonToKey<'a, Self> {
+        KeywordThenColonToKey::new(self)
+    }
+}
+
+impl<'a, I: Iterator<Item = SpannedToken<'a>>> KeywordThenColonToKeyIteratorAdaptor<'a> for I {}
 
 struct EmptyLineFolder<'a> {
     forced_final_eol_span: Option<Span>,

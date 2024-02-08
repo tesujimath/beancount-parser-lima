@@ -78,6 +78,8 @@ pushmeta drink: "alcoholic"
   related_account: Expenses:Groceries
   just-use-a-tag: #mytag
   key-for-link: ^mylink
+  ; keywords are allowed as keys
+  open: "for business"
 
 2023-05-31 document Expenses:Entertainment:Drinks-and-snacks "2023-05-31-emersons-receipt.png" #beer
   assessment: "worth-it"

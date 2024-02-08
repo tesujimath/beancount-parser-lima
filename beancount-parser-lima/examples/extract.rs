@@ -712,7 +712,7 @@ fn indent<'a>() -> impl Iterator<Item = Primitive<'a>> {
 const SPACE: Primitive = Primitive::Str(Cow::Borrowed(" "), Decoration::None);
 
 trait SpacedIteratorAdaptor<'a>: Iterator<Item = Primitive<'a>> + Sized {
-    /// Iterator adapter for spacing primtives
+    /// Iterator adapter for spacing primitives
     fn spaced(self) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a>
     where
         Self: 'a,
