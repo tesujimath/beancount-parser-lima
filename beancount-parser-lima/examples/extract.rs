@@ -511,8 +511,6 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
                 .into_iter()
                 .flat_map(|x| flag(x))
                 .chain(account(x.account()))
-                // TODO
-                .chain(x.amount().into_iter().flat_map(|x| expr_value(x)))
                 .chain(x.currency().into_iter().flat_map(|x| currency(x)))
                 .chain(x.cost_spec().into_iter().flat_map(|x| cost_spec(x)))
                 .chain(
@@ -522,13 +520,8 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
                 )
                 .spaced(),
         )
-        // pub(crate) amount: Option<Spanned<ExprValue>>,
-        // pub(crate) currency: Option<Spanned<Currency<'a>>>,
-        // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
-        // pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
         .chain(keys_values(m))
         .chain(newline())
-    // pub(crate) metadata: Metadata<'a>,
 }
 
 fn tags_links_inline<'a>(x: &'a Metadata) -> impl Iterator<Item = Primitive<'a>> {
