@@ -161,6 +161,7 @@ pub enum Token<'a> {
     Eol,
 
     // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`
+    // which fails to capture an indented first line, but that isn't a thing in Beancount anyway
     Indent,
 
     // errors are returned as an error token
@@ -264,6 +265,8 @@ enum RecoveryToken {
     Minus,
     #[token("/")]
     Slash,
+    #[token(":")]
+    Colon,
 
     #[regex(r"(?&date)", |lex| parse_date(lex.slice()))]
     Date(Date),
@@ -279,6 +282,7 @@ impl<'a> From<RecoveryToken> for Token<'a> {
         match value {
             Minus => Token::Minus,
             Slash => Token::Slash,
+            Colon => Token::Colon,
             Date(date) => Token::Date(date),
             Number(decimal) => Token::Number(decimal),
         }
@@ -317,8 +321,9 @@ fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> 
 // Logos starts matching text like '/1.24' as a currency, and when it fails, it doesn't retry as slash followed by number.
 //
 // What we do is to attempt to lex the failed span using a subset of the original tokens, namely `RecoveryToken`.
-// The set of `RecoveryToken` has been chosen to match what is possible to find within a failed currency regex, since
-// that is where this problem arises.
+// The set of `RecoveryToken` has been chosen to match where we currently get lexing failures, namely:
+// 1. currency failures, which preclude shorter regexes which should match
+// 2. colons
 //
 // It may be necessary to extend `RecoveryToken` as and when further failures in lexing arise.
 // The long-term solution is the Logos rewrite, mentioned in that issue.

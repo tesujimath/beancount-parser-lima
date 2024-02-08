@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use crate::SourceId;
 
-use super::{lex, Token, Token::*};
+use super::{lex, LexerError, Token, Token::*};
 use rust_decimal_macros::dec;
 use time::format_description::well_known::Iso8601;
 
@@ -23,6 +23,14 @@ fn time(s: &str) -> Token {
 
 fn string_literal(s: &str) -> Token {
     StringLiteral(Cow::Borrowed(s))
+}
+
+fn unrecognized() -> Token<'static> {
+    Error(LexerError::new("unrecognized token"))
+}
+
+fn error(s: &'static str) -> Token<'static> {
+    Error(LexerError::new(s))
 }
 
 fn lex_and_check(s: &str, expected: Vec<Token>) {
@@ -58,7 +66,7 @@ fn basic_tokens() {
             date("2014-01-02"),
             Eol,
             Indent,
-            // The original Beancount parser would only match a time after a date,
+            // ANOMALY: The original Beancount parser would only match a time after a date,
             // but that was for performance reasons, not reasons of syntax, so
             // this parser differs here.
             time("13:18"),
@@ -121,6 +129,270 @@ fn basic_tokens() {
             Colon,
             Eol,
         ],
+    );
+}
+
+#[test]
+fn unicode_account_name() {
+    lex_and_check(
+        r#"
+Other:Bank
+Óthяr:Bあnk
+abc1:abc1
+ΑβγⅠ:ΑβγⅠ
+ابجا:ابجا
+"#,
+        vec![
+            Account("Other:Bank"),
+            Eol,
+            Account("Óthяr:Bあnk"),
+            Eol,
+            Key("abc1"),
+            Colon,
+            Key("abc1"),
+            Eol,
+            Account("ΑβγⅠ:ΑβγⅠ"),
+            Eol,
+            Account("ابجا:ابجا"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn indent() {
+    lex_and_check(
+        r#"
+2014-07-05 *
+    Equity:Something
+"#,
+        vec![
+            date("2014-07-05"),
+            Asterisk,
+            Eol,
+            Indent,
+            Account("Equity:Something"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn comma_currencies() {
+    lex_and_check(
+        r#"
+USD,CAD,AUD
+"#,
+        vec![
+            Currency("USD"),
+            Comma,
+            Currency("CAD"),
+            Comma,
+            Currency("AUD"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn number_ok() {
+    lex_and_check(
+        r#"
+1001 USD
+1002.00 USD
+-1001 USD
+-1002.00 USD
++1001 USD
++1002.00 USD
+1,001 USD
+1,002.00 USD
+-1,001 USD
+-1,002.00 USD
++1,001 USD
++1,002.00 USD
+"#,
+        vec![
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+            Minus,
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            Minus,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+            Plus,
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            Plus,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+            Minus,
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            Minus,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+            Plus,
+            number!(1001),
+            Currency("USD"),
+            Eol,
+            Plus,
+            number!(1002.00),
+            Currency("USD"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn number_space() {
+    lex_and_check(
+        r#"
+- 1002.00 USD
+"#,
+        vec![Minus, number!(1002), Currency("USD"), Eol],
+    );
+}
+
+#[test]
+fn number_dots() {
+    lex_and_check(
+        r#"
+1.234.00 USD
+"#,
+        vec![
+            number!(1.234),
+            unrecognized(), // ANOMALY: just the dot, which is where we differ from the original Beancount scanner
+            number!(0),
+            Currency("USD"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn number_no_integer() {
+    lex_and_check(
+        r#"
+.2347 USD
+"#,
+        vec![
+            unrecognized(), // ANOMALY: just the dot, which is where we differ from the original Beancount scanner
+            number!(2347),
+            Currency("USD"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn currency_number() {
+    lex_and_check(
+        r#"
+555.00 CAD.11
+"#,
+        vec![number!(555), Currency("CAD.11"), Eol],
+    );
+}
+
+#[test]
+fn currency_dash() {
+    lex_and_check(
+        r#"
+TEST-DA
+"#,
+        vec![Currency("TEST-DA"), Eol],
+    );
+}
+
+#[test]
+fn bad_date_invalid_token() {
+    lex_and_check(
+        r#"
+2013-12-98
+"#,
+        vec![error("date out of range"), Eol],
+    );
+}
+
+#[test]
+fn bad_date_valid_but_invalid() {
+    lex_and_check(
+        r#"
+2013-15-01
+"#,
+        vec![error("month out of range"), Eol],
+    );
+}
+
+#[test]
+fn date_followed_by_number() {
+    lex_and_check(
+        r#"
+2013-12-228
+"#,
+        // ANOMALY: Because it cares about word boundary on the date, original Beancount parses as an
+        // arithmetic expression.  But Logos doesn't support boundaries.  So we do it differently.
+        // vec![number!(2013), Minus, number!(12), Minus, number!(228), Eol],
+        vec![date("2013-12-22"), number!(8), Eol],
+    );
+}
+
+#[test]
+fn bad_time() {
+    lex_and_check(
+        r#"
+99:99
+2000-09-10 99:99
+"#,
+        // ANOMALY: Again, we handle this differently.
+        vec![
+            number!(99),
+            Colon,
+            number!(99),
+            Eol,
+            date("2000-09-10"),
+            number!(99),
+            Colon,
+            number!(99),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn single_letter_account() {
+    lex_and_check(
+        r#"
+Assets:A
+"#,
+        vec![Account("Assets:A"), Eol],
+    );
+}
+
+#[test]
+fn account_names_with_dash() {
+    lex_and_check(
+        r#"
+Equity:Beginning-Balances
+"#,
+        vec![Account("Equity:Beginning-Balances"), Eol],
     );
 }
 
