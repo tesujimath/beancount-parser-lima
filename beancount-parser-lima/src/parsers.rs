@@ -1034,11 +1034,11 @@ where
         let number = select_ref! { Number(x) => Expr::Value(*x) };
 
         // Match a factor of an expression
-        let factor = just(Minus)
+        let factor = choice((just(Minus), just(Plus)))
             .or_not()
             .then(number.or(parens.clone()))
             .map(|(negated, x)| {
-                if negated.is_some() {
+                if negated.is_some_and(|tok| tok == Minus) {
                     Expr::Neg(Box::new(x))
                 } else {
                     x

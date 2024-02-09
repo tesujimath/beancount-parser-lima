@@ -63,7 +63,7 @@ poptag #essential
 
 2023-05-30 balance Assets:Bank:Current          1000 NZD ~ 0.01 #richman
 
-2023-05-30 balance Expenses:Groceries             55 NZD
+2023-05-30 balance Expenses:Groceries             +55 NZD
   meals: "cheap"
 
 pushmeta drink: "alcoholic"
