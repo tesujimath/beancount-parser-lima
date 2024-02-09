@@ -1,7 +1,6 @@
 use super::types::*;
 use logos::Logos;
 use rust_decimal::Decimal;
-use smallvec::{smallvec, SmallVec};
 use std::{
     borrow::Cow,
     error::Error,
@@ -250,9 +249,10 @@ impl<'a> Display for Token<'a> {
 }
 
 type RangedToken<'a> = (Token<'a>, Range<usize>);
+type RangedTokenOrError<'a> = (Result<Token<'a>, LexerError>, Range<usize>);
 type SpannedToken<'a> = (Token<'a>, Span);
 
-// Work-around for Logos issue #315.  See `attempt_recovery`.
+// Work-around for Logos issue #315.  See `RecoveryAttempter`.
 //
 // when adjusting any of these regexes, be sure to make the same change in `Token`
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
@@ -311,10 +311,7 @@ fn lex_with_final_eol(
 ) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
-        .flat_map(|(tok_or_error, span)| match tok_or_error {
-            Ok(tok) => smallvec![(tok, span)],
-            Err(_e) => attempt_recovery(span.clone(), s).collect::<SmallVec<_, 1>>(),
-        })
+        .attempt_recovery(s)
         .keyword_then_colon_to_key()
         .handle_eol_indent(final_eol)
         // TODO consider lifting this map out to the caller, so lexer deals only in ranges, and doesn't need to know about source_id
@@ -332,19 +329,85 @@ fn lex_with_final_eol(
 //
 // It may be necessary to extend `RecoveryToken` as and when further failures in lexing arise.
 // The long-term solution is the Logos rewrite, mentioned in that issue.
-fn attempt_recovery(failed_span: Range<usize>, s: &str) -> impl Iterator<Item = RangedToken> {
-    let failed_token = &s[failed_span.start..failed_span.end];
-
-    RecoveryToken::lexer(failed_token)
-        .spanned()
-        .map(move |(tok_or_error, rel_span)| {
-            let span = failed_span.start + rel_span.start..failed_span.start + rel_span.end;
-            match tok_or_error {
-                Ok(tok) => (tok.into(), span),
-                Err(e) => (Token::Error(e), span),
-            }
-        })
+struct RecoveryAttempter<'a, I> {
+    primary_iter: I,
+    recovery: Option<(logos::SpannedIter<'a, RecoveryToken>, usize)>,
+    source: &'a str,
 }
+
+impl<'a, I> RecoveryAttempter<'a, I>
+where
+    I: Iterator<Item = RangedTokenOrError<'a>>,
+{
+    fn new(iter: I, source: &'a str) -> Self {
+        RecoveryAttempter {
+            primary_iter: iter,
+            recovery: None,
+            source,
+        }
+    }
+
+    fn create_recovery_lexer(&mut self, failed_span: &Range<usize>) {
+        let failed_source = &self.source[failed_span.start..failed_span.end];
+
+        self.recovery = Some((
+            RecoveryToken::lexer(failed_source).spanned(),
+            failed_span.start,
+        ));
+    }
+
+    fn next_primary_item(&mut self) -> Option<RangedToken<'a>> {
+        match self.primary_iter.next() {
+            Some((Ok(t), span)) => Some((t, span)),
+            Some((Err(_), span)) => {
+                self.create_recovery_lexer(&span);
+                self.next_recovery_item()
+            }
+            None => None,
+        }
+    }
+
+    fn next_recovery_item(&mut self) -> Option<RangedToken<'a>> {
+        fn offset(r: &Range<usize>, o: usize) -> Range<usize> {
+            r.start + o..r.end + o
+        }
+
+        if let Some((recovery_iter, recovery_offset)) = self.recovery.as_mut() {
+            if let Some((recovery_item, span)) = recovery_iter.next() {
+                let span = offset(&span, *recovery_offset);
+                match recovery_item {
+                    Ok(tok) => Some((tok.into(), span)),
+                    Err(e) => Some((Token::Error(e), span)),
+                }
+            } else {
+                self.recovery = None;
+
+                self.next_primary_item()
+            }
+        } else {
+            self.next_primary_item()
+        }
+    }
+}
+
+impl<'a, I> Iterator for RecoveryAttempter<'a, I>
+where
+    I: Iterator<Item = RangedTokenOrError<'a>>,
+{
+    type Item = RangedToken<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_recovery_item()
+    }
+}
+
+trait RecoveryAttempterIteratorAdaptor<'a>: Iterator<Item = RangedTokenOrError<'a>> + Sized {
+    fn attempt_recovery(self, source: &'a str) -> RecoveryAttempter<'a, Self> {
+        RecoveryAttempter::new(self, source)
+    }
+}
+
+impl<'a, I: Iterator<Item = RangedTokenOrError<'a>>> RecoveryAttempterIteratorAdaptor<'a> for I {}
 
 struct KeywordThenColonToKey<'a, I> {
     iter: I,
@@ -447,9 +510,10 @@ where
     I: Iterator<Item = RangedToken<'a>>,
 {
     fn new(mut iter: I, final_eol: Option<Range<usize>>) -> Self {
-        let first_tok = iter
-            .next()
-            .and_then(|tok| if tok.0 == Token::Eol { None } else { Some(tok) });
+        let mut first_tok = Some((Token::Eol, Range::default()));
+        while first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
+            first_tok = iter.next()
+        }
 
         EolIndentHandler {
             iter,
@@ -463,12 +527,8 @@ where
     fn merge(&mut self) -> Option<RangedToken<'a>> {
         let mut first_tok = self.iter.next();
         // only get a second token if the first is some kind of EOL, because only then is there anything to merge
-        let mut second_tok = if let Some((tok, _span)) = &first_tok {
-            if tok.is_eol() {
-                self.iter.next()
-            } else {
-                None
-            }
+        let mut second_tok = if first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
+            self.iter.next()
         } else {
             None
         };
@@ -479,6 +539,7 @@ where
                 (Some(first), Some(second)) if first.0.is_eol() && second.0.is_eol() => {
                     let (tok, span) = second_tok.take().unwrap();
                     first_tok = Some((tok, first.1.start..span.end));
+                    second_tok = self.iter.next();
                 }
                 _ => {
                     merging = false;
