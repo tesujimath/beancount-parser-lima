@@ -6,6 +6,12 @@ use std::ops::Range;
 use test_case::test_case;
 use time::Month;
 
+fn bare_lex_with_source(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+    bare_lex(s)
+        .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
+        .collect::<Vec<_>>()
+}
+
 #[test_case(r#"2023-07-03 * "New World Gardens North East Va ;"
 "#, ((2023, Month::July, 3), 0..10), (Flag::Asterisk, 11..12), None, Some(("New World Gardens North East Va ;", 13..48)), vec![], vec![])]
 fn test_transaction(
@@ -18,7 +24,7 @@ fn test_transaction(
     expected_links: Vec<(&str, Range<usize>)>,
 ) {
     let source_id = SourceId::default();
-    let tokens = bare_lex(source_id, s);
+    let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
     let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
@@ -67,7 +73,7 @@ fn test_transaction(
 #[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
 fn test_compound_amount(s: &str, expected: ScopedAmount) {
     let source_id = SourceId::default();
-    let tokens = bare_lex(source_id, s);
+    let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
 
     let result = compound_amount().parse(spanned_tokens).into_result();
@@ -80,7 +86,7 @@ fn test_compound_amount(s: &str, expected: ScopedAmount) {
 #[test_case("# 123.45", ScopedExprValue::Total(Expr::Value(dec!(123.45)).into()))]
 fn test_compound_expr(s: &str, expected: ScopedExprValue) {
     let source_id = SourceId::default();
-    let tokens = bare_lex(source_id, s);
+    let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
 
     let result = compound_expr().parse(spanned_tokens).into_result();
@@ -95,7 +101,7 @@ fn test_tags_links(
     expected_links: Vec<(&str, Range<usize>)>,
 ) {
     let source_id = SourceId::default();
-    let tokens = bare_lex(source_id, s);
+    let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
     let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
@@ -128,7 +134,7 @@ fn test_tags_links(
 #[test_case("3.141 # pi", "3.141")]
 fn expr_test(s: &str, expected: &str) {
     let source_id = SourceId::default();
-    let tokens = bare_lex(source_id, s);
+    let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens
         .spanned(end_of_input(source_id, s))
         .with_context(source_id);

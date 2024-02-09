@@ -158,7 +158,7 @@ impl BeancountSources {
                 all_content.push((path, source_id_string, content));
                 let (path, source_id_string, content) = all_content.last().unwrap();
 
-                let tokens = Some(lex(source_id, content));
+                let tokens = Some(lex_with_source(source_id, content));
                 let spanned_tokens = tokens
                     .as_ref()
                     .unwrap()
@@ -308,6 +308,12 @@ impl std::fmt::Debug for BeancountSources {
     }
 }
 
+pub fn lex_with_source(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+    lex(s)
+        .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
+        .collect::<Vec<_>>()
+}
+
 fn read<P>(file_path: P) -> anyhow::Result<String>
 where
     P: AsRef<Path>,
@@ -410,7 +416,7 @@ where
         let mut tokenized_sources = Vec::new();
 
         for (source_id, _source_path, content) in sources.content_iter() {
-            tokenized_sources.push(lex(source_id, content));
+            tokenized_sources.push(lex_with_source(source_id, content));
         }
 
         BeancountParser {

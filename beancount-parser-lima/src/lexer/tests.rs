@@ -1,10 +1,7 @@
 #![cfg(test)]
-use std::borrow::Cow;
-
-use crate::SourceId;
-
 use super::{lex, LexerError, Token, Token::*};
 use rust_decimal_macros::dec;
+use std::borrow::Cow;
 use time::format_description::well_known::Iso8601;
 
 macro_rules! number {
@@ -34,10 +31,7 @@ fn error(s: &'static str) -> Token<'static> {
 }
 
 fn lex_and_check(s: &str, expected: Vec<Token>) {
-    let actual = lex(SourceId::default(), s)
-        .into_iter()
-        .map(|(tok, _span)| tok)
-        .collect::<Vec<_>>();
+    let actual = lex(s).map(|(tok, _span)| tok).collect::<Vec<_>>();
 
     assert_eq!(actual, expected);
 }

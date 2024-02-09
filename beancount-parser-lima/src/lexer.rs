@@ -289,34 +289,30 @@ impl<'a> From<RecoveryToken> for Token<'a> {
     }
 }
 
-/// Lex the input discarding empty lines, and mapping `Range` span into `Span`
+/// Lex the input discarding empty lines,
 /// and forcing a final `Eol` in case missing.
 ///
 /// Lexing errors are returned as `Error` tokens.
-pub fn lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+pub fn lex(s: &str) -> impl Iterator<Item = RangedToken> {
     let end_of_input = s.len()..s.len();
-    lex_with_final_eol(source_id, s, Some(end_of_input))
+    lex_with_final_eol(s, Some(end_of_input))
 }
 
-/// Lex the input discarding empty lines, and mapping `Range` span into `Span`
+/// Lex the input discarding empty lines.
 #[cfg(test)]
-pub fn bare_lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
-    lex_with_final_eol(source_id, s, None)
+pub fn bare_lex(s: &str) -> impl Iterator<Item = RangedToken> {
+    lex_with_final_eol(s, None)
 }
 
 fn lex_with_final_eol(
-    source_id: SourceId,
     s: &str,
     final_eol: Option<Range<usize>>,
-) -> Vec<(Token, Span)> {
+) -> impl Iterator<Item = RangedToken> {
     Token::lexer(s)
         .spanned()
         .attempt_recovery(s)
         .keyword_then_colon_to_key()
         .handle_eol_indent(final_eol)
-        // TODO consider lifting this map out to the caller, so lexer deals only in ranges, and doesn't need to know about source_id
-        .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
-        .collect::<Vec<_>>()
 }
 
 // This is a work-around for Logos issue #315.
