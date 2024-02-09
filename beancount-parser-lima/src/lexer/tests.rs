@@ -416,6 +416,16 @@ Equity:Beginning-Balances
 }
 
 #[test]
+fn stupidly_long_account_names() {
+    lex_and_check(
+        r#"
+Expenses:Something:AX:BX:CX:DX:EX:FX:GX:HX
+"#,
+        vec![Account("Expenses:Something:AX:BX:CX:DX:EX:FX:GX:HX"), Eol],
+    );
+}
+
+#[test]
 fn keywords_as_key() {
     lex_and_check(
         r#"
