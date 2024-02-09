@@ -125,12 +125,13 @@ impl<'a> BeancountOption<'a> {
 
             "infer_tolerance_from_cost" => parse_bool(value.item).map(InferToleranceFromCost),
 
-            "documents" => Ok(source_path
-                .and_then(|path| path.parent())
-                .map_or(PathBuf::from(value.item), |parent| {
-                    parent.join(value.item).clean()
-                }))
-            .map(Documents),
+            "documents" => Ok(Documents(
+                source_path
+                    .and_then(|path| path.parent())
+                    .map_or(PathBuf::from(value.item), |parent| {
+                        parent.join(value.item).clean()
+                    }),
+            )),
 
             "operating_currency" => parse_currency(value.item).map(OperatingCurrency),
 
