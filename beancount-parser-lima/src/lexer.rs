@@ -1,4 +1,4 @@
-use super::{end_of_input, types::*};
+use super::types::*;
 use logos::Logos;
 use rust_decimal::Decimal;
 use smallvec::{smallvec, SmallVec};
@@ -294,7 +294,8 @@ impl<'a> From<RecoveryToken> for Token<'a> {
 ///
 /// Lexing errors are returned as `Error` tokens.
 pub fn lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
-    lex_with_final_eol(source_id, s, Some(end_of_input(source_id, s)))
+    let end_of_input = s.len()..s.len();
+    lex_with_final_eol(source_id, s, Some(end_of_input))
 }
 
 /// Lex the input discarding empty lines, and mapping `Range` span into `Span`
@@ -303,18 +304,23 @@ pub fn bare_lex(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
     lex_with_final_eol(source_id, s, None)
 }
 
-fn lex_with_final_eol(source_id: SourceId, s: &str, final_eol: Option<Span>) -> Vec<(Token, Span)> {
+fn lex_with_final_eol(
+    source_id: SourceId,
+    s: &str,
+    final_eol: Option<Range<usize>>,
+) -> Vec<(Token, Span)> {
     Token::lexer(s)
         .spanned()
         .flat_map(|(tok_or_error, span)| match tok_or_error {
-            Ok(tok) => smallvec![(tok, chumsky::span::Span::new(source_id, span))],
-            Err(_e) => attempt_recovery(span.clone(), s)
-                .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
-                .collect::<SmallVec<_, 1>>(),
+            Ok(tok) => smallvec![(tok, span)],
+            Err(_e) => attempt_recovery(span.clone(), s).collect::<SmallVec<_, 1>>(),
         })
         .keyword_then_colon_to_key()
-        .fold(EmptyLineFolder::new(final_eol), EmptyLineFolder::fold)
-        .finalize()
+        .handle_eol_indent()
+        .drop_initial_and_ensure_final_eol(final_eol)
+        // TODO consider lifting this map out to the caller, so lexer deals only in ranges, and doesn't need to know about source_id
+        .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
+        .collect::<Vec<_>>()
 }
 
 // This is a work-around for Logos issue #315.
@@ -341,9 +347,9 @@ fn attempt_recovery(failed_span: Range<usize>, s: &str) -> impl Iterator<Item = 
         })
 }
 
-pub struct KeywordThenColonToKey<'a, I> {
+struct KeywordThenColonToKey<'a, I> {
     iter: I,
-    pending_tok: Option<(SpannedToken<'a>, Option<&'static str>)>,
+    pending_tok: Option<(RangedToken<'a>, Option<&'static str>)>,
 }
 
 impl<'a, I> KeywordThenColonToKey<'a, I> {
@@ -384,9 +390,9 @@ impl<'a, I> KeywordThenColonToKey<'a, I> {
 
 impl<'a, I> Iterator for KeywordThenColonToKey<'a, I>
 where
-    I: Iterator<Item = SpannedToken<'a>>,
+    I: Iterator<Item = RangedToken<'a>>,
 {
-    type Item = SpannedToken<'a>;
+    type Item = RangedToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pending_tok.is_none() {
@@ -415,75 +421,171 @@ where
     }
 }
 
-pub trait KeywordThenColonToKeyIteratorAdaptor<'a>:
-    Iterator<Item = SpannedToken<'a>> + Sized
-{
+trait KeywordThenColonToKeyIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>> + Sized {
     /// Iterator adapter for mapping keyword-then-colon to key.
     fn keyword_then_colon_to_key(self) -> KeywordThenColonToKey<'a, Self> {
         KeywordThenColonToKey::new(self)
     }
 }
 
-impl<'a, I: Iterator<Item = SpannedToken<'a>>> KeywordThenColonToKeyIteratorAdaptor<'a> for I {}
+impl<'a, I: Iterator<Item = RangedToken<'a>>> KeywordThenColonToKeyIteratorAdaptor<'a> for I {}
 
-struct EmptyLineFolder<'a> {
-    forced_final_eol_span: Option<Span>,
-    committed: Vec<(Token<'a>, Span)>,
-    pending_eol: Option<(Token<'a>, Span)>,
+struct EolIndentHandler<'a, I> {
+    iter: I,
+    pending: [Option<RangedToken<'a>>; 2],
 }
 
-impl<'a> EmptyLineFolder<'a> {
-    fn new(forced_final_eol_span: Option<Span>) -> Self {
-        EmptyLineFolder {
-            forced_final_eol_span,
-            committed: Vec::new(),
-            pending_eol: None,
+impl<'a, I> EolIndentHandler<'a, I>
+where
+    I: Iterator<Item = RangedToken<'a>>,
+{
+    fn new(iter: I) -> Self {
+        EolIndentHandler {
+            iter,
+            pending: [None, None],
         }
     }
 
-    fn finalize(mut self) -> Vec<(Token<'a>, Span)> {
-        if let Some(pending) = self.pending_eol.take() {
-            self.committed.push(pending)
-        } else if let Some(eol_span) = self.forced_final_eol_span.take() {
-            // force a final newline
-            self.committed.push((Token::Eol, eol_span))
-        }
-        self.committed
-    }
-
-    fn fold(mut self, item: (Token<'a>, Span)) -> Self {
-        use chumsky::span::Span;
-
-        if item.0.is_eol() {
-            if let Some((_, span)) = self.pending_eol.take() {
-                self.pending_eol = Some((item.0, span.union(item.1)))
+    fn merge(&mut self) -> Option<RangedToken<'a>> {
+        let mut first_tok = self.iter.next();
+        // only get a second token if the first is some kind of EOL, because only then is there anything to merge
+        let mut second_tok = if let Some((tok, _span)) = &first_tok {
+            if tok.is_eol() {
+                self.iter.next()
             } else {
-                self.pending_eol = Some(item)
+                None
             }
         } else {
-            if let Some(pending) = self.pending_eol.take() {
-                use Token::*;
+            None
+        };
 
-                // don't push an initial empty line
-                if !self.committed.is_empty() {
-                    if pending.0 == EolThenIndent {
-                        // expand into separate tokens
-                        let (context, start, end) =
-                            (pending.1.context(), pending.1.start, pending.1.end);
-                        self.committed
-                            .push((Eol, Span::new(context, start..end - 1)));
-                        self.committed
-                            .push((Indent, Span::new(context, end - 1..end)));
-                    } else {
-                        self.committed.push(pending);
-                    }
+        let mut merging = true;
+        while merging {
+            match (&mut first_tok, &mut second_tok) {
+                (Some(first), Some(second)) if first.0.is_eol() && second.0.is_eol() => {
+                    let (tok, span) = second_tok.take().unwrap();
+                    first_tok = Some((tok, first.1.start..span.end));
+                }
+                _ => {
+                    merging = false;
                 }
             }
-            self.committed.push(item);
         }
 
-        self
+        match first_tok {
+            Some((Token::EolThenIndent, span)) => {
+                self.pending = [Some((Token::Indent, span.clone())), second_tok];
+                Some((Token::Eol, span))
+            }
+            Some(tok) => {
+                self.pending = [second_tok, None];
+                Some(tok)
+            }
+            None => None,
+        }
     }
+}
+
+impl<'a, I> Iterator for EolIndentHandler<'a, I>
+where
+    I: Iterator<Item = RangedToken<'a>>,
+{
+    type Item = RangedToken<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match [self.pending[0].take(), self.pending[1].take()] {
+            [Some(first), second] => {
+                self.pending = [second, None];
+                Some(first)
+            }
+            _ => self.merge(),
+        }
+    }
+}
+
+trait EolIndentHandlerIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>> + Sized {
+    /// Iterator adapter for mapping keyword-then-colon to key.
+    fn handle_eol_indent(self) -> EolIndentHandler<'a, Self> {
+        EolIndentHandler::new(self)
+    }
+}
+
+impl<'a, I: Iterator<Item = RangedToken<'a>>> EolIndentHandlerIteratorAdaptor<'a> for I {}
+
+struct DropInitialAndEnsureFinalEol<'a, I>
+where
+    I: Iterator<Item = RangedToken<'a>>,
+{
+    iter: I,
+    forced_final_eol_span: Option<Range<usize>>,
+    previous_was_eol: bool,
+    pending: Option<RangedToken<'a>>,
+}
+
+impl<'a, I> DropInitialAndEnsureFinalEol<'a, I>
+where
+    I: Iterator<Item = RangedToken<'a>>,
+{
+    fn new(mut iter: I, forced_final_eol_span: Option<Range<usize>>) -> Self {
+        let first_tok = iter
+            .next()
+            .and_then(|tok| if tok.0 == Token::Eol { None } else { Some(tok) });
+        DropInitialAndEnsureFinalEol {
+            iter,
+            forced_final_eol_span,
+            previous_was_eol: false,
+            pending: first_tok,
+        }
+    }
+}
+
+impl<'a, I> Iterator for DropInitialAndEnsureFinalEol<'a, I>
+where
+    I: Iterator<Item = RangedToken<'a>>,
+{
+    type Item = RangedToken<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = if self.pending.is_some() {
+            self.pending.take()
+        } else {
+            self.iter.next()
+        };
+
+        match (next, &self.forced_final_eol_span) {
+            (None, Some(span)) => {
+                if !self.previous_was_eol {
+                    self.previous_was_eol = true;
+                    Some((Token::Eol, span.clone()))
+                } else {
+                    None
+                }
+            }
+            (None, None) => None,
+            (Some(item), _) => {
+                if item.0 == Token::Eol {
+                    self.previous_was_eol = true;
+                }
+                Some(item)
+            }
+        }
+    }
+}
+
+trait DropInitialAndEnsureFinalEolIteratorAdaptor<'a>:
+    Iterator<Item = RangedToken<'a>> + Sized
+{
+    fn drop_initial_and_ensure_final_eol(
+        self,
+        forced_final_eol_span: Option<Range<usize>>,
+    ) -> DropInitialAndEnsureFinalEol<'a, Self> {
+        DropInitialAndEnsureFinalEol::new(self, forced_final_eol_span)
+    }
+}
+
+impl<'a, I: Iterator<Item = RangedToken<'a>>> DropInitialAndEnsureFinalEolIteratorAdaptor<'a>
+    for I
+{
 }
 
 fn parse_date(s: &str) -> Result<Date, LexerError> {
