@@ -316,8 +316,7 @@ fn lex_with_final_eol(
             Err(_e) => attempt_recovery(span.clone(), s).collect::<SmallVec<_, 1>>(),
         })
         .keyword_then_colon_to_key()
-        .handle_eol_indent()
-        .drop_initial_and_ensure_final_eol(final_eol)
+        .handle_eol_indent(final_eol)
         // TODO consider lifting this map out to the caller, so lexer deals only in ranges, and doesn't need to know about source_id
         .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
         .collect::<Vec<_>>()
@@ -430,19 +429,34 @@ trait KeywordThenColonToKeyIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>>
 
 impl<'a, I: Iterator<Item = RangedToken<'a>>> KeywordThenColonToKeyIteratorAdaptor<'a> for I {}
 
+/// An iterator adapter which does all of the following:
+/// 1. Expand EolThenIndent into separate Eol and Indent tokens
+/// 2. Fold consecutive Eol tokens into a single one
+/// 3. Drop any initial Eol
+/// 4. Optionally, force a final Eol
 struct EolIndentHandler<'a, I> {
     iter: I,
+    first_tok: Option<RangedToken<'a>>,
     pending: [Option<RangedToken<'a>>; 2],
+    final_eol: Option<Range<usize>>,
+    previous_was_eol: bool,
 }
 
 impl<'a, I> EolIndentHandler<'a, I>
 where
     I: Iterator<Item = RangedToken<'a>>,
 {
-    fn new(iter: I) -> Self {
+    fn new(mut iter: I, final_eol: Option<Range<usize>>) -> Self {
+        let first_tok = iter
+            .next()
+            .and_then(|tok| if tok.0 == Token::Eol { None } else { Some(tok) });
+
         EolIndentHandler {
             iter,
+            first_tok,
             pending: [None, None],
+            final_eol,
+            previous_was_eol: false,
         }
     }
 
@@ -484,15 +498,8 @@ where
             None => None,
         }
     }
-}
 
-impl<'a, I> Iterator for EolIndentHandler<'a, I>
-where
-    I: Iterator<Item = RangedToken<'a>>,
-{
-    type Item = RangedToken<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next_merged(&mut self) -> Option<RangedToken<'a>> {
         match [self.pending[0].take(), self.pending[1].take()] {
             [Some(first), second] => {
                 self.pending = [second, None];
@@ -503,56 +510,20 @@ where
     }
 }
 
-trait EolIndentHandlerIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>> + Sized {
-    /// Iterator adapter for mapping keyword-then-colon to key.
-    fn handle_eol_indent(self) -> EolIndentHandler<'a, Self> {
-        EolIndentHandler::new(self)
-    }
-}
-
-impl<'a, I: Iterator<Item = RangedToken<'a>>> EolIndentHandlerIteratorAdaptor<'a> for I {}
-
-struct DropInitialAndEnsureFinalEol<'a, I>
-where
-    I: Iterator<Item = RangedToken<'a>>,
-{
-    iter: I,
-    forced_final_eol_span: Option<Range<usize>>,
-    previous_was_eol: bool,
-    pending: Option<RangedToken<'a>>,
-}
-
-impl<'a, I> DropInitialAndEnsureFinalEol<'a, I>
-where
-    I: Iterator<Item = RangedToken<'a>>,
-{
-    fn new(mut iter: I, forced_final_eol_span: Option<Range<usize>>) -> Self {
-        let first_tok = iter
-            .next()
-            .and_then(|tok| if tok.0 == Token::Eol { None } else { Some(tok) });
-        DropInitialAndEnsureFinalEol {
-            iter,
-            forced_final_eol_span,
-            previous_was_eol: false,
-            pending: first_tok,
-        }
-    }
-}
-
-impl<'a, I> Iterator for DropInitialAndEnsureFinalEol<'a, I>
+impl<'a, I> Iterator for EolIndentHandler<'a, I>
 where
     I: Iterator<Item = RangedToken<'a>>,
 {
     type Item = RangedToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = if self.pending.is_some() {
-            self.pending.take()
+        let next = if self.first_tok.is_some() {
+            self.first_tok.take()
         } else {
-            self.iter.next()
+            self.next_merged()
         };
 
-        match (next, &self.forced_final_eol_span) {
+        match (next, &self.final_eol) {
             (None, Some(span)) => {
                 if !self.previous_was_eol {
                     self.previous_was_eol = true;
@@ -572,21 +543,14 @@ where
     }
 }
 
-trait DropInitialAndEnsureFinalEolIteratorAdaptor<'a>:
-    Iterator<Item = RangedToken<'a>> + Sized
-{
-    fn drop_initial_and_ensure_final_eol(
-        self,
-        forced_final_eol_span: Option<Range<usize>>,
-    ) -> DropInitialAndEnsureFinalEol<'a, Self> {
-        DropInitialAndEnsureFinalEol::new(self, forced_final_eol_span)
+trait EolIndentHandlerIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>> + Sized {
+    /// Iterator adapter for mapping keyword-then-colon to key.
+    fn handle_eol_indent(self, final_eol: Option<Range<usize>>) -> EolIndentHandler<'a, Self> {
+        EolIndentHandler::new(self, final_eol)
     }
 }
 
-impl<'a, I: Iterator<Item = RangedToken<'a>>> DropInitialAndEnsureFinalEolIteratorAdaptor<'a>
-    for I
-{
-}
+impl<'a, I: Iterator<Item = RangedToken<'a>>> EolIndentHandlerIteratorAdaptor<'a> for I {}
 
 fn parse_date(s: &str) -> Result<Date, LexerError> {
     let mut date = s.split(&['-', '/']);
