@@ -386,14 +386,14 @@ fn account_names_with_numbers() {
         r#"
 Assets:Vouchers:99Ranch
 Assets:99Test
-Assets:signals
+Assets:Signals
 "#,
         vec![
             Account("Assets:Vouchers:99Ranch"),
             Eol,
             Account("Assets:99Test"),
             Eol,
-            Account("Assets:signals"),
+            Account("Assets:Signals"),
             Eol,
         ],
     );
