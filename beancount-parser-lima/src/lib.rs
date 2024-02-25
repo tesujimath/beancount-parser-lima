@@ -168,8 +168,10 @@ impl BeancountSources {
                 // ignore any errors in parsing, we'll pick them up in the next pass
                 if let Some(includes) = includes().parse(spanned_tokens).into_output() {
                     for include in includes {
-                        let included_path =
-                            path.as_ref().map_or(PathBuf::from(&include), |parent| {
+                        let included_path = path
+                            .as_ref()
+                            .and_then(|path| path.parent())
+                            .map_or(PathBuf::from(&include), |parent| {
                                 parent.join(include).clean()
                             });
                         if !all_paths.contains(included_path.as_path()) {
