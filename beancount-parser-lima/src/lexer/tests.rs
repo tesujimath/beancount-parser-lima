@@ -1,5 +1,6 @@
 #![cfg(test)]
 use super::{lex, LexerError, Token, Token::*};
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::borrow::Cow;
 use time::format_description::well_known::Iso8601;
@@ -380,6 +381,8 @@ Assets:A
     );
 }
 
+// ANOMALY: The test from original Beancount has account name of `Assets:signals`
+// which is invalid.  Fixed here.
 #[test]
 fn account_names_with_numbers() {
     lex_and_check(
@@ -409,14 +412,73 @@ Equity:Beginning-Balances
     );
 }
 
+// ANOMALY: because Logos doesn't support contextual lexing,
+// we lex the bogus `check` directive as a Key.  Would be rejected by our parser.
 #[test]
-fn stupidly_long_account_names() {
+fn invalid_directive() {
     lex_and_check(
         r#"
-Expenses:Something:AX:BX:CX:DX:EX:FX:GX:HX
+2008-03-01 check Assets:BestBank:Savings 2340.19 USD
 "#,
-        vec![Account("Expenses:Something:AX:BX:CX:DX:EX:FX:GX:HX"), Eol],
+        vec![
+            date("2008-03-01"),
+            Key("check"),
+            Account("Assets:BestBank:Savings"),
+            number!(2340.19),
+            Currency("USD"),
+            Eol,
+        ],
     );
+}
+
+// ANOMALY: our lexer strips the comment leaving nothing, whereas original
+// Beancount replaces it with an Eol token.
+#[test]
+fn comment() {
+    lex_and_check(
+        r#"
+;; This is a typical error that should get detected for long strings.
+2008-03-01
+"#,
+        vec![date("2008-03-01"), Eol],
+    );
+}
+
+#[test]
+fn multiline_string() {
+    lex_and_check(
+        r#"
+"
+I'm a
+multi-line 
+string
+but not too long
+"
+"#,
+        vec![
+            string_literal(
+                r#"
+I'm a
+multi-line 
+string
+but not too long
+"#,
+            ),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: string_too_long is not checked by our lexer, it is a parser feature,
+// because only the parser has access to the option which defines how long is too long
+
+// ANOMALY: we represent numbers as rust_decimal::Decimal, which are 128 bit quantities,
+// not arbitrary precision.
+#[test]
+fn very_long_number() {
+    let long_number_str = String::from_iter(&['1'; 29]);
+    let long_number = Decimal::try_from(long_number_str.as_ref()).unwrap();
+    lex_and_check(long_number_str.as_ref(), vec![Number(long_number), Eol]);
 }
 
 #[test]
