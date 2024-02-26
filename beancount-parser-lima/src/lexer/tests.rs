@@ -458,7 +458,7 @@ fn multiline_string() {
         r#"
 "
 I'm a
-multi-line 
+multi-line
 string
 but not too long
 "
@@ -467,7 +467,7 @@ but not too long
             string_literal(
                 r#"
 I'm a
-multi-line 
+multi-line
 string
 but not too long
 "#,
@@ -504,7 +504,7 @@ fn no_final_newline() {
 // See https://doc.rust-lang.org/std/ascii/fn.escape_default.html
 #[test]
 fn string_escaped() {
-    bare_lex_and_check(
+    lex_and_check(
         r#"
 "The Great \"Juju\""
 "The Great \t\n\r\f\b"
@@ -513,6 +513,297 @@ fn string_escaped() {
             string_literal(r#"The Great "Juju""#),
             Eol,
             string_literal("The Great \t\n\r\x0C\x08"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn string_newline() {
+    let s = format!(r#""The Great\nJuju"{}"#, "\n");
+    lex_and_check(s.as_str(), vec![string_literal("The Great\nJuju"), Eol]);
+}
+
+// ANOMALY: multiline strings include and spaces at he beginning of each line.
+// Original Beancount test suggests that is not the case.
+#[test]
+fn string_newline_long() {
+    lex_and_check(
+        r#"
+    "Forty
+    world
+    leaders
+    and
+    hundreds"
+"#,
+        vec![
+            string_literal("Forty\n    world\n    leaders\n    and\n    hundreds"),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: I am unsure what StringNewlineTooLong is trying to test, so I ignored it.
+
+// ANOMALY: Omitted InvalidCharacter test, as Rust prevents generation of such a malformed string
+
+#[test]
+fn popmeta() {
+    lex_and_check(
+        r#"
+    popmeta location:
+"#,
+        vec![Popmeta, Key("location"), Colon, Eol],
+    );
+}
+
+#[test]
+fn true_false_null() {
+    lex_and_check(
+        r#"
+    TRUE FALSE NULL
+"#,
+        vec![True, False, Null, Eol],
+    );
+}
+
+#[test]
+fn valid_commas_in_number() {
+    lex_and_check(
+        r#"
+    45,234.00
+"#,
+        vec![number!(45234), Eol],
+    );
+}
+
+// ANOMALY: We're stricter about commas than original Beancount, so this lexes differently
+// ANOMALY: There seems to be a Logos bug here, which is why the comma gets eaten by the 452.
+// Logos issue: [Incorrectly matched token slice](https://github.com/maciejhirsz/logos/issues/256)
+#[test]
+fn invalid_commas_in_integer() {
+    lex_and_check(
+        r#"
+    452,34.00
+"#,
+        vec![
+            number!(452),
+            // should get a comma token here:
+            // Comma,
+            number!(34.0),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn invalid_commas_in_fractional() {
+    lex_and_check(
+        r#"
+    45234.000,000
+"#,
+        vec![number!(45234.0), Comma, number!(0), Eol],
+    );
+}
+
+#[test]
+fn ignored_lines_comment() {
+    lex_and_check(
+        r#"
+    ;; Long comment line about something something.
+"#,
+        vec![Eol],
+    );
+}
+
+// ANOMALY: we handle indent before discarded line differently from original Beancount
+#[test]
+fn ignored_lines_indented_comment() {
+    lex_and_check(
+        r#"
+option "title" "The Title"
+      ;; Something something.
+
+"#,
+        vec![
+            Option,
+            string_literal("title"),
+            string_literal("The Title"),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: unrecognized tokens are returned per character, not per-word
+// and we lex lowercase words as keys even without trailing colons (as Logos
+// can't do trailing context).
+#[test]
+fn ignored_lines_non_comment_ignored() {
+    lex_and_check(
+        r#"
+    Regular prose appearing mid-file.
+"#,
+        vec![
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            Key("prose"),
+            Key("appearing"),
+            Key("mid-file"),
+            unrecognized(),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: as above with keys
+#[test]
+fn ignored_lines_non_comment_non_flag() {
+    lex_and_check(
+        r#"
+    Xxx this sentence starts with a non-flag character.
+"#,
+        vec![
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            Key("this"),
+            Key("sentence"),
+            Key("starts"),
+            Key("with"),
+            unrecognized(),
+            Key("non-flag"),
+            Key("character"),
+            unrecognized(),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: To ignore a line starting with an flag there must be no leading space.
+// I am unsure whether this is OK or not, but it's tricky to replicate the existing
+// functionality because of the ambiguous token matching for indent #tag,
+// which must lex as a tag and not an ignored line.
+#[test]
+fn ignored_lines_non_comment_org_mode_title() {
+    lex_and_check(
+        r#"
+* This sentence is an org-mode title.
+"#,
+        vec![Eol],
+    );
+}
+
+// ANOMALY: no whitespace prefix allowed here, see `ignored_lines_non_comment_org_mode_title`
+#[test]
+fn ignored_lines_non_comment_org_mode_drawer() {
+    lex_and_check(
+        r#"
+:PROPERTIES:
+:this: is an org-mode property drawer
+:END:
+"#,
+        vec![Eol],
+    );
+}
+
+// ANOMALY: gets lexed differently, and with unrecognized per character not per word
+#[test]
+fn lexer_error_invalid_text() {
+    lex_and_check(
+        r#"
+    Not a Beancount file.
+"#,
+        vec![
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            unrecognized(),
+            Key("file"),
+            unrecognized(),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn lexer_error_invalid_token() {
+    lex_and_check(
+        r#"
+    2000-01-01 open ` USD
+"#,
+        vec![
+            date("2000-01-01"),
+            Open,
+            unrecognized(),
+            Currency("USD"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn lexer_error_recovery() {
+    lex_and_check(
+        r#"
+    2000-13-32 open Assets:Something
+    2000-01-02 open Assets:Working
+"#,
+        vec![
+            error("month out of range"),
+            Open,
+            Account("Assets:Something"),
+            Eol,
+            Indent,
+            date("2000-01-02"),
+            Open,
+            Account("Assets:Working"),
+            Eol,
+        ],
+    );
+}
+
+// ANOMALY: why are the single quotes escaped in original lexer?
+#[test]
+fn lexer_error_substring_with_quotes() {
+    lex_and_check(
+        r#"
+    2016-07-15 query "hotels" "SELECT * WHERE account ~ 'Expenses:Accommodation'"
+"#,
+        vec![
+            date("2016-07-15"),
+            Query,
+            string_literal("hotels"),
+            string_literal("SELECT * WHERE account ~ 'Expenses:Accommodation'"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn unicode_utf8() {
+    lex_and_check(
+        r#"
+    2015-05-23 note Assets:Something "a¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼ z"
+"#,
+        vec![
+            date("2015-05-23"),
+            Note,
+            Account("Assets:Something"),
+            string_literal("a¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼ z"),
             Eol,
         ],
     );
