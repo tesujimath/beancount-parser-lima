@@ -1,4 +1,6 @@
 #![cfg(test)]
+use crate::bare_lex;
+
 use super::{lex, LexerError, Token, Token::*};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -33,6 +35,12 @@ fn error(s: &'static str) -> Token<'static> {
 
 fn lex_and_check(s: &str, expected: Vec<Token>) {
     let actual = lex(s).map(|(tok, _span)| tok).collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}
+
+fn bare_lex_and_check(s: &str, expected: Vec<Token>) {
+    let actual = bare_lex(s).map(|(tok, _span)| tok).collect::<Vec<_>>();
 
     assert_eq!(actual, expected);
 }
@@ -479,6 +487,35 @@ fn very_long_number() {
     let long_number_str = String::from_iter(&['1'; 29]);
     let long_number = Decimal::try_from(long_number_str.as_ref()).unwrap();
     lex_and_check(long_number_str.as_ref(), vec![Number(long_number), Eol]);
+}
+
+// ANOMALY: very_long_string is a parser test for us
+
+// ANOMALY: default lexer adds a final newline; if this is not desired, use `bare_lex`
+#[test]
+fn no_final_newline() {
+    bare_lex_and_check(
+        r#"2014-01-01 open Assets:Temporary    "#,
+        vec![date("2014-01-01"), Open, Account("Assets:Temporary")],
+    );
+}
+
+// ANOMALY: our string unescaper is slightly different from abseil CUnescape, which does C style escapes.
+// See https://doc.rust-lang.org/std/ascii/fn.escape_default.html
+#[test]
+fn string_escaped() {
+    bare_lex_and_check(
+        r#"
+"The Great \"Juju\""
+"The Great \t\n\r\f\b"
+"#,
+        vec![
+            string_literal(r#"The Great "Juju""#),
+            Eol,
+            string_literal("The Great \t\n\r\x0C\x08"),
+            Eol,
+        ],
+    );
 }
 
 #[test]

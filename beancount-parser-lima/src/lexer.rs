@@ -9,6 +9,7 @@ use std::{
     str::FromStr,
 };
 use time::{Date, Month, Time};
+use unescaper::unescape;
 
 // when adjusting any of these regexes, be sure to check whether `RecoveryToken` needs the same
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
@@ -631,15 +632,13 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
     Time::from_hms(hour, min, sec).or(Err(LexerError::new("time out of range")))
 }
 
+// Unescape string literal using the inverse of std::ascii::escape_default
+// https://doc.rust-lang.org/std/ascii/fn.escape_default.html
 fn unescape_string_literal(s: &str) -> Result<Cow<str>, LexerError> {
     if s.contains('\\') {
-        // TODO be more careful here to check for malformed backslash escapes - maybe there's a crate for this?
-        Ok(Cow::Owned(
-            s.replace("\\n", "\n")
-                .replace("\\t", "\t")
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\"),
-        ))
+        unescape(s)
+            .map(Cow::Owned)
+            .map_err(|e| LexerError::new(e.to_string()))
     } else {
         Ok(Cow::Borrowed(s))
     }
