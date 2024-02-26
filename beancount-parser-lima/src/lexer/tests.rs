@@ -524,7 +524,7 @@ fn string_newline() {
     lex_and_check(s.as_str(), vec![string_literal("The Great\nJuju"), Eol]);
 }
 
-// ANOMALY: multiline strings include and spaces at he beginning of each line.
+// ANOMALY: multiline strings include and spaces at the beginning of each line.
 // Original Beancount test suggests that is not the case.
 #[test]
 fn string_newline_long() {
@@ -687,7 +687,7 @@ fn ignored_lines_non_comment_non_flag() {
 // ANOMALY: To ignore a line starting with an flag there must be no leading space.
 // I am unsure whether this is OK or not, but it's tricky to replicate the existing
 // functionality because of the ambiguous token matching for indent #tag,
-// which must lex as a tag and not an ignored line.
+// which must lex as a tag and not an ignored line.  Also postings with flags.
 #[test]
 fn ignored_lines_non_comment_org_mode_title() {
     lex_and_check(
@@ -698,14 +698,14 @@ fn ignored_lines_non_comment_org_mode_title() {
     );
 }
 
-// ANOMALY: no whitespace prefix allowed here, see `ignored_lines_non_comment_org_mode_title`
+// whitespace prefix *is* allowed here
 #[test]
 fn ignored_lines_non_comment_org_mode_drawer() {
     lex_and_check(
         r#"
-:PROPERTIES:
-:this: is an org-mode property drawer
-:END:
+    :PROPERTIES:
+    :this: is an org-mode property drawer
+    :END:
 "#,
         vec![Eol],
     );
