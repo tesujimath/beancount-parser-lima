@@ -974,6 +974,14 @@ pub struct Account<'a> {
 }
 
 impl<'a> Account<'a> {
+    ///constructor
+    pub fn new(account_type: AccountType, subaccount: Subaccount) -> Account {
+        Account {
+            account_type,
+            subaccount,
+        }
+    }
+
     /// Field accessor.
     pub fn account_type(&self) -> AccountType {
         self.account_type
@@ -1739,6 +1747,12 @@ impl ExprValue {
     /// Field accessor.
     pub fn value(&self) -> Decimal {
         self.value
+    }
+}
+
+impl PartialEq<Decimal> for ExprValue {
+    fn eq(&self, other: &Decimal) -> bool {
+        &self.value == other
     }
 }
 
