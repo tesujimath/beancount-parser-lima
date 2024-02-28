@@ -1062,6 +1062,12 @@ impl<'a> AsRef<str> for AccountTypeName<'a> {
     }
 }
 
+impl<'a> PartialEq<&str> for AccountTypeName<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
 impl<'a> Display for AccountTypeName<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -1128,6 +1134,12 @@ impl<'a> ElementType for AccountName<'a> {
 impl<'a> AsRef<str> for AccountName<'a> {
     fn as_ref(&self) -> &str {
         self.0
+    }
+}
+
+impl<'a> PartialEq<&str> for AccountName<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
     }
 }
 
@@ -1226,6 +1238,12 @@ impl<'a> ElementType for Currency<'a> {
 impl<'a> AsRef<str> for Currency<'a> {
     fn as_ref(&self) -> &str {
         self.0
+    }
+}
+
+impl<'a> PartialEq<&str> for Currency<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
     }
 }
 
@@ -1543,6 +1561,12 @@ impl<'a> AsRef<str> for Tag<'a> {
     }
 }
 
+impl<'a> PartialEq<&str> for Tag<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
 impl<'a> Display for Tag<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "#{}", self.0 .0)
@@ -1570,6 +1594,12 @@ impl<'a> TryFrom<&'a str> for Link<'a> {
 impl<'a> ElementType for Link<'a> {
     fn element_type(&self) -> &'static str {
         "link"
+    }
+}
+
+impl<'a> PartialEq<&str> for Link<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
     }
 }
 
@@ -1639,6 +1669,12 @@ impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
     }
 }
 
+impl<'a> PartialEq<&str> for TagOrLinkIdentifier<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
 /// A key for a [Metadata] [MetaValue].
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Key<'a>(&'a str);
@@ -1662,6 +1698,12 @@ impl<'a> AsRef<str> for Key<'a> {
 impl<'a> ElementType for Key<'a> {
     fn element_type(&self) -> &'static str {
         "key"
+    }
+}
+
+impl<'a> PartialEq<&str> for Key<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
     }
 }
 
