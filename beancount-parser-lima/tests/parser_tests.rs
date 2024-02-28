@@ -5,8 +5,8 @@ use std::{
 
 use ::beancount_parser_lima as lima;
 use lima::{
-    Account, AccountName, AccountType, BeancountParser, BeancountSources, DirectiveVariant, Flag,
-    ParseError, ParseSuccess, Spanned, Subaccount,
+    Account, AccountName, AccountType, BeancountParser, BeancountSources, Flag, ParseError,
+    ParseSuccess, Spanned, Subaccount,
 };
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -32,36 +32,27 @@ fn parser_basic_testing() {
     {
         match parser.parse() {
             Ok(ParseSuccess { directives, .. }) => {
-                use DirectiveVariant::*;
+                let expected = vec![Directive::new(
+                    "2014-01-27",
+                    DirectiveVariant::Transaction(
+                        Transaction::new(
+                            Flag::Asterisk,
+                            vec![
+                                Posting::new("Liabilities:US:Amex:BlueCash")
+                                    .amount(dec!(-22.02))
+                                    .currency("USD"),
+                                Posting::new("Expenses:Food:Grocery")
+                                    .amount(dec!(22.02))
+                                    .currency("USD"),
+                            ],
+                        )
+                        .narration("UNION MARKET"),
+                    ),
+                )];
 
-                assert_eq!(directives.len(), 1);
-                let d0 = &directives[0];
-
-                // assert_eq!(
-                //     *d0.date().item(),
-                //     Date::from_calendar_date(2014, Month::January, 27).unwrap()
-                // );
-
-                eq_date(d0.date(), date("2014-01-27"));
-
-                if let Transaction(t0) = d0.variant() {
-                    eq_flag(t0.flag(), Flag::Asterisk);
-                    eq(t0.flag(), Flag::Asterisk);
-
-                    eq_option(t0.payee(), None);
-
-                    // assert_eq!(t0.narration().map(|n| *n.item()), Some("UNION MARKET"));
-                    eq_option(t0.narration(), Some("UNION MARKET"));
-
-                    assert_eq!(t0.postings().len(), 2);
-                    t0.postings().collect::<Vec<_>>().is(vec![
-                        Posting::new("Liabilities:US:Amex:BlueCash")
-                            .amount(dec!(-22.02))
-                            .currency("USD"),
-                        Posting::new("Expenses:Food:Grocery")
-                            .amount(dec!(22.02))
-                            .currency("USD"),
-                    ]);
+                assert_eq!(directives.len(), expected.len(), "directives.len()");
+                for (actual, expected) in directives.iter().zip(expected.iter()) {
+                    actual.expect_eq(expected);
                 }
             }
             Err(ParseError { errors, .. }) => {
@@ -73,11 +64,61 @@ fn parser_basic_testing() {
     check(&sources, &parser, &stderr());
 }
 
-trait Checker<E> {
-    fn is(self, expected: E);
+trait ExpectEq<Rhs>
+where
+    Rhs: ?Sized,
+{
+    fn expect_eq(&self, expected: &Rhs);
 }
 
-pub struct Transaction {
+#[derive(Debug)]
+struct Directive {
+    pub(crate) date: Date,
+    pub(crate) metadata: Metadata,
+    pub(crate) variant: DirectiveVariant,
+}
+
+impl Directive {
+    fn new(date: &str, variant: DirectiveVariant) -> Self {
+        Directive {
+            date: date_from_string(date),
+            metadata: Metadata::default(),
+            variant,
+        }
+    }
+}
+
+impl<'a> ExpectEq<Directive> for Spanned<lima::Directive<'a>> {
+    fn expect_eq(&self, expected: &Directive) {
+        use DirectiveVariant::*;
+
+        assert_eq!(self.date().item(), &expected.date);
+        match (self.variant(), &expected.variant) {
+            (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
+                variant.expect_eq(other);
+            }
+            _ => panic!("mismatched directive variant"),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum DirectiveVariant {
+    Transaction(Transaction),
+    // Price(Price),
+    // Balance(Balance),
+    // Open(Open),
+    // Close(Close),
+    // Commodity(Commodity),
+    // Pad(Pad),
+    // Document(Document),
+    // Note(Note),
+    // Event(Event),
+    // Query(Query),
+}
+
+#[derive(Debug)]
+struct Transaction {
     flag: Flag,
     payee: Option<&'static str>,
     narration: Option<&'static str>,
@@ -109,7 +150,19 @@ impl Transaction {
     }
 }
 
-pub struct Price {
+impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
+    fn expect_eq(&self, expected: &Transaction) {
+        self.flag().expect_eq(&expected.flag);
+        self.payee().expect_eq(&expected.payee);
+        self.narration().expect_eq(&expected.narration);
+        self.postings()
+            .collect::<Vec<_>>()
+            .expect_eq(&expected.postings);
+    }
+}
+
+#[derive(Debug)]
+struct Price {
     currency: &'static str,
     amount: Amount,
 }
@@ -120,9 +173,10 @@ impl Price {
     }
 }
 
-pub struct Posting {
+#[derive(Debug)]
+struct Posting {
     flag: Option<Flag>,
-    account: &'static str,
+    account: Account<'static>,
     amount: Option<Decimal>,
     currency: Option<&'static str>,
     cost_spec: Option<CostSpec>,
@@ -131,10 +185,10 @@ pub struct Posting {
 }
 
 impl Posting {
-    fn new(account: &'static str) -> Self {
+    fn new(account_str: &'static str) -> Self {
         Posting {
             flag: None,
-            account,
+            account: account(account_str),
             amount: None,
             currency: None,
             cost_spec: None,
@@ -165,7 +219,30 @@ impl Posting {
     }
 }
 
-pub struct Amount {
+impl<'a> ExpectEq<Posting> for Spanned<lima::Posting<'a>> {
+    fn expect_eq(&self, expected: &Posting) {
+        self.flag().expect_eq(&expected.flag);
+        self.account().expect_eq(&expected.account);
+        self.amount().expect_eq(&expected.amount);
+        self.currency().expect_eq(&expected.currency);
+        // TODO
+        // self.cost_spec().is(cost_spec);
+        // self.price_annotation().is(price_annotation);
+        // self.metadata().is(metadata);
+    }
+}
+
+impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a Spanned<lima::Posting<'a>>> {
+    fn expect_eq(&self, expected: &Vec<Posting>) {
+        assert_eq!(self.len(), expected.len(), "postings.len");
+        for (actual, expected) in self.iter().zip(expected.iter()) {
+            actual.expect_eq(expected)
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Amount {
     number: Decimal,
     currency: &'static str,
 }
@@ -176,53 +253,8 @@ impl Amount {
     }
 }
 
-impl<'a> Checker<Transaction> for &'a lima::Transaction<'a> {
-    fn is(self, expected: Transaction) {
-        let Transaction {
-            flag,
-            payee,
-            narration,
-            postings,
-        } = expected;
-
-        self.flag().is(flag);
-    }
-}
-
-impl<'a> Checker<Posting> for &'a Spanned<lima::Posting<'a>> {
-    fn is(self, expected: Posting) {
-        let Posting {
-            flag,
-            account,
-            amount,
-            currency: cur,
-            cost_spec,
-            price_annotation,
-            metadata,
-        } = expected;
-        self.flag().is(flag);
-        // self.account().is(account);
-        self.amount().is(amount);
-        self.currency().is(cur.map(|c| currency(c)));
-        // TODO
-        // self.cost_spec().is(cost_spec);
-        // self.price_annotation().is(price_annotation);
-        // self.metadata().is(metadata);
-    }
-}
-
-impl<'a> Checker<Vec<Posting>> for Vec<&'a Spanned<lima::Posting<'a>>> {
-    fn is(self, expected: Vec<Posting>) {
-        assert_eq!(self.len(), expected.len());
-
-        for (actual, expected) in self.into_iter().zip(expected.into_iter()) {
-            actual.is(expected);
-        }
-    }
-}
-
-impl<'a> Checker<&'static str> for &'a Account<'a> {
-    fn is(self, expected: &'static str) {
+impl<'a> ExpectEq<str> for Account<'a> {
+    fn expect_eq(&self, expected: &str) {
         assert_eq!(self, &account(expected));
     }
 }
@@ -246,88 +278,39 @@ fn currency(s: &str) -> lima::Currency {
 }
 
 // TODO
-pub struct CostSpec();
-pub struct ScopedAmount();
+#[derive(Debug)]
+struct CostSpec();
+#[derive(Debug)]
+struct ScopedAmount();
 
-#[derive(Default)]
-pub struct Metadata();
+#[derive(Default, Debug)]
+struct Metadata();
 
-fn eq_date(actual: &Date, expected: Date) {
-    assert_eq!(*actual, expected);
-}
-
-fn eq_flag(actual: &Flag, expected: Flag) {
-    assert_eq!(*actual, expected);
-}
-
-// TODO this probably isn't what I want to do
-fn eq<T>(actual: &Spanned<T>, expected: T)
-where
-    T: Eq + Debug,
-{
-    assert_eq!(actual.item(), &expected);
-}
-
-impl<T, E> Checker<E> for &Spanned<T>
+impl<T, E> ExpectEq<E> for Spanned<T>
 where
     T: PartialEq<E> + Debug,
     E: Debug,
 {
-    fn is(self, expected: E) {
-        assert_eq!(self.item(), &expected);
+    fn expect_eq(&self, expected: &E) {
+        assert_eq!(self.item(), expected);
     }
 }
 
-impl<T, E> Checker<Option<E>> for Option<&Spanned<T>>
+impl<T, E> ExpectEq<Option<E>> for Option<&Spanned<T>>
 where
     T: PartialEq<E> + Debug,
     E: Debug,
 {
-    fn is(self, expected: Option<E>) {
+    fn expect_eq(&self, expected: &Option<E>) {
         match (self, expected) {
             (None, None) => (),
-            (Some(actual), Some(ref expected)) => {
-                assert_eq!(actual.item(), expected);
-            }
+            (Some(actual), Some(ref expected)) => assert_eq!(actual.item(), expected),
             (Some(actual), None) => panic!("expected None got {:?}", actual.item()),
             (None, Some(ref expected)) => panic!("expected {:?} got None", expected),
         }
     }
 }
 
-// impl<T> Checker for Option<T>
-// where
-//     T: Eq + Debug,
-// {
-//     type Expected = Option<T>;
-
-//     fn is(self, expected: Self::Expected) {
-//         assert_eq!(self, expected);
-//         // match (self, expected) {
-//         //     (None, None) => (),
-//         //     (Some(actual), Some(expected)) => {
-//         //         assert_eq!(actual, expected);
-//         //     }
-//         //     (Some(actual), None) => panic!("expected None got {:?}", actual.item()),
-//         //     (None, Some(ref expected)) => panic!("expected {:?} got None", expected),
-//         // }
-//     }
-// }
-
-fn eq_option<T>(actual: Option<&Spanned<T>>, expected: Option<T>)
-where
-    T: Eq + Debug,
-{
-    match (actual, expected) {
-        (None, None) => (),
-        (Some(actual), Some(ref expected)) => {
-            assert_eq!(actual.item(), expected);
-        }
-        (Some(actual), None) => panic!("expected None got {:?}", actual.item()),
-        (None, Some(ref expected)) => panic!("expected {:?} got None", expected),
-    }
-}
-
-fn date(s: &str) -> Date {
+fn date_from_string(s: &str) -> Date {
     time::Date::parse(s, &Iso8601::DEFAULT).unwrap()
 }
