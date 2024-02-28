@@ -2,11 +2,55 @@
 #![allow(dead_code)]
 
 use ::beancount_parser_lima as lima;
-use lima::{Account, AccountName, AccountType, Flag, Spanned, Subaccount};
+use lima::{
+    Account, AccountName, AccountType, BeancountParser, BeancountSources, Flag, ParseError,
+    ParseSuccess, Spanned, Subaccount,
+};
 use rust_decimal::Decimal;
-use std::fmt::Debug;
-use std::str::FromStr;
+use std::{fmt::Debug, str::FromStr};
 use time::{format_description::well_known::Iso8601, Date};
+
+pub fn check(sources: &BeancountSources, parser: &BeancountParser, expected: Vec<Directive>) {
+    let stderr = &std::io::stderr();
+    match parser.parse() {
+        Ok(ParseSuccess { directives, .. }) => {
+            assert_eq!(directives.len(), expected.len(), "directives.len()");
+            for (actual, expected) in directives.iter().zip(expected.iter()) {
+                actual.expect_eq(expected);
+            }
+        }
+        Err(ParseError { errors, .. }) => {
+            let n_errors = errors.len();
+            sources.write(stderr, errors).unwrap();
+            panic!("parse failed with {} errors", n_errors);
+        }
+    }
+}
+
+pub fn check_errors(
+    _sources: &BeancountSources,
+    parser: &BeancountParser,
+    expected: Vec<&'static str>,
+) {
+    match parser.parse() {
+        Ok(ParseSuccess { directives, .. }) => {
+            let n_directives = directives.len();
+            for directive in directives {
+                eprintln!("{}\n", &directive);
+            }
+            panic!(
+                "parse unexpectedly succeeded with {} directives",
+                n_directives
+            );
+        }
+        Err(ParseError { errors, .. }) => {
+            assert_eq!(errors.len(), expected.len(), "errors.len()");
+            for (actual, expected) in errors.iter().zip(expected.iter()) {
+                assert_eq!(actual.message(), *expected);
+            }
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! check_parse {
@@ -16,28 +60,21 @@ macro_rules! check_parse {
                 let sources = BeancountSources::from(source_val);
                 let parser = BeancountParser::new(&sources);
 
-                fn check<W>(
-                    sources: &BeancountSources,
-                    parser: &BeancountParser,
-                    expected: Vec<Directive>,
-                    w: W,
-                ) where
-                    W: Write + Copy,
-                {
-                    match parser.parse() {
-                        Ok(ParseSuccess { directives, .. }) => {
-                            assert_eq!(directives.len(), expected.len(), "directives.len()");
-                            for (actual, expected) in directives.iter().zip(expected.iter()) {
-                                actual.expect_eq(expected);
-                            }
-                        }
-                        Err(ParseError { errors, .. }) => {
-                            sources.write(w, errors).unwrap();
-                        }
-                    }
-                }
+                check(&sources, &parser, expected_val);
+            }
+        }
+    }};
+}
 
-                check(&sources, &parser, expected_val, &stderr());
+#[macro_export]
+macro_rules! check_parse_errors {
+    ($source:expr, $expected:expr) => {{
+        match ($source, $expected) {
+            (source_val, expected_val) => {
+                let sources = BeancountSources::from(source_val);
+                let parser = BeancountParser::new(&sources);
+
+                check_errors(&sources, &parser, expected_val);
             }
         }
     }};

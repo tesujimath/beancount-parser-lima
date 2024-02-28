@@ -119,6 +119,10 @@ where
         e
     }
 
+    pub fn message(&self) -> &str {
+        self.message.as_str()
+    }
+
     pub(crate) fn related_to_named_span<S>(self, name: S, span: Span) -> Self
     where
         S: ToString,
