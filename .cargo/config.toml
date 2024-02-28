@@ -1,0 +1,3 @@
+[env]
+# version of Beancount used for protobuf schema
+BEANCOUNT_PROTO_VERSION = "master"

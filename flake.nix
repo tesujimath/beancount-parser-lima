@@ -39,6 +39,9 @@
                 rust-bin.stable.latest.default
                 rustfmt
 
+                # for protoc, used for parser test schema
+                protobuf
+
                 # for Python bindings
                 maturin
                 python3
