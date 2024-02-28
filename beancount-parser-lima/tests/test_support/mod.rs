@@ -113,7 +113,13 @@ impl<'a> ExpectEq<Directive> for Spanned<lima::Directive<'a>> {
             (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
                 variant.expect_eq(other);
             }
-            _ => panic!("mismatched directive variant"),
+            (lima::DirectiveVariant::Balance(variant), Balance(ref other)) => {
+                variant.expect_eq(other);
+            }
+            _ => panic!(
+                "mismatched directive variant: got {}, expected {:?}",
+                self, &expected
+            ),
         }
     }
 }
@@ -122,7 +128,7 @@ impl<'a> ExpectEq<Directive> for Spanned<lima::Directive<'a>> {
 pub enum DirectiveVariant {
     Transaction(Transaction),
     // Price(Price),
-    // Balance(Balance),
+    Balance(Balance),
     // Open(Open),
     // Close(Close),
     // Commodity(Commodity),
@@ -178,6 +184,32 @@ impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
         self.postings()
             .collect::<Vec<_>>()
             .expect_eq(&expected.postings);
+    }
+}
+
+#[derive(Debug)]
+pub struct Balance {
+    account: Account<'static>,
+    atol: AmountWithTolerance,
+}
+
+pub fn balance(account_str: &'static str, atol: AmountWithTolerance) -> Balance {
+    Balance {
+        account: account(account_str),
+        atol,
+    }
+}
+
+impl Balance {
+    pub fn date(self, date: &str) -> Directive {
+        Directive::new(date, DirectiveVariant::Balance(self))
+    }
+}
+
+impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
+    fn expect_eq(&self, expected: &Balance) {
+        self.account().expect_eq(&expected.account);
+        self.atol().expect_eq(&expected.atol);
     }
 }
 
@@ -262,14 +294,48 @@ impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a Spanned<lima::Posting<'a>>> {
 }
 
 #[derive(Debug)]
-struct Amount {
+pub struct Amount {
     number: Decimal,
     currency: &'static str,
 }
 
+pub fn amount(number: Decimal, currency: &'static str) -> Amount {
+    Amount { number, currency }
+}
+
 impl Amount {
-    fn new(number: Decimal, currency: &'static str) -> Self {
-        Amount { number, currency }
+    pub fn with_tolerance(self, tolerance: Decimal) -> AmountWithTolerance {
+        AmountWithTolerance {
+            amount: self,
+            tolerance: Some(tolerance),
+        }
+    }
+
+    pub fn with_no_tolerance(self) -> AmountWithTolerance {
+        AmountWithTolerance {
+            amount: self,
+            tolerance: None,
+        }
+    }
+}
+
+impl<'a> ExpectEq<Amount> for Spanned<lima::Amount<'a>> {
+    fn expect_eq(&self, expected: &Amount) {
+        self.number().expect_eq(&expected.number);
+        self.currency().expect_eq(&expected.currency);
+    }
+}
+
+#[derive(Debug)]
+pub struct AmountWithTolerance {
+    amount: Amount,
+    tolerance: Option<Decimal>,
+}
+
+impl<'a> ExpectEq<AmountWithTolerance> for Spanned<lima::AmountWithTolerance<'a>> {
+    fn expect_eq(&self, expected: &AmountWithTolerance) {
+        self.amount().expect_eq(&expected.amount);
+        self.tolerance().expect_eq(&expected.tolerance);
     }
 }
 

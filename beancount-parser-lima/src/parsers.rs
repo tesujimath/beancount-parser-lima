@@ -818,13 +818,21 @@ pub(crate) fn amount_with_tolerance<'src, I>(
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    group((
-        amount().map_with(spanned_extra),
-        just(Token::Tilde)
-            .ignore_then(decimal().map_with(spanned_extra))
-            .or_not(),
+    choice((
+        amount().map_with(|amount, e| AmountWithTolerance::new((spanned_extra(amount, e), None))),
+        group((
+            expr_value().map_with(spanned_extra),
+            just(Token::Tilde),
+            decimal().map_with(spanned_extra),
+            currency().map_with(spanned_extra),
+        ))
+        .map_with(|(number, _, tolerance, currency), e| {
+            AmountWithTolerance::new((
+                spanned_extra(Amount::new((number, currency)), e),
+                Some(tolerance),
+            ))
+        }),
     ))
-    .map(AmountWithTolerance::new)
 }
 
 pub(crate) fn loose_amount<'src, I>() -> impl Parser<'src, I, LooseAmount<'src>, Extra<'src>>

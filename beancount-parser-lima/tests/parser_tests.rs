@@ -81,7 +81,51 @@ fn parser_entry_types_transaction_three_strings() {
     )
 }
 
-use crate::test_support::{check, check_errors, posting, transaction};
+#[test]
+fn parser_entry_types_transaction_with_txn_keyword() {
+    check_parse!(
+        r#"
+2013-05-18 txn "Nice dinner at Mermaid Inn"
+    Expenses:Restaurant         100 USD
+    Assets:US:Cash             -100 USD
+"#,
+        vec![transaction(
+            Flag::Asterisk,
+            vec![
+                posting("Expenses:Restaurant")
+                    .amount(dec!(100))
+                    .currency("USD"),
+                posting("Assets:US:Cash").amount(dec!(-100)).currency("USD"),
+            ],
+        )
+        .narration("Nice dinner at Mermaid Inn")
+        .date("2013-05-18"),]
+    )
+}
+
+#[test]
+fn parser_entry_types_balance() {
+    check_parse!(
+        r#"
+2013-05-18 balance Assets:US:BestBank:Checking  200 USD
+2013-05-18 balance Assets:US:BestBank:Checking  200 ~ 0.002 USD
+"#,
+        vec![
+            balance(
+                "Assets:US:BestBank:Checking",
+                amount(dec!(200), "USD").with_no_tolerance()
+            )
+            .date("2013-05-18"),
+            balance(
+                "Assets:US:BestBank:Checking",
+                amount(dec!(200), "USD").with_tolerance(dec!(0.002))
+            )
+            .date("2013-05-18"),
+        ]
+    )
+}
+
+use crate::test_support::{amount, balance, check, check_errors, posting, transaction};
 use ::beancount_parser_lima as lima;
 use lima::{BeancountParser, BeancountSources, Flag};
 use rust_decimal_macros::dec;
