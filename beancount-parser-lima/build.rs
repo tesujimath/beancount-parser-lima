@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn clone_beancount() -> Option<PathBuf> {
+fn fetch_beancount_proto() -> Option<PathBuf> {
     use VarError::*;
 
     match env::var("BEANCOUNT_PROTO_VERSION") {
@@ -21,24 +21,25 @@ fn clone_beancount() -> Option<PathBuf> {
             println!("cargo:rerun-if-changed=.cargo/config.toml");
 
             let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
-            let beancount_dir = out_dir.join(format!("beancount-{}", version));
+            let beancount_repo_dir: PathBuf = format!("beancount-{}", version).into();
+            let beancount_repo_path = out_dir.join(beancount_repo_dir.as_path());
 
-            if Path::exists(&beancount_dir) {
-                Some(beancount_dir)
+            if Path::exists(&beancount_repo_path) {
+                Some(beancount_repo_path)
             } else {
-                let beancount_dir_string = beancount_dir.to_string_lossy();
+                let beancount_repo_path_str = beancount_repo_path.to_string_lossy();
                 let git_args = [
                     "clone",
                     "--filter=blob:none",
                     "--branch",
                     version.as_ref(),
                     "https://github.com/beancount/beancount.git",
-                    beancount_dir_string.as_ref(),
+                    beancount_repo_path_str.as_ref(),
                 ];
                 match std::process::Command::new("git").args(git_args).output() {
                     Ok(output) => {
                         if output.status.success() {
-                            Some(beancount_dir)
+                            Some(beancount_repo_path)
                         } else {
                             println!(
                                 "cargo:warning=git {:?} failed: {}",
@@ -60,9 +61,24 @@ fn clone_beancount() -> Option<PathBuf> {
 }
 
 fn main() -> std::io::Result<()> {
-    if let Some(beancount_dir) = clone_beancount() {
-        let proto_path = beancount_dir.join("beancount/ccore/data.proto");
-        prost_build::compile_protos(&[proto_path], &[beancount_dir])?;
+    if let Some(beancount_repo_path) = fetch_beancount_proto() {
+        // println!(
+        //     "cargo:warning=generating protobuf for repo directory {:?}",
+        //     &beancount_repo_path
+        // );
+
+        protobuf_codegen::Codegen::new()
+            .protoc()
+            .include(beancount_repo_path.as_path())
+            .input(beancount_repo_path.join("beancount/cparser/options.proto"))
+            .input(beancount_repo_path.join("beancount/cparser/inter.proto"))
+            .input(beancount_repo_path.join("beancount/cparser/ledger.proto"))
+            .input(beancount_repo_path.join("beancount/ccore/date.proto"))
+            .input(beancount_repo_path.join("beancount/ccore/precision.proto"))
+            .input(beancount_repo_path.join("beancount/ccore/number.proto"))
+            .input(beancount_repo_path.join("beancount/ccore/data.proto"))
+            .cargo_out_dir("proto")
+            .run_from_script();
     }
 
     Ok(())

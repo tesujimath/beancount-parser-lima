@@ -28,7 +28,7 @@ lazy_format = "2.0.0"
 logos = "0.13.0"
 path-clean = "1.0.1"
 proptest = "1.2.0"
-prost = "0.12.3"
+protobuf = "3.4.0"
 rust_decimal = "1.29.1"
 rust_decimal_macros = "1.29.1"
 smallvec = "2.0.0-alpha.3"
@@ -44,4 +44,4 @@ test-case = "3.1.0"
 time = { version = "0.3.28", features = ["parsing"] }
 
 [build-dependencies]
-prost-build = "0.12.3"
+protobuf-codegen = "3.4.0"
