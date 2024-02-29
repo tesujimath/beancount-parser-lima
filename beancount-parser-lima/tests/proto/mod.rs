@@ -1,5 +1,13 @@
 use ::beancount_parser_lima as lima;
+use beancount::{
+    data::{Amount, Balance, Directive},
+    date::Date,
+    ledger::Ledger,
+    number::Number,
+};
 use lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned};
+use rust_decimal::Decimal;
+use std::{borrow::ToOwned, fmt::Display, rc::Rc, str::FromStr};
 
 fn check_proto(sources: &BeancountSources, parser: &BeancountParser, expected: &str) {
     let stderr = &std::io::stderr();
@@ -18,8 +26,12 @@ fn check_proto(sources: &BeancountSources, parser: &BeancountParser, expected: &
                 expected.directives.len(),
                 "directives.len()"
             );
-            for (actual, expected) in directives.iter().zip(expected.directives.iter()) {
-                actual.expect_eq(expected);
+            for (i, (actual, expected)) in directives
+                .iter()
+                .zip(expected.directives.iter())
+                .enumerate()
+            {
+                actual.expect_eq(expected, context(format!("directive {}", i + 1)));
             }
         }
         Err(ParseError { errors, .. }) => {
@@ -37,59 +49,183 @@ pub fn check_proto_parse(input: &str, expected: &str) {
     check_proto(&sources, &parser, expected);
 }
 
-pub trait ExpectEq<Rhs>
-where
-    Rhs: ?Sized,
-{
-    fn expect_eq(&self, expected: &Rhs);
+struct Context {
+    label: String,
+    parent: Option<Rc<Context>>,
 }
 
-impl<'a> ExpectEq<Directive> for Spanned<lima::Directive<'a>> {
-    fn expect_eq(&self, expected: &Directive) {
-        self.date().expect_eq(&expected.date);
+fn context<S>(label: S) -> Rc<Context>
+where
+    S: AsRef<str>,
+{
+    Rc::new(Context {
+        label: label.as_ref().to_owned(),
+        parent: None,
+    })
+}
 
-        // match (self.variant(), &expected.variant) {
-        //     (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
-        //         variant.expect_eq(other);
-        //     }
-        //     (lima::DirectiveVariant::Balance(variant), Balance(ref other)) => {
-        //         variant.expect_eq(other);
-        //     }
-        //     _ => panic!(
-        //         "mismatched directive variant: got {}, expected {:?}",
-        //         self, &expected
-        //     ),
-        // }
+fn with_context<S>(parent: Rc<Context>, label: S) -> Rc<Context>
+where
+    S: AsRef<str>,
+{
+    Rc::new(Context {
+        label: label.as_ref().to_owned(),
+        parent: Some(parent),
+    })
+}
+
+impl Display for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(parent) = &self.parent {
+            write!(f, "{}.{}", parent, self.label)
+        } else {
+            write!(f, "{}", self.label)
+        }
     }
 }
 
-impl<'a> ExpectEq<Date> for Spanned<time::Date> {
-    fn expect_eq(&self, expected: &Date) {
-        assert_eq!(self.year(), expected.year.unwrap(), "year of date");
+trait ExpectEq<Rhs> {
+    fn expect_eq(&self, expected: Rhs, ctx: Rc<Context>);
+}
+
+impl<'a> ExpectEq<&Directive> for Spanned<lima::Directive<'a>> {
+    fn expect_eq(&self, expected: &Directive, ctx: Rc<Context>) {
+        self.date()
+            .expect_eq(&expected.date, with_context(ctx.clone(), "date"));
+
+        match self.variant() {
+            //     (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
+            //         variant.expect_eq(other);
+            //     }
+            lima::DirectiveVariant::Balance(variant) if expected.has_balance() => {
+                variant.expect_eq(expected.balance(), ctx);
+            }
+
+            _ => panic!(
+                "mismatched directive variant: got {}, expected {:?} {}",
+                self, &expected, &ctx
+            ),
+        }
+    }
+}
+
+impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
+    fn expect_eq(&self, expected: &Balance, ctx: Rc<Context>) {
+        self.account().expect_eq(
+            &expected.account,
+            with_context(ctx.clone(), "balance.account"),
+        );
+        self.atol().amount().expect_eq(
+            &expected.amount,
+            with_context(ctx.clone(), "balance.amount"),
+        );
+        self.atol().tolerance().expect_eq(
+            expected.tolerance.as_ref(),
+            with_context(ctx.clone(), "balance.tolerance"),
+        );
+    }
+}
+
+// TODO not actually needed I think
+// impl<'a> ExpectEq<&str> for Account<'a> {
+//     fn expect_eq(&self, expected: &str) {
+//         assert_eq!(self, &account(expected));
+//     }
+// }
+
+impl<'a> ExpectEq<&Option<String>> for lima::Account<'a> {
+    fn expect_eq(&self, expected: &Option<String>, ctx: Rc<Context>) {
+        match expected {
+            Some(expected) => assert_eq!(self, &account(expected.as_str()), "{}", &ctx),
+            None => panic!("missing account from expected {}", &ctx),
+        }
+    }
+}
+
+fn account(s: &str) -> lima::Account {
+    let mut account = s.split(':');
+    let account_type_name = account.by_ref().next().unwrap();
+    let subaccount = account
+        .map(lima::AccountName::try_from)
+        .collect::<Result<lima::Subaccount, _>>()
+        .unwrap();
+
+    lima::Account::new(
+        lima::AccountType::from_str(account_type_name).unwrap(),
+        subaccount,
+    )
+}
+
+impl<'a> ExpectEq<&Amount> for lima::Amount<'a> {
+    fn expect_eq(&self, expected: &Amount, ctx: Rc<Context>) {
+        self.number().value().expect_eq(
+            expected.number.as_ref(),
+            with_context(ctx.clone(), "number"),
+        );
+        // self.number().expr().expect_eq(expected.expr);
+        self.currency().expect_eq(
+            expected.currency.as_ref(),
+            with_context(ctx.clone(), "currency"),
+        );
+    }
+}
+
+impl<'a> ExpectEq<Option<&String>> for &Spanned<lima::Currency<'a>> {
+    fn expect_eq(&self, expected: Option<&String>, ctx: Rc<Context>) {
+        match expected {
+            Some(expected) => assert_eq!(self.item().as_ref(), expected, "{}", &ctx),
+            None => panic!("missing currency from expected {}", &ctx),
+        }
+    }
+}
+
+impl ExpectEq<&Date> for Spanned<time::Date> {
+    fn expect_eq(&self, expected: &Date, ctx: Rc<Context>) {
+        assert_eq!(
+            self.year(),
+            expected.year.unwrap(),
+            "{}",
+            with_context(ctx.clone(), "year")
+        );
         assert_eq!(
             self.month() as i32,
             expected.month.unwrap(),
-            "month of date"
+            "{}",
+            with_context(ctx.clone(), "month")
         );
-        assert_eq!(self.day() as i32, expected.day.unwrap(), "day of date");
-
-        // match (self.variant(), &expected.variant) {
-        //     (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
-        //         variant.expect_eq(other);
-        //     }
-        //     (lima::DirectiveVariant::Balance(variant), Balance(ref other)) => {
-        //         variant.expect_eq(other);
-        //     }
-        //     _ => panic!(
-        //         "mismatched directive variant: got {}, expected {:?}",
-        //         self, &expected
-        //     ),
-        // }
+        assert_eq!(
+            self.day() as i32,
+            expected.day.unwrap(),
+            "{}",
+            with_context(ctx.clone(), "day")
+        );
     }
 }
 
-use beancount::data::Directive;
-use beancount::date::Date;
-use beancount::ledger::Ledger;
+impl ExpectEq<Option<&Number>> for Option<&Spanned<Decimal>> {
+    fn expect_eq(&self, expected: Option<&Number>, ctx: Rc<Context>) {
+        match (self, expected) {
+            (Some(number), Some(expected)) => {
+                assert_eq!(number.item(), &number_to_decimal(expected), "{}", &ctx)
+            }
+            (Some(_), None) => panic!("expected nothing found number {}", &ctx),
+            (None, Some(_)) => panic!("expected number found nothing {}", &ctx),
+            (None, None) => (),
+        }
+    }
+}
+
+impl ExpectEq<Option<&Number>> for Decimal {
+    fn expect_eq(&self, expected: Option<&Number>, ctx: Rc<Context>) {
+        match expected {
+            Some(expected) => assert_eq!(self, &number_to_decimal(expected), "{}", &ctx),
+            None => panic!("missing number from expected {}", &ctx),
+        }
+    }
+}
+
+fn number_to_decimal(number: &Number) -> Decimal {
+    Decimal::from_str_exact(number.exact.as_ref().unwrap().as_str()).unwrap()
+}
 
 mod beancount;
