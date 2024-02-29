@@ -1,5 +1,7 @@
 tests {
-    source: "2013-05-18 balance Assets:US:BestBank:Checking 200 USD\n2013-05-18 balance Assets:US:BestBank:Checking  200 ~ 0.002 USD\n"
+	source:
+"2013-05-18 balance Assets:US:BestBank:Checking 200 USD\n"
+"2013-05-18 balance Assets:US:BestBank:Checking  200 ~ 0.002 USD\n"
 
     directives {
       date { year: 2013 month: 5 day: 18 }
