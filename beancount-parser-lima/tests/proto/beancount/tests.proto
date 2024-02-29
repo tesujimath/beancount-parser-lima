@@ -1,0 +1,29 @@
+// -*- mode: protobuf -*-
+//
+// A schema for parser tests.
+syntax = "proto2";
+
+package beancount.parser;
+
+import 'beancount/ccore/data.proto';
+import 'beancount/cparser/options.proto';
+
+// A single parser test, that is, input source and expected parsed output.
+message Test {
+  // Input source for the test
+  required string source = 1;
+
+  // Expected directives
+  repeated beancount.Directive directives = 2;
+
+  // Expected errors
+  repeated beancount.Error errors = 3;
+
+  // Expected options.
+  optional options.Options options = 4;
+}
+
+// List of parser tests
+message Tests {
+  repeated Test tests= 1;
+}

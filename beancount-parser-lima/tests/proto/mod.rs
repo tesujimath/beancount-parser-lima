@@ -1,34 +1,38 @@
 use ::beancount_parser_lima as lima;
 use beancount::{
-    data::{Amount, Balance, Directive},
+    data::{Amount, Balance, Directive, Error},
     date::Date,
     ledger::Ledger,
     number::Number,
+    tests::{Test, Tests},
 };
 use lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned};
 use rust_decimal::Decimal;
 use std::{borrow::ToOwned, fmt::Display, rc::Rc, str::FromStr};
 
-fn check_proto(sources: &BeancountSources, parser: &BeancountParser, expected: &str) {
+fn check_proto(
+    sources: &BeancountSources,
+    parser: &BeancountParser,
+    expected_directives: Vec<Directive>,
+    _expected_errors: Vec<Error>,
+) {
     let stderr = &std::io::stderr();
-
-    let expected: Ledger = protobuf::text_format::parse_from_str(expected).unwrap();
 
     println!(
         "Expected ledger contains {} directives",
-        expected.directives.len()
+        expected_directives.len()
     );
 
     match parser.parse() {
         Ok(ParseSuccess { directives, .. }) => {
             assert_eq!(
                 directives.len(),
-                expected.directives.len(),
+                expected_directives.len(),
                 "directives.len()"
             );
             for (i, (actual, expected)) in directives
                 .iter()
-                .zip(expected.directives.iter())
+                .zip(expected_directives.iter())
                 .enumerate()
             {
                 actual.expect_eq(expected, context(format!("directive {}", i + 1)));
@@ -46,7 +50,35 @@ pub fn check_proto_parse(input: &str, expected: &str) {
     let sources = BeancountSources::from(input);
     let parser = BeancountParser::new(&sources);
 
-    check_proto(&sources, &parser, expected);
+    let expected: Ledger = protobuf::text_format::parse_from_str(expected).unwrap();
+    let Ledger {
+        directives, errors, ..
+    } = expected;
+
+    check_proto(&sources, &parser, directives, errors);
+}
+
+fn check_test(input: &str, expected_directives: Vec<Directive>, expected_errors: Vec<Error>) {
+    let sources = BeancountSources::from(input);
+    let parser = BeancountParser::new(&sources);
+
+    check_proto(&sources, &parser, expected_directives, expected_errors);
+}
+
+pub fn check_tests(tests_txtpb: &str) {
+    // println!("checking tests from {}", tests_txtpb);
+    let tests: Tests = protobuf::text_format::parse_from_str(tests_txtpb).unwrap();
+    let Tests { tests, .. } = tests;
+
+    for test in tests.into_iter() {
+        let Test {
+            source,
+            directives,
+            errors,
+            ..
+        } = test;
+        check_test(source.unwrap().as_str(), directives, errors);
+    }
 }
 
 struct Context {
