@@ -62,17 +62,9 @@ fn fetch_beancount_proto() -> Option<PathBuf> {
 
 fn main() -> std::io::Result<()> {
     if let Some(beancount_repo_path) = fetch_beancount_proto() {
-        let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
-        let our_proto_path = cargo_manifest_dir.join("tests/proto");
-
-        // println!(
-        //     "cargo:warning=generating protobuf for repo directory {:?}, our_proto_path {:?}",
-        //     &beancount_repo_path, &our_proto_path
-        // );
-
         protobuf_codegen::Codegen::new()
             .protoc()
-            .includes([beancount_repo_path.as_path(), our_proto_path.as_path()])
+            .include(beancount_repo_path.as_path())
             .inputs(
                 [
                     "beancount/cparser/options.proto",
@@ -85,11 +77,6 @@ fn main() -> std::io::Result<()> {
                 ]
                 .iter()
                 .map(|input| beancount_repo_path.join(input)),
-            )
-            .inputs(
-                ["beancount/tests.proto"]
-                    .iter()
-                    .map(|input| our_proto_path.join(input)),
             )
             .cargo_out_dir("proto")
             .run_from_script();

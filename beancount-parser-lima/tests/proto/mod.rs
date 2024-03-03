@@ -4,17 +4,17 @@ use beancount::{
     date::Date,
     ledger::Ledger,
     number::Number,
-    tests::{Test, Tests},
 };
 use lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned};
 use rust_decimal::Decimal;
-use std::{borrow::ToOwned, fmt::Display, rc::Rc, str::FromStr};
+use std::{
+    borrow::ToOwned, env, fmt::Display, fs::read_to_string, path::PathBuf, rc::Rc, str::FromStr,
+};
 
-fn check_proto(
+fn check(
     sources: &BeancountSources,
     parser: &BeancountParser,
     expected_directives: Vec<Directive>,
-    _expected_errors: Vec<Error>,
 ) {
     let stderr = &std::io::stderr();
 
@@ -46,39 +46,35 @@ fn check_proto(
     }
 }
 
-pub fn check_proto_parse(input: &str, expected: &str) {
+fn create_sources_and_check(input: &str, expected_directives: Vec<Directive>) {
     let sources = BeancountSources::from(input);
     let parser = BeancountParser::new(&sources);
 
-    let expected: Ledger = protobuf::text_format::parse_from_str(expected).unwrap();
-    let Ledger {
-        directives, errors, ..
-    } = expected;
-
-    check_proto(&sources, &parser, directives, errors);
+    check(&sources, &parser, expected_directives);
 }
 
-fn check_test(input: &str, expected_directives: Vec<Directive>, expected_errors: Vec<Error>) {
-    let sources = BeancountSources::from(input);
-    let parser = BeancountParser::new(&sources);
+pub fn check_parse(test_name: &str) {
+    let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
+    let testcase_dir =
+        cargo_manifest_dir.join(["..", "beancount-parser-tests"].iter().collect::<PathBuf>());
+    let input_file: PathBuf = Into::<PathBuf>::into(format!("{}.beancount", test_name));
+    let input_path = testcase_dir.join(input_file);
+    let expected_output_file: PathBuf = Into::<PathBuf>::into(format!("{}.txtpb", test_name));
+    let expected_output_path = testcase_dir.join(expected_output_file);
 
-    check_proto(&sources, &parser, expected_directives, expected_errors);
-}
+    let input = read_to_string(&input_path)
+        .unwrap_or_else(|_| panic!("failed to read input from {:?}", &input_path));
 
-pub fn check_tests(tests_txtpb: &str) {
-    // println!("checking tests from {}", tests_txtpb);
-    let tests: Tests = protobuf::text_format::parse_from_str(tests_txtpb).unwrap();
-    let Tests { tests, .. } = tests;
+    let expected_output = read_to_string(&expected_output_path).unwrap_or_else(|_| {
+        panic!(
+            "failed to read expected output from {:?}",
+            &expected_output_path
+        )
+    });
+    let expected_output_ledger: Ledger =
+        protobuf::text_format::parse_from_str(&expected_output).unwrap();
 
-    for test in tests.into_iter() {
-        let Test {
-            source,
-            directives,
-            errors,
-            ..
-        } = test;
-        check_test(source.unwrap().as_str(), directives, errors);
-    }
+    create_sources_and_check(&input, expected_output_ledger.directives);
 }
 
 struct Context {

@@ -85,6 +85,19 @@ This is an incomplete list of what is currently unsupported.
 
 Also, unary options are not supported.
 
+## Parser Tests
+The [parser tests](beancount-parser-tests) are based on the
+[parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc),
+extracted into a language independent format.
+That is, all the original tests have been replicated here, with some additions.
+
+Each test comprises a Beancount file and expected parse output formatted as
+Protobuf Text Format Language (https://protobuf.dev/reference/protobuf/textformat-spec/),
+using the [Protobuf schema](https://github.com/beancount/beancount/blob/master/beancount/cparser/ledger.proto)
+from the Beancount repo.
+
+Error cases in this repo have been converted to match the expected error message output of this parser.
+
 ## Alpha Status Dependencies
 
 - Chumsky `1.0.0.alpha.*` releases are required for zero-copy support
