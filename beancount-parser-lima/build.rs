@@ -18,7 +18,7 @@ fn fetch_beancount_proto() -> Option<PathBuf> {
             None
         }
         Ok(version) => {
-            println!("cargo:rerun-if-changed=.cargo/config.toml");
+            println!("cargo:rerun-if-changed=../.cargo/config.toml");
 
             let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
             let beancount_repo_dir: PathBuf = format!("beancount-{}", version).into();
