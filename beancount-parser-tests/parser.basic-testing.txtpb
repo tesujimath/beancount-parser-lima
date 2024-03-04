@@ -1,0 +1,15 @@
+directives {
+  date { year: 2014 month: 1 day: 27 }
+  transaction {
+    flag: "*"
+      narration: "UNION MARKET"
+      postings {
+      account: "Liabilities:US:Amex:BlueCash"
+        spec { units { number { exact: "-22.02" } currency: "USD" } }
+    }
+    postings {
+      account: "Expenses:Food:Grocery"
+        spec { units { number { exact: "22.02" } currency: "USD" } }
+    }
+  }
+}

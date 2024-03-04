@@ -1,10 +1,10 @@
-use ::beancount_parser_lima as lima;
-use beancount::{
-    data::{Amount, Balance, Directive, Posting},
+use self::beancount::{
+    data::{Amount, Balance, Directive, Posting, Transaction},
     date::Date,
     ledger::Ledger,
     number::Number,
 };
+use ::beancount_parser_lima as lima;
 use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
@@ -36,7 +36,7 @@ fn check(
                 .zip(expected_directives.iter())
                 .enumerate()
             {
-                actual.expect_eq(expected, context(format!("directive {}", i + 1)));
+                actual.expect_eq(expected, context(format!("directives[{}]", i)));
             }
         }
         Err(ParseError { errors, .. }) => {
@@ -137,9 +137,10 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
             .expect_eq(&expected.date, with_context(ctx.clone(), "date"));
 
         match self.variant() {
-            //     (lima::DirectiveVariant::Transaction(variant), Transaction(ref other)) => {
-            //         variant.expect_eq(other);
-            //     }
+            lima::DirectiveVariant::Transaction(variant) if expected.has_transaction() => {
+                variant.expect_eq(expected.transaction(), ctx);
+            }
+
             lima::DirectiveVariant::Balance(variant) if expected.has_balance() => {
                 variant.expect_eq(expected.balance(), ctx);
             }
@@ -149,6 +150,27 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
                 self, &expected, &ctx
             ),
         }
+    }
+}
+
+impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
+    fn expect_eq(&self, expected: &Transaction, ctx: Rc<Context>) {
+        self.flag().item().expect_eq(
+            expected.flag.as_ref(),
+            with_context(ctx.clone(), "transaction.flag"),
+        );
+        self.payee().item().copied().expect_eq(
+            expected.payee.as_ref(),
+            with_context(ctx.clone(), "transaction.payee"),
+        );
+        self.narration().item().copied().expect_eq(
+            expected.narration.as_ref(),
+            with_context(ctx.clone(), "transaction.narration"),
+        );
+        self.postings()
+            .map(|posting| posting.item())
+            .collect::<Vec<_>>()
+            .expect_eq(&expected.postings, ctx.clone());
     }
 }
 
@@ -174,13 +196,18 @@ impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
         self.flag()
             .item()
             .copied()
-            .expect_eq(expected.flag.as_ref(), ctx.clone());
-        self.account().expect_eq(&expected.account, ctx.clone());
+            .expect_eq(expected.flag.as_ref(), with_context(ctx.clone(), "flag"));
+        self.account()
+            .expect_eq(&expected.account, with_context(ctx.clone(), "account"));
+        self.amount().item().map(|expr| expr.value()).expect_eq(
+            expected.spec.units.number.as_ref(),
+            with_context(ctx.clone(), "amount"),
+        );
+        self.currency().item().expect_eq(
+            expected.spec.units.currency.as_ref(),
+            with_context(ctx.clone(), "currency"),
+        );
         // TODO
-        // self.amount()
-        //     .item()
-        //     .expect_eq(&expected.amount, ctx.clone());
-        // self.currency().expect_eq(&expected.currency, ctx.clone());
         // self.cost_spec().is(cost_spec);
         // self.price_annotation().is(price_annotation);
         // self.metadata().is(metadata);
@@ -193,7 +220,7 @@ impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
         for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
             actual.expect_eq(
                 expected,
-                with_context(ctx.clone(), format!("posting {}", i + 1)),
+                with_context(ctx.clone(), format!("postings[{}]", i)),
             )
         }
     }
@@ -264,6 +291,14 @@ impl<'a> ExpectEq<Option<&String>> for &lima::Currency<'a> {
     }
 }
 
+impl ExpectEq<Option<&String>> for &str {
+    fn expect_eq(&self, expected: Option<&String>, ctx: Rc<Context>) {
+        match expected {
+            Some(expected) => assert_eq!(*self, expected.as_str(), "{}", &ctx),
+            None => panic!("missing currency from expected {}", &ctx),
+        }
+    }
+}
 impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
     fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Rc<Context>) {
         match expected {
@@ -298,18 +333,27 @@ impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
 // }
 
 #[derive(Display, Debug)]
-struct BytesToFlagError(&'static str);
+struct BytesToFlagError(String);
 
 impl std::error::Error for BytesToFlagError {}
 
 fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
     if bytes.len() != 1 {
         Err(BytesToFlagError(
-            "expected flag value must be one character",
+            "expected flag value must be one character".to_string(),
         ))
     } else {
-        // TODO
-        Ok(lima::Flag::Exclamation)
+        match bytes[0] as char {
+            '*' => Ok(lima::Flag::Asterisk),
+            '!' => Ok(lima::Flag::Exclamation),
+            '&' => Ok(lima::Flag::Ampersand),
+            '#' => Ok(lima::Flag::Hash),
+            '?' => Ok(lima::Flag::Question),
+            '%' => Ok(lima::Flag::Percent),
+            c => lima::FlagLetter::try_from(c)
+                .map(lima::Flag::Letter)
+                .map_err(|e| BytesToFlagError(e.to_string())),
+        }
     }
 }
 
