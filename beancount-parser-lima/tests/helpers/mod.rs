@@ -1,6 +1,7 @@
 use self::beancount::{
     data::{Amount, Balance, Directive, Error, Posting, Transaction},
     date::Date,
+    inter::CostSpec,
     ledger::Ledger,
     number::Number,
 };
@@ -144,16 +145,16 @@ impl Display for Context {
 }
 
 trait ExpectEq<Rhs> {
-    fn expect_eq(&self, expected: Rhs, ctx: Context);
+    fn expect_eq(&self, expected: &Rhs, ctx: Context);
 }
 
-impl<Rhs, T> ExpectEq<Option<Rhs>> for Option<T>
+impl<'r, 't, Rhs, T> ExpectEq<Option<&'r Rhs>> for Option<&'t T>
 where
     T: ExpectEq<Rhs>,
 {
-    fn expect_eq(&self, expected: Option<Rhs>, ctx: Context) {
+    fn expect_eq(&self, expected: &Option<&Rhs>, ctx: Context) {
         match (self, expected) {
-            (Some(actual), Some(expected)) => actual.expect_eq(expected, ctx),
+            (Some(actual), Some(expected)) => (*actual).expect_eq(*expected, ctx),
             (Some(_), None) => panic!("expected nothing found value at {}", &ctx),
             (None, Some(_)) => panic!("expected value found nothing at {}", &ctx),
             (None, None) => (),
@@ -162,14 +163,14 @@ where
 }
 
 trait ExpectEqUnwrapped<Rhs> {
-    fn expect_eq_unwrapped(&self, expected: Option<Rhs>, ctx: Context);
+    fn expect_eq_unwrapped(&self, expected: Option<&Rhs>, ctx: Context);
 }
 
 impl<Rhs, T> ExpectEqUnwrapped<Rhs> for T
 where
     T: ExpectEq<Rhs>,
 {
-    fn expect_eq_unwrapped(&self, expected: Option<Rhs>, ctx: Context) {
+    fn expect_eq_unwrapped(&self, expected: Option<&Rhs>, ctx: Context) {
         match expected {
             Some(expected) => self.expect_eq(expected, ctx),
             None => panic!("expected nothing found value at {}", &ctx),
@@ -177,9 +178,10 @@ where
     }
 }
 
-impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
+impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
     fn expect_eq(&self, expected: &Directive, ctx: Context) {
-        self.date().expect_eq(&expected.date, ctx.with("date"));
+        self.date()
+            .expect_eq_unwrapped(expected.date.as_ref(), ctx.with("date"));
 
         match self.variant() {
             lima::DirectiveVariant::Transaction(variant) if expected.has_transaction() => {
@@ -198,26 +200,24 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
     }
 }
 
-impl ExpectEq<&Error> for lima::Error {
+impl ExpectEq<Error> for lima::Error {
     fn expect_eq(&self, expected: &Error, ctx: Context) {
         self.message()
             .expect_eq_unwrapped(expected.message.as_ref(), ctx.with("message"));
     }
 }
 
-impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
+impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
     fn expect_eq(&self, expected: &Transaction, ctx: Context) {
         self.flag()
             .item()
             .expect_eq_unwrapped(expected.flag.as_ref(), ctx.with("flag"));
         self.payee()
             .item()
-            .copied()
-            .expect_eq(expected.payee.as_ref(), ctx.with("payee"));
+            .expect_eq(&expected.payee.as_ref(), ctx.with("payee"));
         self.narration()
             .item()
-            .copied()
-            .expect_eq(expected.narration.as_ref(), ctx.with("narration"));
+            .expect_eq(&expected.narration.as_ref(), ctx.with("narration"));
         self.postings()
             .map(|posting| posting.item())
             .collect::<Vec<_>>()
@@ -225,7 +225,7 @@ impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
     }
 }
 
-impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
+impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
     fn expect_eq(&self, expected: &Balance, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -235,34 +235,36 @@ impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
         self.atol()
             .tolerance()
             .item()
-            .copied()
-            .expect_eq(expected.tolerance.as_ref(), ctx.with("tolerance"));
+            .expect_eq(&expected.tolerance.as_ref(), ctx.with("tolerance"));
     }
 }
 
-impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
+impl<'a> ExpectEq<Posting> for lima::Posting<'a> {
     fn expect_eq(&self, expected: &Posting, ctx: Context) {
         self.flag()
             .item()
-            .copied()
-            .expect_eq(expected.flag.as_ref(), ctx.with("flag"));
+            .expect_eq(&expected.flag.as_ref(), ctx.with("flag"));
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
         self.amount()
             .item()
             .map(|expr| expr.value())
-            .expect_eq(expected.spec.units.number.as_ref(), ctx.with("amount"));
+            .as_ref()
+            .expect_eq(&expected.spec.units.number.as_ref(), ctx.with("amount"));
         self.currency()
             .item()
-            .expect_eq(expected.spec.units.currency.as_ref(), ctx.with("currency"));
+            .as_ref()
+            .expect_eq(&expected.spec.units.currency.as_ref(), ctx.with("currency"));
+        self.cost_spec()
+            .item()
+            .expect_eq(&expected.spec.cost.as_ref(), ctx.with("cost"));
         // TODO
-        // self.cost_spec().is(cost_spec);
         // self.price_annotation().is(price_annotation);
         // self.metadata().is(metadata);
     }
 }
 
-impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
+impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
     fn expect_eq(&self, expected: &Vec<Posting>, ctx: Context) {
         assert_eq!(self.len(), expected.len(), "postings.len");
         for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
@@ -271,11 +273,23 @@ impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
     }
 }
 
+impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
+    fn expect_eq(&self, expected: &CostSpec, ctx: Context) {
+        // TODO
+        // per_unit: Option<Spanned<ExprValue>>,
+        // total: Option<Spanned<ExprValue>>,
+        // currency: Option<Spanned<Currency<'a>>>,
+        // date: Option<Spanned<Date>>,
+        // label: Option<Spanned<&'a str>>,
+        // merge: bool,
+    }
+}
+
 impl<'a, S> ExpectEq<S> for lima::Account<'a>
 where
     S: AsRef<str>,
 {
-    fn expect_eq(&self, expected: S, ctx: Context) {
+    fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(self, &account(expected.as_ref()), "{}", &ctx);
     }
 }
@@ -294,7 +308,7 @@ fn account(s: &str) -> lima::Account {
     )
 }
 
-impl<'a> ExpectEq<&Amount> for lima::Amount<'a> {
+impl<'a> ExpectEq<Amount> for lima::Amount<'a> {
     fn expect_eq(&self, expected: &Amount, ctx: Context) {
         self.number()
             .value()
@@ -309,7 +323,7 @@ impl<'a, S> ExpectEq<S> for &lima::Currency<'a>
 where
     S: AsRef<str>,
 {
-    fn expect_eq(&self, expected: S, ctx: Context) {
+    fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(self.as_ref(), expected.as_ref(), "{}", &ctx);
     }
 }
@@ -318,12 +332,12 @@ impl<S> ExpectEq<S> for &str
 where
     S: AsRef<str>,
 {
-    fn expect_eq(&self, expected: S, ctx: Context) {
+    fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(*self, expected.as_ref(), "{}", &ctx);
     }
 }
 
-impl ExpectEq<&Vec<u8>> for lima::Flag {
+impl ExpectEq<Vec<u8>> for lima::Flag {
     fn expect_eq(&self, expected: &Vec<u8>, ctx: Context) {
         match bytes_to_flag(expected) {
             Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
@@ -357,7 +371,7 @@ fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
     }
 }
 
-impl ExpectEq<&Date> for time::Date {
+impl ExpectEq<Date> for time::Date {
     fn expect_eq(&self, expected: &Date, ctx: Context) {
         assert_eq!(self.year(), expected.year.unwrap(), "{}", ctx.with("year"));
         assert_eq!(
@@ -375,7 +389,7 @@ impl ExpectEq<&Date> for time::Date {
     }
 }
 
-impl ExpectEq<&Number> for Decimal {
+impl ExpectEq<Number> for Decimal {
     fn expect_eq(&self, expected: &Number, ctx: Context) {
         assert_eq!(self, &number_to_decimal(expected, ctx.clone()), "{}", &ctx);
     }
