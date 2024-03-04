@@ -78,50 +78,56 @@ pub fn check_parse(test_name: &str) {
     create_sources_and_check(&input, expected_output_ledger.directives);
 }
 
-struct Context {
+#[derive(Clone, Debug)]
+struct ContextChain {
     label: String,
-    parent: Option<Rc<Context>>,
+    parent: Option<Context>,
 }
 
-fn context<S>(label: S) -> Rc<Context>
+#[derive(Clone, Debug)]
+struct Context(Rc<ContextChain>);
+
+fn context<S>(label: S) -> Context
 where
     S: AsRef<str>,
 {
-    Rc::new(Context {
+    Context(Rc::new(ContextChain {
         label: label.as_ref().to_owned(),
         parent: None,
-    })
+    }))
 }
 
-fn with_context<S>(parent: Rc<Context>, label: S) -> Rc<Context>
-where
-    S: AsRef<str>,
-{
-    Rc::new(Context {
-        label: label.as_ref().to_owned(),
-        parent: Some(parent),
-    })
+impl Context {
+    fn with<S>(&self, label: S) -> Context
+    where
+        S: AsRef<str>,
+    {
+        Context(Rc::new(ContextChain {
+            label: label.as_ref().to_owned(),
+            parent: Some(Context(self.0.clone())),
+        }))
+    }
 }
 
 impl Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(parent) = &self.parent {
-            write!(f, "{}.{}", parent, self.label)
+        if let Some(parent) = &self.0.parent {
+            write!(f, "{}.{}", parent, self.0.label)
         } else {
-            write!(f, "{}", self.label)
+            write!(f, "{}", self.0.label)
         }
     }
 }
 
 trait ExpectEq<Rhs> {
-    fn expect_eq(&self, expected: Rhs, ctx: Rc<Context>);
+    fn expect_eq(&self, expected: Rhs, ctx: Context);
 }
 
 impl<E, T> ExpectEq<Option<E>> for Option<T>
 where
     T: ExpectEq<Option<E>>,
 {
-    fn expect_eq(&self, expected: Option<E>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: Option<E>, ctx: Context) {
         match (self, expected) {
             (Some(actual), Some(expected)) => actual.expect_eq(Some(expected), ctx),
             (Some(_), None) => panic!("expected nothing found value{}", &ctx),
@@ -132,17 +138,16 @@ where
 }
 
 impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
-    fn expect_eq(&self, expected: &Directive, ctx: Rc<Context>) {
-        self.date()
-            .expect_eq(&expected.date, with_context(ctx.clone(), "date"));
+    fn expect_eq(&self, expected: &Directive, ctx: Context) {
+        self.date().expect_eq(&expected.date, ctx.with("date"));
 
         match self.variant() {
             lima::DirectiveVariant::Transaction(variant) if expected.has_transaction() => {
-                variant.expect_eq(expected.transaction(), ctx);
+                variant.expect_eq(expected.transaction(), ctx.with("transaction"));
             }
 
             lima::DirectiveVariant::Balance(variant) if expected.has_balance() => {
-                variant.expect_eq(expected.balance(), ctx);
+                variant.expect_eq(expected.balance(), ctx.with("balance"));
             }
 
             _ => panic!(
@@ -154,19 +159,18 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
 }
 
 impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
-    fn expect_eq(&self, expected: &Transaction, ctx: Rc<Context>) {
-        self.flag().item().expect_eq(
-            expected.flag.as_ref(),
-            with_context(ctx.clone(), "transaction.flag"),
-        );
-        self.payee().item().copied().expect_eq(
-            expected.payee.as_ref(),
-            with_context(ctx.clone(), "transaction.payee"),
-        );
-        self.narration().item().copied().expect_eq(
-            expected.narration.as_ref(),
-            with_context(ctx.clone(), "transaction.narration"),
-        );
+    fn expect_eq(&self, expected: &Transaction, ctx: Context) {
+        self.flag()
+            .item()
+            .expect_eq(expected.flag.as_ref(), ctx.with("flag"));
+        self.payee()
+            .item()
+            .copied()
+            .expect_eq(expected.payee.as_ref(), ctx.with("payee"));
+        self.narration()
+            .item()
+            .copied()
+            .expect_eq(expected.narration.as_ref(), ctx.with("narration"));
         self.postings()
             .map(|posting| posting.item())
             .collect::<Vec<_>>()
@@ -175,38 +179,35 @@ impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
 }
 
 impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
-    fn expect_eq(&self, expected: &Balance, ctx: Rc<Context>) {
-        self.account().expect_eq(
-            &expected.account,
-            with_context(ctx.clone(), "balance.account"),
-        );
-        self.atol().amount().expect_eq(
-            &expected.amount,
-            with_context(ctx.clone(), "balance.amount"),
-        );
-        self.atol().tolerance().item().copied().expect_eq(
-            expected.tolerance.as_ref(),
-            with_context(ctx.clone(), "balance.tolerance"),
-        );
+    fn expect_eq(&self, expected: &Balance, ctx: Context) {
+        self.account()
+            .expect_eq(&expected.account, ctx.with("account"));
+        self.atol()
+            .amount()
+            .expect_eq(&expected.amount, ctx.with("amount"));
+        self.atol()
+            .tolerance()
+            .item()
+            .copied()
+            .expect_eq(expected.tolerance.as_ref(), ctx.with("tolerance"));
     }
 }
 
 impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
-    fn expect_eq(&self, expected: &Posting, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: &Posting, ctx: Context) {
         self.flag()
             .item()
             .copied()
-            .expect_eq(expected.flag.as_ref(), with_context(ctx.clone(), "flag"));
+            .expect_eq(expected.flag.as_ref(), ctx.with("flag"));
         self.account()
-            .expect_eq(&expected.account, with_context(ctx.clone(), "account"));
-        self.amount().item().map(|expr| expr.value()).expect_eq(
-            expected.spec.units.number.as_ref(),
-            with_context(ctx.clone(), "amount"),
-        );
-        self.currency().item().expect_eq(
-            expected.spec.units.currency.as_ref(),
-            with_context(ctx.clone(), "currency"),
-        );
+            .expect_eq(&expected.account, ctx.with("account"));
+        self.amount()
+            .item()
+            .map(|expr| expr.value())
+            .expect_eq(expected.spec.units.number.as_ref(), ctx.with("amount"));
+        self.currency()
+            .item()
+            .expect_eq(expected.spec.units.currency.as_ref(), ctx.with("currency"));
         // TODO
         // self.cost_spec().is(cost_spec);
         // self.price_annotation().is(price_annotation);
@@ -215,26 +216,16 @@ impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
 }
 
 impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
-    fn expect_eq(&self, expected: &Vec<Posting>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: &Vec<Posting>, ctx: Context) {
         assert_eq!(self.len(), expected.len(), "postings.len");
         for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
-            actual.expect_eq(
-                expected,
-                with_context(ctx.clone(), format!("postings[{}]", i)),
-            )
+            actual.expect_eq(expected, ctx.with(format!("postings[{}]", i)))
         }
     }
 }
 
-// TODO not actually needed I think
-// impl<'a> ExpectEq<&str> for Account<'a> {
-//     fn expect_eq(&self, expected: &str) {
-//         assert_eq!(self, &account(expected));
-//     }
-// }
-
 impl<'a> ExpectEq<&Option<String>> for lima::Account<'a> {
-    fn expect_eq(&self, expected: &Option<String>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: &Option<String>, ctx: Context) {
         match expected {
             Some(expected) => assert_eq!(self, &account(expected.as_str()), "{}", &ctx),
             None => panic!("missing account from expected {}", &ctx),
@@ -257,33 +248,19 @@ fn account(s: &str) -> lima::Account {
 }
 
 impl<'a> ExpectEq<&Amount> for lima::Amount<'a> {
-    fn expect_eq(&self, expected: &Amount, ctx: Rc<Context>) {
-        self.number().value().expect_eq(
-            expected.number.as_ref(),
-            with_context(ctx.clone(), "number"),
-        );
+    fn expect_eq(&self, expected: &Amount, ctx: Context) {
+        self.number()
+            .value()
+            .expect_eq(expected.number.as_ref(), ctx.with("number"));
         // self.number().expr().expect_eq(expected.expr);
-        self.currency().item().expect_eq(
-            expected.currency.as_ref(),
-            with_context(ctx.clone(), "currency"),
-        );
+        self.currency()
+            .item()
+            .expect_eq(expected.currency.as_ref(), ctx.with("currency"));
     }
 }
 
-// TODO may not need this
-// impl<'a> ExpectEq<Option<&Amount>> for Option<&lima::Amount<'a>> {
-//     fn expect_eq(&self, expected: Option<&Amount>, ctx: Rc<Context>) {
-//         match (self, expected) {
-//             (Some(amount), Some(expected)) => amount.expect_eq(expected, ctx.clone()),
-//             (Some(_), None) => panic!("expected nothing found amount {}", &ctx),
-//             (None, Some(_)) => panic!("expected amount found nothing {}", &ctx),
-//             (None, None) => (),
-//         }
-//     }
-// }
-
 impl<'a> ExpectEq<Option<&String>> for &lima::Currency<'a> {
-    fn expect_eq(&self, expected: Option<&String>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: Option<&String>, ctx: Context) {
         match expected {
             Some(expected) => assert_eq!(self.as_ref(), expected, "{}", &ctx),
             None => panic!("missing currency from expected {}", &ctx),
@@ -292,7 +269,7 @@ impl<'a> ExpectEq<Option<&String>> for &lima::Currency<'a> {
 }
 
 impl ExpectEq<Option<&String>> for &str {
-    fn expect_eq(&self, expected: Option<&String>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: Option<&String>, ctx: Context) {
         match expected {
             Some(expected) => assert_eq!(*self, expected.as_str(), "{}", &ctx),
             None => panic!("missing currency from expected {}", &ctx),
@@ -300,7 +277,7 @@ impl ExpectEq<Option<&String>> for &str {
     }
 }
 impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
-    fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Context) {
         match expected {
             Some(expected) => match bytes_to_flag(expected) {
                 Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
@@ -310,27 +287,6 @@ impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
         }
     }
 }
-
-// TODO remove
-// impl ExpectEq<Option<&Vec<u8>>> for Option<&lima::Flag> {
-//     fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Rc<Context>) {
-//         match (self, expected) {
-//             (Some(flag), Some(expected)) => {
-//                 assert!(
-//                     expected.len() == 1,
-//                     "expected flag value must be one character"
-//                 );
-//                 match bytes_to_flag(expected) {
-//                     Ok(expected_flag) => assert_eq!(**flag, expected_flag, "{}", &ctx),
-//                     Err(e) => panic!("{}", e),
-//                 }
-//             }
-//             (Some(_), None) => panic!("expected nothing found flag {}", &ctx),
-//             (None, Some(_)) => panic!("expected flag found nothing {}", &ctx),
-//             (None, None) => (),
-//         }
-//     }
-// }
 
 #[derive(Display, Debug)]
 struct BytesToFlagError(String);
@@ -358,30 +314,25 @@ fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
 }
 
 impl ExpectEq<&Date> for time::Date {
-    fn expect_eq(&self, expected: &Date, ctx: Rc<Context>) {
-        assert_eq!(
-            self.year(),
-            expected.year.unwrap(),
-            "{}",
-            with_context(ctx.clone(), "year")
-        );
+    fn expect_eq(&self, expected: &Date, ctx: Context) {
+        assert_eq!(self.year(), expected.year.unwrap(), "{}", ctx.with("year"));
         assert_eq!(
             self.month() as i32,
             expected.month.unwrap(),
             "{}",
-            with_context(ctx.clone(), "month")
+            ctx.with("month")
         );
         assert_eq!(
             self.day() as i32,
             expected.day.unwrap(),
             "{}",
-            with_context(ctx.clone(), "day")
+            ctx.with("day")
         );
     }
 }
 
 impl ExpectEq<Option<&Number>> for Decimal {
-    fn expect_eq(&self, expected: Option<&Number>, ctx: Rc<Context>) {
+    fn expect_eq(&self, expected: Option<&Number>, ctx: Context) {
         match expected {
             Some(expected) => assert_eq!(self, &number_to_decimal(expected), "{}", &ctx),
             None => panic!("expected nothing found value {}", &ctx),
