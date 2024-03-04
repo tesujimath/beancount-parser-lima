@@ -480,6 +480,17 @@ where
     }
 }
 
+/// convenenience trait for dealing with Option<&Spanned>
+pub trait OptionalItem<T> {
+    fn item(&self) -> Option<&T>;
+}
+
+impl<T> OptionalItem<T> for Option<&Spanned<T>> {
+    fn item(&self) -> Option<&T> {
+        self.map(|spanned| spanned.item())
+    }
+}
+
 /// Implemented by any element, for access to its kind in error reporting.
 pub trait ElementType {
     fn element_type(&self) -> &'static str;
