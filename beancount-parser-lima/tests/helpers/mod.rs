@@ -1,5 +1,5 @@
 use self::beancount::{
-    data::{Amount, Balance, Directive, Posting, Transaction},
+    data::{Amount, Balance, Directive, Error, Posting, Transaction},
     date::Date,
     ledger::Ledger,
     number::Number,
@@ -16,6 +16,7 @@ fn check(
     sources: &BeancountSources,
     parser: &BeancountParser,
     expected_directives: Vec<Directive>,
+    expected_errors: Vec<Error>,
 ) {
     let stderr = &std::io::stderr();
 
@@ -41,17 +42,28 @@ fn check(
         }
         Err(ParseError { errors, .. }) => {
             let n_errors = errors.len();
-            sources.write(stderr, errors).unwrap();
-            panic!("parse failed with {} errors", n_errors);
+            if n_errors == expected_errors.len() {
+                for (i, (actual, expected)) in errors.iter().zip(expected_errors.iter()).enumerate()
+                {
+                    actual.expect_eq(expected, context(format!("errors[{}]", i)));
+                }
+            } else {
+                sources.write(stderr, errors).unwrap();
+                panic!("parse failed with {} errors", n_errors);
+            }
         }
     }
 }
 
-fn create_sources_and_check(input: &str, expected_directives: Vec<Directive>) {
+fn create_sources_and_check(
+    input: &str,
+    expected_directives: Vec<Directive>,
+    expected_errors: Vec<Error>,
+) {
     let sources = BeancountSources::from(input);
     let parser = BeancountParser::new(&sources);
 
-    check(&sources, &parser, expected_directives);
+    check(&sources, &parser, expected_directives, expected_errors);
 }
 
 pub fn check_parse<S>(test_name: S)
@@ -78,7 +90,11 @@ where
     let expected_output_ledger: Ledger =
         protobuf::text_format::parse_from_str(&expected_output).unwrap();
 
-    create_sources_and_check(&input, expected_output_ledger.directives);
+    create_sources_and_check(
+        &input,
+        expected_output_ledger.directives,
+        expected_output_ledger.errors,
+    );
 }
 
 #[derive(Clone, Debug)]
@@ -158,6 +174,13 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
                 self, &expected, &ctx
             ),
         }
+    }
+}
+
+impl ExpectEq<&Error> for lima::Error {
+    fn expect_eq(&self, expected: &Error, ctx: Context) {
+        self.message()
+            .expect_eq(expected.message.as_ref(), ctx.with("message"));
     }
 }
 
@@ -279,6 +302,7 @@ impl ExpectEq<Option<&String>> for &str {
         }
     }
 }
+
 impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
     fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Context) {
         match expected {
