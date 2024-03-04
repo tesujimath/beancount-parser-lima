@@ -130,8 +130,8 @@ where
     fn expect_eq(&self, expected: Option<E>, ctx: Context) {
         match (self, expected) {
             (Some(actual), Some(expected)) => actual.expect_eq(Some(expected), ctx),
-            (Some(_), None) => panic!("expected nothing found value{}", &ctx),
-            (None, Some(_)) => panic!("expected value found nothing {}", &ctx),
+            (Some(_), None) => panic!("expected nothing found value at {}", &ctx),
+            (None, Some(_)) => panic!("expected value found nothing at {}", &ctx),
             (None, None) => (),
         }
     }
@@ -283,7 +283,7 @@ impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
                 Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
                 Err(e) => panic!("{}", e),
             },
-            None => panic!("expected nothing found flag {}", &ctx),
+            None => panic!("expected nothing found value at {}", &ctx),
         }
     }
 }
@@ -335,7 +335,7 @@ impl ExpectEq<Option<&Number>> for Decimal {
     fn expect_eq(&self, expected: Option<&Number>, ctx: Context) {
         match expected {
             Some(expected) => assert_eq!(self, &number_to_decimal(expected), "{}", &ctx),
-            None => panic!("expected nothing found value {}", &ctx),
+            None => panic!("expected nothing found value at {}", &ctx),
         }
     }
 }
