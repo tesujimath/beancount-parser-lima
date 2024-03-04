@@ -1,11 +1,12 @@
 use ::beancount_parser_lima as lima;
 use beancount::{
-    data::{Amount, Balance, Directive, Error},
+    data::{Amount, Balance, Directive, Posting},
     date::Date,
     ledger::Ledger,
     number::Number,
 };
-use lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned};
+use derive_more::Display;
+use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
 use std::{
     borrow::ToOwned, env, fmt::Display, fs::read_to_string, path::PathBuf, rc::Rc, str::FromStr,
@@ -116,7 +117,21 @@ trait ExpectEq<Rhs> {
     fn expect_eq(&self, expected: Rhs, ctx: Rc<Context>);
 }
 
-impl<'a> ExpectEq<&Directive> for Spanned<lima::Directive<'a>> {
+impl<E, T> ExpectEq<Option<E>> for Option<T>
+where
+    T: ExpectEq<Option<E>>,
+{
+    fn expect_eq(&self, expected: Option<E>, ctx: Rc<Context>) {
+        match (self, expected) {
+            (Some(actual), Some(expected)) => actual.expect_eq(Some(expected), ctx),
+            (Some(_), None) => panic!("expected nothing found value{}", &ctx),
+            (None, Some(_)) => panic!("expected value found nothing {}", &ctx),
+            (None, None) => (),
+        }
+    }
+}
+
+impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
     fn expect_eq(&self, expected: &Directive, ctx: Rc<Context>) {
         self.date()
             .expect_eq(&expected.date, with_context(ctx.clone(), "date"));
@@ -147,10 +162,40 @@ impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
             &expected.amount,
             with_context(ctx.clone(), "balance.amount"),
         );
-        self.atol().tolerance().expect_eq(
+        self.atol().tolerance().item().copied().expect_eq(
             expected.tolerance.as_ref(),
             with_context(ctx.clone(), "balance.tolerance"),
         );
+    }
+}
+
+impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
+    fn expect_eq(&self, expected: &Posting, ctx: Rc<Context>) {
+        self.flag()
+            .item()
+            .copied()
+            .expect_eq(expected.flag.as_ref(), ctx.clone());
+        self.account().expect_eq(&expected.account, ctx.clone());
+        // TODO
+        // self.amount()
+        //     .item()
+        //     .expect_eq(&expected.amount, ctx.clone());
+        // self.currency().expect_eq(&expected.currency, ctx.clone());
+        // self.cost_spec().is(cost_spec);
+        // self.price_annotation().is(price_annotation);
+        // self.metadata().is(metadata);
+    }
+}
+
+impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
+    fn expect_eq(&self, expected: &Vec<Posting>, ctx: Rc<Context>) {
+        assert_eq!(self.len(), expected.len(), "postings.len");
+        for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
+            actual.expect_eq(
+                expected,
+                with_context(ctx.clone(), format!("posting {}", i + 1)),
+            )
+        }
     }
 }
 
@@ -191,23 +236,84 @@ impl<'a> ExpectEq<&Amount> for lima::Amount<'a> {
             with_context(ctx.clone(), "number"),
         );
         // self.number().expr().expect_eq(expected.expr);
-        self.currency().expect_eq(
+        self.currency().item().expect_eq(
             expected.currency.as_ref(),
             with_context(ctx.clone(), "currency"),
         );
     }
 }
 
-impl<'a> ExpectEq<Option<&String>> for &Spanned<lima::Currency<'a>> {
+// TODO may not need this
+// impl<'a> ExpectEq<Option<&Amount>> for Option<&lima::Amount<'a>> {
+//     fn expect_eq(&self, expected: Option<&Amount>, ctx: Rc<Context>) {
+//         match (self, expected) {
+//             (Some(amount), Some(expected)) => amount.expect_eq(expected, ctx.clone()),
+//             (Some(_), None) => panic!("expected nothing found amount {}", &ctx),
+//             (None, Some(_)) => panic!("expected amount found nothing {}", &ctx),
+//             (None, None) => (),
+//         }
+//     }
+// }
+
+impl<'a> ExpectEq<Option<&String>> for &lima::Currency<'a> {
     fn expect_eq(&self, expected: Option<&String>, ctx: Rc<Context>) {
         match expected {
-            Some(expected) => assert_eq!(self.item().as_ref(), expected, "{}", &ctx),
+            Some(expected) => assert_eq!(self.as_ref(), expected, "{}", &ctx),
             None => panic!("missing currency from expected {}", &ctx),
         }
     }
 }
 
-impl ExpectEq<&Date> for Spanned<time::Date> {
+impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
+    fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Rc<Context>) {
+        match expected {
+            Some(expected) => match bytes_to_flag(expected) {
+                Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
+                Err(e) => panic!("{}", e),
+            },
+            None => panic!("expected nothing found flag {}", &ctx),
+        }
+    }
+}
+
+// TODO remove
+// impl ExpectEq<Option<&Vec<u8>>> for Option<&lima::Flag> {
+//     fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Rc<Context>) {
+//         match (self, expected) {
+//             (Some(flag), Some(expected)) => {
+//                 assert!(
+//                     expected.len() == 1,
+//                     "expected flag value must be one character"
+//                 );
+//                 match bytes_to_flag(expected) {
+//                     Ok(expected_flag) => assert_eq!(**flag, expected_flag, "{}", &ctx),
+//                     Err(e) => panic!("{}", e),
+//                 }
+//             }
+//             (Some(_), None) => panic!("expected nothing found flag {}", &ctx),
+//             (None, Some(_)) => panic!("expected flag found nothing {}", &ctx),
+//             (None, None) => (),
+//         }
+//     }
+// }
+
+#[derive(Display, Debug)]
+struct BytesToFlagError(&'static str);
+
+impl std::error::Error for BytesToFlagError {}
+
+fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
+    if bytes.len() != 1 {
+        Err(BytesToFlagError(
+            "expected flag value must be one character",
+        ))
+    } else {
+        // TODO
+        Ok(lima::Flag::Exclamation)
+    }
+}
+
+impl ExpectEq<&Date> for time::Date {
     fn expect_eq(&self, expected: &Date, ctx: Rc<Context>) {
         assert_eq!(
             self.year(),
@@ -230,24 +336,11 @@ impl ExpectEq<&Date> for Spanned<time::Date> {
     }
 }
 
-impl ExpectEq<Option<&Number>> for Option<&Spanned<Decimal>> {
-    fn expect_eq(&self, expected: Option<&Number>, ctx: Rc<Context>) {
-        match (self, expected) {
-            (Some(number), Some(expected)) => {
-                assert_eq!(number.item(), &number_to_decimal(expected), "{}", &ctx)
-            }
-            (Some(_), None) => panic!("expected nothing found number {}", &ctx),
-            (None, Some(_)) => panic!("expected number found nothing {}", &ctx),
-            (None, None) => (),
-        }
-    }
-}
-
 impl ExpectEq<Option<&Number>> for Decimal {
     fn expect_eq(&self, expected: Option<&Number>, ctx: Rc<Context>) {
         match expected {
             Some(expected) => assert_eq!(self, &number_to_decimal(expected), "{}", &ctx),
-            None => panic!("missing number from expected {}", &ctx),
+            None => panic!("expected nothing found value {}", &ctx),
         }
     }
 }
