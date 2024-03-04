@@ -1,7 +1,7 @@
 use self::beancount::{
     data::{Amount, Balance, Directive, Error, Posting, Transaction},
     date::Date,
-    inter::CostSpec,
+    inter::{CostSpec, PriceSpec},
     ledger::Ledger,
     number::Number,
 };
@@ -258,8 +258,10 @@ impl<'a> ExpectEq<Posting> for lima::Posting<'a> {
         self.cost_spec()
             .item()
             .expect_eq(&expected.spec.cost.as_ref(), ctx.with("cost"));
+        self.price_annotation()
+            .item()
+            .expect_eq(&expected.spec.price.as_ref(), ctx.with("price"));
         // TODO
-        // self.price_annotation().is(price_annotation);
         // self.metadata().is(metadata);
     }
 }
@@ -297,6 +299,35 @@ impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
             .expect_eq(&expected.label.as_ref(), ctx.with("label"));
         self.merge()
             .expect_eq_unwrapped(expected.merge_cost.as_ref(), ctx.with("merge"));
+    }
+}
+
+impl<'a> ExpectEq<PriceSpec> for lima::ScopedAmount<'a> {
+    fn expect_eq(&self, expected: &PriceSpec, ctx: Context) {
+        use lima::ScopedAmount::*;
+        use lima::ScopedExprValue::*;
+
+        let (currency, amount, is_total) = match self {
+            BareCurrency(currency) => (Some(currency), None, None),
+            BareAmount(PerUnit(expr)) => (None, Some(expr.value()), Some(false)),
+            BareAmount(Total(expr)) => (None, Some(expr.value()), Some(true)),
+            CurrencyAmount(PerUnit(expr), currency) => {
+                (Some(currency), Some(expr.value()), Some(false))
+            }
+            CurrencyAmount(Total(expr), currency) => {
+                (Some(currency), Some(expr.value()), Some(true))
+            }
+        };
+
+        currency
+            .as_ref()
+            .expect_eq(&expected.currency.as_ref(), ctx.with("currency"));
+        amount
+            .as_ref()
+            .expect_eq(&expected.number.as_ref(), ctx.with("amount"));
+        is_total
+            .as_ref()
+            .expect_eq(&expected.is_total.as_ref(), ctx.with("amount"));
     }
 }
 
