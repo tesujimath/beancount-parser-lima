@@ -9,7 +9,13 @@ use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
 use std::{
-    borrow::ToOwned, env, fmt::Display, fs::read_to_string, path::PathBuf, rc::Rc, str::FromStr,
+    borrow::ToOwned,
+    env,
+    fmt::Display,
+    fs::read_to_string,
+    path::{Path, PathBuf},
+    rc::Rc,
+    str::FromStr,
 };
 
 fn check(
@@ -55,12 +61,14 @@ fn check(
     }
 }
 
-fn create_sources_and_check(
-    input: &str,
+fn create_sources_and_check<P>(
+    input_path: P,
     expected_directives: Vec<Directive>,
     expected_errors: Vec<Error>,
-) {
-    let sources = BeancountSources::from(input);
+) where
+    P: AsRef<Path>,
+{
+    let sources = BeancountSources::from(input_path.as_ref());
     let parser = BeancountParser::new(&sources);
 
     check(&sources, &parser, expected_directives, expected_errors);
@@ -71,15 +79,13 @@ where
     S: AsRef<str>,
 {
     let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
-    let testcase_dir = cargo_manifest_dir.join(["..", "test-cases"].iter().collect::<PathBuf>());
+    // unwrap here is safe because we know the repo structure, so there definitely is a parent
+    let testcase_dir = cargo_manifest_dir.parent().unwrap().join("test-cases");
     let input_file: PathBuf = Into::<PathBuf>::into(format!("{}.beancount", test_name.as_ref()));
     let input_path = testcase_dir.join(input_file);
     let expected_output_file: PathBuf =
         Into::<PathBuf>::into(format!("{}.txtpb", test_name.as_ref()));
     let expected_output_path = testcase_dir.join(expected_output_file);
-
-    let input = read_to_string(&input_path)
-        .unwrap_or_else(|_| panic!("failed to read input from {:?}", &input_path));
 
     let expected_output = read_to_string(&expected_output_path).unwrap_or_else(|_| {
         panic!(
@@ -91,7 +97,7 @@ where
         protobuf::text_format::parse_from_str(&expected_output).unwrap();
 
     create_sources_and_check(
-        &input,
+        input_path,
         expected_output_ledger.directives,
         expected_output_ledger.errors,
     );
