@@ -3,7 +3,7 @@ use std::{
     cmp::Ordering,
     collections::{hash_map, HashMap},
     hash::Hash,
-    iter::{once, ExactSizeIterator, FromIterator},
+    iter::once,
 };
 
 use crate::types::*;

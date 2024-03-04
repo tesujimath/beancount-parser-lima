@@ -1,12 +1,8 @@
 #![cfg(test)]
 use super::*;
 use proptest::prelude::*;
-use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use std::collections::hash_map::DefaultHasher;
 use test_case::test_case;
 
 prop_compose! {

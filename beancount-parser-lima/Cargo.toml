@@ -19,31 +19,31 @@ ariadne = "0.3.0"
 # for bleeding edge ariadne
 # ariadne= { path = "../../../../third-party/rust/ariadne" }
 chumsky = { version = "1.0.0-alpha.6", features = ["label", "regex"] }
-derive_more = "0.99.17"
 # for bleeding edge chumsky:
 # chumsky = { git = "https://github.com/tesujimath/chumsky", branch = "one_of_ref-not_ref", features = ["label", "regex"] }
 # chumsky = { path = "../../../../third-party/rust/chumsky", features = ["label", "regex"] }
 either = "1.8.1"
-itertools = "0.10.5"
 lazy_format = "2.0.0"
 logos = "0.13.0"
 path-clean = "1.0.1"
-proptest = "1.2.0"
 protobuf = "3.4.0"
-rstest = "0.18.2"
 rust_decimal = "1.29.1"
 rust_decimal_macros = "1.29.1"
 smallvec = "2.0.0-alpha.3"
-stats_alloc = "0.1.10"
 strum = "0.25.0"
 strum_macros = "0.25.0"
 time = "0.3.28"
 unescaper = "0.1.4"
-xflags = "0.3.1"
 
 [dev-dependencies]
+derive_more = "0.99.17"
+itertools = "0.10.5"
+proptest = "1.2.0"
+rstest = "0.18.2"
+stats_alloc = "0.1.10"
 test-case = "3.1.0"
 time = { version = "0.3.28", features = ["parsing"] }
+xflags = "0.3.1"
 
 [build-dependencies]
 protobuf-codegen = "3.4.0"

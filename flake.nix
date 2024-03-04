@@ -33,6 +33,7 @@
                 cargo-modules
                 cargo-nightly
                 cargo-udeps
+                cargo-outdated
                 gcc
                 gdb
                 rust-analyzer

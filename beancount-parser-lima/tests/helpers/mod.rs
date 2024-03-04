@@ -9,7 +9,6 @@ use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
 use std::{
-    borrow::ToOwned,
     env,
     fmt::Display,
     fs::read_to_string,
