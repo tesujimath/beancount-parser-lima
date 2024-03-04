@@ -60,7 +60,7 @@ fn fetch_beancount_proto() -> Option<PathBuf> {
     }
 }
 
-fn main() -> std::io::Result<()> {
+fn autogen_beancount_proto() -> std::io::Result<()> {
     if let Some(beancount_repo_path) = fetch_beancount_proto() {
         protobuf_codegen::Codegen::new()
             .protoc()
@@ -83,4 +83,7 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+fn main() -> std::io::Result<()> {
+    autogen_beancount_proto()
 }

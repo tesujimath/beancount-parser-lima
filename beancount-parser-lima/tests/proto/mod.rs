@@ -54,13 +54,16 @@ fn create_sources_and_check(input: &str, expected_directives: Vec<Directive>) {
     check(&sources, &parser, expected_directives);
 }
 
-pub fn check_parse(test_name: &str) {
+pub fn check_parse<S>(test_name: S)
+where
+    S: AsRef<str>,
+{
     let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
-    let testcase_dir =
-        cargo_manifest_dir.join(["..", "beancount-parser-tests"].iter().collect::<PathBuf>());
-    let input_file: PathBuf = Into::<PathBuf>::into(format!("{}.beancount", test_name));
+    let testcase_dir = cargo_manifest_dir.join(["..", "test-cases"].iter().collect::<PathBuf>());
+    let input_file: PathBuf = Into::<PathBuf>::into(format!("{}.beancount", test_name.as_ref()));
     let input_path = testcase_dir.join(input_file);
-    let expected_output_file: PathBuf = Into::<PathBuf>::into(format!("{}.txtpb", test_name));
+    let expected_output_file: PathBuf =
+        Into::<PathBuf>::into(format!("{}.txtpb", test_name.as_ref()));
     let expected_output_path = testcase_dir.join(expected_output_file);
 
     let input = read_to_string(&input_path)

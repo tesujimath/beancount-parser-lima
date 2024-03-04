@@ -1,11 +1,11 @@
-use test_case::test_case;
+use rstest::rstest;
+use std::path::PathBuf;
 
-#[test_case("parser.basic-testing")]
-#[test_case("parser-entry-types.balance")]
-#[test_case("parser-entry-types.transaction-one-string")]
-#[test_case("parser-entry-types.transaction-two-strings")]
-fn test_parser(test_name: &str) {
+#[rstest]
+fn test_parser(#[files("../test-cases/*.beancount")] path: PathBuf) {
+    let test_name = path.file_stem().unwrap().to_string_lossy();
     check_parse(test_name);
+    // panic!("testing {} from {:?}", test_name, &path);
 }
 
 use proto::check_parse;
