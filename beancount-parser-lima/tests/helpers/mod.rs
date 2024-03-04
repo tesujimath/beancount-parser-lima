@@ -147,16 +147,32 @@ trait ExpectEq<Rhs> {
     fn expect_eq(&self, expected: Rhs, ctx: Context);
 }
 
-impl<E, T> ExpectEq<Option<E>> for Option<T>
+impl<Rhs, T> ExpectEq<Option<Rhs>> for Option<T>
 where
-    T: ExpectEq<Option<E>>,
+    T: ExpectEq<Rhs>,
 {
-    fn expect_eq(&self, expected: Option<E>, ctx: Context) {
+    fn expect_eq(&self, expected: Option<Rhs>, ctx: Context) {
         match (self, expected) {
-            (Some(actual), Some(expected)) => actual.expect_eq(Some(expected), ctx),
+            (Some(actual), Some(expected)) => actual.expect_eq(expected, ctx),
             (Some(_), None) => panic!("expected nothing found value at {}", &ctx),
             (None, Some(_)) => panic!("expected value found nothing at {}", &ctx),
             (None, None) => (),
+        }
+    }
+}
+
+trait ExpectEqUnwrapped<Rhs> {
+    fn expect_eq_unwrapped(&self, expected: Option<Rhs>, ctx: Context);
+}
+
+impl<Rhs, T> ExpectEqUnwrapped<Rhs> for T
+where
+    T: ExpectEq<Rhs>,
+{
+    fn expect_eq_unwrapped(&self, expected: Option<Rhs>, ctx: Context) {
+        match expected {
+            Some(expected) => self.expect_eq(expected, ctx),
+            None => panic!("expected nothing found value at {}", &ctx),
         }
     }
 }
@@ -185,7 +201,7 @@ impl<'a> ExpectEq<&Directive> for lima::Directive<'a> {
 impl ExpectEq<&Error> for lima::Error {
     fn expect_eq(&self, expected: &Error, ctx: Context) {
         self.message()
-            .expect_eq(expected.message.as_ref(), ctx.with("message"));
+            .expect_eq_unwrapped(expected.message.as_ref(), ctx.with("message"));
     }
 }
 
@@ -193,7 +209,7 @@ impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
     fn expect_eq(&self, expected: &Transaction, ctx: Context) {
         self.flag()
             .item()
-            .expect_eq(expected.flag.as_ref(), ctx.with("flag"));
+            .expect_eq_unwrapped(expected.flag.as_ref(), ctx.with("flag"));
         self.payee()
             .item()
             .copied()
@@ -212,7 +228,7 @@ impl<'a> ExpectEq<&Transaction> for lima::Transaction<'a> {
 impl<'a> ExpectEq<&Balance> for lima::Balance<'a> {
     fn expect_eq(&self, expected: &Balance, ctx: Context) {
         self.account()
-            .expect_eq(&expected.account, ctx.with("account"));
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
         self.atol()
             .amount()
             .expect_eq(&expected.amount, ctx.with("amount"));
@@ -231,7 +247,7 @@ impl<'a> ExpectEq<&Posting> for lima::Posting<'a> {
             .copied()
             .expect_eq(expected.flag.as_ref(), ctx.with("flag"));
         self.account()
-            .expect_eq(&expected.account, ctx.with("account"));
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
         self.amount()
             .item()
             .map(|expr| expr.value())
@@ -255,12 +271,12 @@ impl<'a> ExpectEq<&Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
     }
 }
 
-impl<'a> ExpectEq<&Option<String>> for lima::Account<'a> {
-    fn expect_eq(&self, expected: &Option<String>, ctx: Context) {
-        match expected {
-            Some(expected) => assert_eq!(self, &account(expected.as_str()), "{}", &ctx),
-            None => panic!("missing account from expected {}", &ctx),
-        }
+impl<'a, S> ExpectEq<S> for lima::Account<'a>
+where
+    S: AsRef<str>,
+{
+    fn expect_eq(&self, expected: S, ctx: Context) {
+        assert_eq!(self, &account(expected.as_ref()), "{}", &ctx);
     }
 }
 
@@ -282,40 +298,36 @@ impl<'a> ExpectEq<&Amount> for lima::Amount<'a> {
     fn expect_eq(&self, expected: &Amount, ctx: Context) {
         self.number()
             .value()
-            .expect_eq(expected.number.as_ref(), ctx.with("number"));
-        // self.number().expr().expect_eq(expected.expr);
+            .expect_eq_unwrapped(expected.number.as_ref(), ctx.with("number"));
         self.currency()
             .item()
-            .expect_eq(expected.currency.as_ref(), ctx.with("currency"));
+            .expect_eq_unwrapped(expected.currency.as_ref(), ctx.with("currency"));
     }
 }
 
-impl<'a> ExpectEq<Option<&String>> for &lima::Currency<'a> {
-    fn expect_eq(&self, expected: Option<&String>, ctx: Context) {
-        match expected {
-            Some(expected) => assert_eq!(self.as_ref(), expected, "{}", &ctx),
-            None => panic!("missing currency from expected {}", &ctx),
-        }
+impl<'a, S> ExpectEq<S> for &lima::Currency<'a>
+where
+    S: AsRef<str>,
+{
+    fn expect_eq(&self, expected: S, ctx: Context) {
+        assert_eq!(self.as_ref(), expected.as_ref(), "{}", &ctx);
     }
 }
 
-impl ExpectEq<Option<&String>> for &str {
-    fn expect_eq(&self, expected: Option<&String>, ctx: Context) {
-        match expected {
-            Some(expected) => assert_eq!(*self, expected.as_str(), "{}", &ctx),
-            None => panic!("missing currency from expected {}", &ctx),
-        }
+impl<S> ExpectEq<S> for &str
+where
+    S: AsRef<str>,
+{
+    fn expect_eq(&self, expected: S, ctx: Context) {
+        assert_eq!(*self, expected.as_ref(), "{}", &ctx);
     }
 }
 
-impl ExpectEq<Option<&Vec<u8>>> for lima::Flag {
-    fn expect_eq(&self, expected: Option<&Vec<u8>>, ctx: Context) {
-        match expected {
-            Some(expected) => match bytes_to_flag(expected) {
-                Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
-                Err(e) => panic!("{}", e),
-            },
-            None => panic!("expected nothing found value at {}", &ctx),
+impl ExpectEq<&Vec<u8>> for lima::Flag {
+    fn expect_eq(&self, expected: &Vec<u8>, ctx: Context) {
+        match bytes_to_flag(expected) {
+            Ok(expected_flag) => assert_eq!(*self, expected_flag, "{}", &ctx),
+            Err(e) => panic!("{}", e),
         }
     }
 }
@@ -363,17 +375,26 @@ impl ExpectEq<&Date> for time::Date {
     }
 }
 
-impl ExpectEq<Option<&Number>> for Decimal {
-    fn expect_eq(&self, expected: Option<&Number>, ctx: Context) {
-        match expected {
-            Some(expected) => assert_eq!(self, &number_to_decimal(expected), "{}", &ctx),
-            None => panic!("expected nothing found value at {}", &ctx),
-        }
+impl ExpectEq<&Number> for Decimal {
+    fn expect_eq(&self, expected: &Number, ctx: Context) {
+        assert_eq!(self, &number_to_decimal(expected, ctx.clone()), "{}", &ctx);
     }
 }
 
-fn number_to_decimal(number: &Number) -> Decimal {
-    Decimal::from_str_exact(number.exact.as_ref().unwrap().as_str()).unwrap()
+fn number_to_decimal(number: &Number, ctx: Context) -> Decimal {
+    Decimal::from_str_exact(
+        number
+            .exact
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected values for numbers must be exact at {}",
+                    &ctx.with("exact")
+                )
+            })
+            .as_str(),
+    )
+    .unwrap()
 }
 
 mod beancount;
