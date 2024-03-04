@@ -13,7 +13,7 @@ use pyo3::{
     IntoPy, Py, PyAny, PyErr, PyResult, Python,
 };
 use smallvec::SmallVec;
-use string_interner::{symbol::SymbolU32, StringInterner, Symbol};
+use string_interner::{symbol::SymbolU32, DefaultStringInterner, StringInterner, Symbol};
 use strum::IntoEnumIterator;
 use time::Date;
 
@@ -687,7 +687,7 @@ impl Converter {
 }
 
 struct StringFactory {
-    string_interner: StringInterner,
+    string_interner: DefaultStringInterner,
     py_strings: Vec<Py<PyString>>,
 }
 
