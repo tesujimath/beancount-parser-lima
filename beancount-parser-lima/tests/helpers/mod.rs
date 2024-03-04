@@ -275,13 +275,28 @@ impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
 
 impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
     fn expect_eq(&self, expected: &CostSpec, ctx: Context) {
-        // TODO
-        // per_unit: Option<Spanned<ExprValue>>,
-        // total: Option<Spanned<ExprValue>>,
-        // currency: Option<Spanned<Currency<'a>>>,
-        // date: Option<Spanned<Date>>,
-        // label: Option<Spanned<&'a str>>,
-        // merge: bool,
+        self.per_unit()
+            .item()
+            .map(|expr| expr.value())
+            .as_ref()
+            .expect_eq(&expected.per_unit.number.as_ref(), ctx.with("per_unit"));
+        self.total()
+            .item()
+            .map(|expr| expr.value())
+            .as_ref()
+            .expect_eq(&expected.total.number.as_ref(), ctx.with("total"));
+        self.currency()
+            .item()
+            .as_ref()
+            .expect_eq(&expected.currency.as_ref(), ctx.with("currency"));
+        self.date()
+            .item()
+            .expect_eq(&expected.date.as_ref(), ctx.with("date"));
+        self.label()
+            .item()
+            .expect_eq(&expected.label.as_ref(), ctx.with("label"));
+        self.merge()
+            .expect_eq_unwrapped(expected.merge_cost.as_ref(), ctx.with("merge"));
     }
 }
 
@@ -409,6 +424,12 @@ fn number_to_decimal(number: &Number, ctx: Context) -> Decimal {
             .as_str(),
     )
     .unwrap()
+}
+
+impl ExpectEq<bool> for bool {
+    fn expect_eq(&self, expected: &bool, ctx: Context) {
+        assert_eq!(*self, *expected, "{}", &ctx);
+    }
 }
 
 mod beancount;
