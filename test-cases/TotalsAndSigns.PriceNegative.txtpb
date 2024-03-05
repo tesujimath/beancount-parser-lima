@@ -1,9 +1,14 @@
 directives {
+  date { year: 2013 month: 5 day: 18 }
   transaction {
+    flag: "*"
+    narration: ""
     postings {
+      account: "Assets:Investments:MSFT"
       spec {
         units { number { exact: "-10" } currency: "MSFT" }
-        price { number { exact: "200.00" } currency: "USD" }
+        # ANOMALY: Lima allows negative prices
+        price { number { exact: "-200.00" } currency: "USD" }
       }
     }
     postings {
@@ -13,7 +18,4 @@ directives {
       }
     }
   }
-}
-errors {
-  message: 'Negative prices are not allowed (see http://furius.ca/beancount/doc/bug-negative-prices for workaround)'
 }

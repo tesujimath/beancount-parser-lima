@@ -39,6 +39,12 @@ fn check(
                 expected_directives.len(),
                 "directives.len()"
             );
+            assert_eq!(
+                0,
+                expected_errors.len(),
+                "expected {} errors, found none",
+                expected_errors.len()
+            );
             for (i, (actual, expected)) in directives
                 .iter()
                 .zip(expected_directives.iter())
@@ -50,9 +56,15 @@ fn check(
         Err(ParseError { errors, .. }) => {
             let n_errors = errors.len();
             if n_errors == expected_errors.len() {
-                for (i, (actual, expected)) in errors.iter().zip(expected_errors.iter()).enumerate()
+                for (i, (actual, expected)) in errors
+                    .into_iter()
+                    .zip(expected_errors.into_iter())
+                    .enumerate()
                 {
-                    actual.expect_eq(expected, context(format!("errors[{}]", i)));
+                    if Some(actual.message()) != expected.message.as_deref() {
+                        sources.write(stderr, vec![actual]).unwrap();
+                        panic!("expected different error at errors[{}]", i);
+                    }
                 }
             } else {
                 sources.write(stderr, errors).unwrap();
@@ -94,8 +106,13 @@ where
             &expected_output_path
         )
     });
-    let expected_output_ledger: Ledger =
-        protobuf::text_format::parse_from_str(&expected_output).unwrap();
+    let expected_output_ledger: Ledger = protobuf::text_format::parse_from_str(&expected_output)
+        .unwrap_or_else(|e| {
+            panic!(
+                "failed to parse Protobuf Text Format in {:?}: {}",
+                &expected_output_path, e
+            )
+        });
 
     create_sources_and_check(
         input_path,

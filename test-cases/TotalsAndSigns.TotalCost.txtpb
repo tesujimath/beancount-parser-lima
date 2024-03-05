@@ -1,19 +1,28 @@
 directives {
+  date { year: 2013 month: 5 day: 18 }
   transaction {
+    flag: "*"
+    narration: ""
     postings {
+      account: "Assets:Investments:MSFT"
       spec {
         units { number { exact: "10" } currency: "MSFT" }
         cost { total { number { exact: "2000" } } currency: "USD" }
       }
     }
     postings {
+      account: "Assets:Investments:Cash"
       spec { units { number { exact: "-20000" } currency: "USD" } }
     }
   }
 }
 directives {
+  date { year: 2013 month: 5 day: 18 }
   transaction {
+    flag: "*"
+    narration: ""
     postings {
+      account: "Assets:Investments:MSFT"
       spec {
         units { number { exact: "10" } currency: "MSFT" }
         cost {
@@ -23,6 +32,7 @@ directives {
       }
     }
     postings {
+      account: "Assets:Investments:Cash"
       spec {
         units { number { exact: "-20000" } currency: "USD" }
       }
@@ -30,14 +40,19 @@ directives {
   }
 }
 directives {
+  date { year: 2013 month: 6 day: 1 }
   transaction {
+    flag: "*"
+    narration: ""
     postings {
+      account: "Assets:Investments:MSFT"
       spec {
         units { number { exact: "-10" } currency: "MSFT" }
         cost { total { number { exact: "2000" } } currency: "USD" }
       }
     }
     postings {
+      account: "Assets:Investments:Cash"
       spec {
         units { number { exact: "20000" } currency: "USD" }
       }

@@ -9,6 +9,7 @@ use either::Either;
 use rust_decimal::Decimal;
 use std::{
     collections::{hash_map, HashMap, HashSet},
+    iter::once,
     ops::Deref,
     path::Path,
 };
@@ -911,17 +912,16 @@ where
     use CostComp::*;
 
     just(Token::Lcurl)
-        .ignore_then(
-            cost_comp()
-                .map_with(spanned_extra)
+        .ignore_then(group((
+            cost_comp().map_with(spanned_extra),
+            (just(Token::Comma).ignore_then(cost_comp().map_with(spanned_extra)))
                 .repeated()
-                .at_least(1)
                 .collect::<Vec<_>>(),
-        )
+        )))
         .then_ignore(just(Token::Rcurl))
-        .try_map(move |cost_comps, span| {
-            cost_comps
-                .into_iter()
+        .try_map(move |(head, tail), span| {
+            once(head)
+                .chain(tail)
                 .fold(
                     // accumulate the `CostComp`s in a `CostSpecBuilder`
                     CostSpecBuilder::default(),

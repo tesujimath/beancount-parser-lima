@@ -1,0 +1,19 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    narration: ""
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        # ANOMALY: Lima parser does not reject negative prices
+        price { number { exact: "-2000.00" } currency: "USD" is_total: true }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "20000" } currency: "USD" } }
+    }
+  }
+}
