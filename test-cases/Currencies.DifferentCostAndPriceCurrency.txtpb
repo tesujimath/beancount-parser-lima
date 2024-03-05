@@ -1,0 +1,21 @@
+# ANOMALY: Lima parser doesn't check for matching currencies
+# Should be done in post-processing
+directives {
+  date { year: 2018 month: 3 day: 21 }
+  transaction {
+    flag: "*"
+    narration: "Convert MR to KrisFlyer"
+    postings {
+      account: "Assets:Test"
+      spec {
+        units { number { exact: "-100" } currency: "MR" }
+        cost { per_unit { number { exact: "0.0075" } } currency: "USD" }
+        price { number { exact: "1" } currency: "KRISFLYER" }
+      }
+    }
+    postings {
+      account: "Assets:Krisflyer"
+      spec { units { number { exact: "100" } currency: "KRISFLYER" } }
+    }
+  }
+}

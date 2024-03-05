@@ -332,11 +332,7 @@ impl<'a> ExpectEq<Meta> for HashMap<&str, &lima::MetaValue<'a>> {
             let key = kv.key.as_ref().unwrap().as_str();
             match self.get(key) {
                 Some(actual) => actual.expect_eq_unwrapped(kv.value.as_ref(), ctx.with(key)),
-                None => panic!(
-                    "expected metadata key {} at {}",
-                    key,
-                    ctx.with("key_values")
-                ),
+                None => panic!("expected metadata key {} at {}", key, &ctx),
             }
         }
     }
@@ -353,7 +349,6 @@ impl<'a> ExpectEq<MetaValue> for lima::MetaValue<'a> {
         match (self, &expected.value) {
             (Simple(String(actual)), Some(Value::Text(expected))) => {
                 actual.expect_eq(expected, ctx.with("text"));
-                // assert_eq!(*actual, expected.as_str(), "{}", ctx.with("text"))
             }
 
             (Simple(Currency(actual)), Some(Value::Currency(expected))) => {
@@ -417,8 +412,10 @@ impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
         self.label()
             .item()
             .expect_eq(&expected.label.as_ref(), ctx.with("label"));
-        self.merge()
-            .expect_eq_unwrapped(expected.merge_cost.as_ref(), ctx.with("merge"));
+        self.merge().expect_eq(
+            &expected.merge_cost.as_ref().copied().unwrap_or(false),
+            ctx.with("merge"),
+        );
     }
 }
 
@@ -427,16 +424,13 @@ impl<'a> ExpectEq<PriceSpec> for lima::ScopedAmount<'a> {
         use lima::ScopedAmount::*;
         use lima::ScopedExprValue::*;
 
+        // it seems that expected proto defaults to false for is_total
         let (currency, amount, is_total) = match self {
-            BareCurrency(currency) => (Some(currency), None, None),
-            BareAmount(PerUnit(expr)) => (None, Some(expr.value()), Some(false)),
-            BareAmount(Total(expr)) => (None, Some(expr.value()), Some(true)),
-            CurrencyAmount(PerUnit(expr), currency) => {
-                (Some(currency), Some(expr.value()), Some(false))
-            }
-            CurrencyAmount(Total(expr), currency) => {
-                (Some(currency), Some(expr.value()), Some(true))
-            }
+            BareCurrency(currency) => (Some(currency), None, false),
+            BareAmount(PerUnit(expr)) => (None, Some(expr.value()), false),
+            BareAmount(Total(expr)) => (None, Some(expr.value()), true),
+            CurrencyAmount(PerUnit(expr), currency) => (Some(currency), Some(expr.value()), false),
+            CurrencyAmount(Total(expr), currency) => (Some(currency), Some(expr.value()), true),
         };
 
         currency
@@ -445,9 +439,10 @@ impl<'a> ExpectEq<PriceSpec> for lima::ScopedAmount<'a> {
         amount
             .as_ref()
             .expect_eq(&expected.number.as_ref(), ctx.with("amount"));
-        is_total
-            .as_ref()
-            .expect_eq(&expected.is_total.as_ref(), ctx.with("amount"));
+        is_total.expect_eq(
+            &expected.is_total.as_ref().copied().unwrap_or(false),
+            ctx.with("is_total"),
+        );
     }
 }
 
