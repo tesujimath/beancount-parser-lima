@@ -1,0 +1,7 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  query {
+    name: "cash"
+    query_string: "SELECT SUM(position) WHERE currency = \'USD\'"
+  }
+}

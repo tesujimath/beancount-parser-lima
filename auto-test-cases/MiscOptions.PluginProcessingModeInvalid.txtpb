@@ -1,0 +1,3 @@
+errors {
+  message: "Could not parse and set option 'plugin_processing_mode' with value 'INVALID'; ignored."
+}

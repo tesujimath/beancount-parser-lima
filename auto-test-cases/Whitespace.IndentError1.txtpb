@@ -1,0 +1,42 @@
+directives {
+  date { year: 2020 month: 7 day: 28 }
+  open {
+    account: "Assets:Foo"
+  }
+}
+directives {
+  date { year: 2020 month: 7 day: 28 }
+  open {
+    account: "Assets:Bar"
+  }
+}
+errors {
+  message: "Syntax error, unexpected INDENT"
+  location { lineno: 3 }
+}
+errors {
+  message: "Syntax error, unexpected DEDENT"
+  location { lineno: 4 }
+}
+  )", { .leave_lineno = true });
+}
+
+//------------------------------------------------------------------------------
+// TestParserComplete
+
+TEST(TestParserComplete, TransactionSinglePostingAtZero) {
+  ExpectParse(R"(
+2013-05-18 * "Nice dinner at Mermaid Inn"
+  Expenses:Restaurant         0 USD
+  )", R"(
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    narration: "Nice dinner at Mermaid Inn"
+    postings {
+      account: "Expenses:Restaurant"
+      spec { units { number { exact: "0" } currency: "USD" } }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+directives {
+  date { year: 2021 month: 9 day: 19 }
+  open { account: "Assets:US:Checking" }
+}
+errors {
+  message: "Invalid account name: \'Assets:US:Checking\'"
+}
+options {
+  account_types {
+    assets: 'Actifs'
+    liabilities: 'Passifs'
+  }
+}

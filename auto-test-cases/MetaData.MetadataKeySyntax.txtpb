@@ -1,0 +1,12 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "nameoncard" value { text: "Jim" } }
+    kv { key: "nameOnCard" value { text: "Joe" } }
+    kv { key: "name-on-card" value { text: "Bob" } }
+    kv { key: "name_on_card" value { text: "John" } }
+  }
+  transaction {
+    flag: "*"
+  }
+}

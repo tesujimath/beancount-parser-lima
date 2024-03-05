@@ -1,0 +1,19 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "-10" } currency: "MSFT" }
+        cost { per_unit { number { exact: "-200.00" } } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec {
+        units { number { exact: "2000.00" } currency: "USD" }
+      }
+    }
+  }
+}

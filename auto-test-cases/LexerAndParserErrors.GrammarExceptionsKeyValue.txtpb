@@ -1,0 +1,15 @@
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  close { account: "Assets:Before" }
+}
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  meta {
+    kv { key: "key" value { text: "Value" } }
+  }
+  commodity { currency: "HOOL" }
+}
+directives {
+  date { year: 2000 month: 1 day: 1 }
+  open { account: "Assets:Before" }
+}

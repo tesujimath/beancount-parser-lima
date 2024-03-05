@@ -1,0 +1,16 @@
+directives {
+  transaction {
+    postings {
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        price { number { exact: "2000.00" } currency: "USD" is_total: true }
+      }
+    }
+    postings {
+      # ...
+    }
+  }
+}
+errors {
+  message: 'Negative prices are not allowed (see http://furius.ca/beancount/doc/bug-negative-prices for workaround)'
+}

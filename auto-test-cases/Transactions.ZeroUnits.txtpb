@@ -1,0 +1,16 @@
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  transaction {
+    flag: "*"
+    narration: "Zero number of units"
+    postings {
+      account: "Assets:Investment"
+      spec { units { number { exact: "0" } currency: "HOOL" }
+             cost { per_unit { number { exact: "500.00" } } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Cash"
+      spec { units { number { exact: "0" } currency: "USD" } }
+    }
+  }
+}

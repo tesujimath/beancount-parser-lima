@@ -1,0 +1,46 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  transaction {
+    flag: "*"
+  }
+}
+errors {
+  message: "Syntax error, unexpected ACCOUNT"
+}
+)");
+  // This is a difference with the Python version; indentation is more strict in
+  // the RE-Flex/C++ version and this generates an error.
+}
+
+TEST(TestMetaData, MetadataEmpty) {
+  ExpectParse(R"(
+2013-05-18 * "blabla"
+  oranges:
+  bananas:
+
+2013-05-19 open Assets:Something
+  apples:
+  )", R"(
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "oranges" value {} }
+    kv { key: "bananas" value {} }
+  }
+  transaction {
+    flag: "*"
+    narration: "blabla"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 19 }
+  meta {
+    kv { key: "apples" value {} }
+  }
+  open {
+    account: "Assets:Something"
+  }
+}

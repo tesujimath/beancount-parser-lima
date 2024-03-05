@@ -1,0 +1,17 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { currency: "MSFT" }
+        price { number { exact: "2000.00" } currency: "USD" is_total: true }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "20000.00" } currency: "USD" } }
+    }
+  }
+}

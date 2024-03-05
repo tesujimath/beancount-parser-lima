@@ -1,0 +1,7 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  note {
+    account: "Assets:US:BestBank:Checking"
+    comment: "Blah, di blah."
+  }
+}

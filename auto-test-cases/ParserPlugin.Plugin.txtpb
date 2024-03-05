@@ -1,0 +1,5 @@
+info {
+  plugin {
+    name: "beancount.plugin.unrealized"
+  }
+}

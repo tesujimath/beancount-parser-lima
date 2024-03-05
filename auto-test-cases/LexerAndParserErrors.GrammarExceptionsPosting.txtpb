@@ -1,0 +1,26 @@
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  close { account: "Assets:Before" }
+}
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Before"
+      spec {
+        units { number { exact: "100.00" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:After"
+      spec {
+        units { number { exact: "-100.00" } currency: "USD" }
+      }
+    }
+  }
+}
+directives {
+  date { year: 2000 month: 1 day: 1 }
+  open { account: "Assets:Before" }
+}

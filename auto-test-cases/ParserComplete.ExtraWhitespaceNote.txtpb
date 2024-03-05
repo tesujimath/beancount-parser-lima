@@ -1,0 +1,3 @@
+errors {
+  message: "Syntax error, unexpected EOL, expecting DEDENT or TAG or LINK or KEY"
+}

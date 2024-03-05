@@ -1,0 +1,13 @@
+directives {
+  date {
+    year: 2000
+    month: 1
+    day: 2
+  }
+  open {
+    account: "Assets:Working"
+  }
+}
+errors {
+  message: "Syntax error, unexpected invalid token"
+}

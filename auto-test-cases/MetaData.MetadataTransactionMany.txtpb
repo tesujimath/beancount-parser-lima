@@ -1,0 +1,30 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  transaction {
+    flag: "*"
+    postings {
+      meta {
+        kv { key: "test2" value { text: "has" } }
+        kv { key: "test3" value { text: "to" } }
+      }
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        price { number { exact: "2000" } currency: "USD" is_total: true } }
+    }
+    postings {
+      meta {
+        kv { key: "test4" value { text: "come" } }
+        kv { key: "test5" value { text: "from" } }
+        kv { key: "test6" value { text: "this" } }
+      }
+      account: "Assets:Investments:Cash"
+      spec {
+        units { number { exact: "-20000" } currency: "USD" }
+      }
+    }
+  }
+}

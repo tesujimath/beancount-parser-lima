@@ -1,0 +1,3 @@
+errors {
+  message: "Syntax error, unexpected LCURL, expecting EOL or TAG or LINK"
+}

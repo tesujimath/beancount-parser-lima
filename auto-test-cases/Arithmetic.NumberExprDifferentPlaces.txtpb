@@ -1,0 +1,31 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    narration: "Test"
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "-12" } currency: "HOOL" }
+        cost { per_unit { number { exact: "252.021" } } currency: "USD" }
+        price { number { exact: "281.442" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "1000000" } currency: "USD" }
+      }
+    }
+  }
+}
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  meta {
+    kv { key: "number" value { number { exact: "-5684.53" } } }
+  }
+  balance {
+    account: "Assets:Something"
+    amount { number { exact: "3024.252" } currency: "USD" }
+  }
+}

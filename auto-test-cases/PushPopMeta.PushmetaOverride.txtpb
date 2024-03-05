@@ -1,0 +1,35 @@
+directives {
+  date { year: 2015 month: 6 day: 1 }
+  meta {
+    kv { key: "location" value { text: "Lausanne, Switzerland" } }
+  }
+  transaction {
+    flag: "*"
+    narration: "Something"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
+}
+directives {
+  date { year: 2015 month: 6 day: 2 }
+  meta {
+    kv { key: "location" value { text: "Paris, France" } }
+  }
+  transaction {
+    flag: "*"
+    narration: "Something"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }

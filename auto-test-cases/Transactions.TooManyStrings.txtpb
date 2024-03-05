@@ -1,0 +1,3 @@
+errors {
+  message: "Syntax error, unexpected STRING, expecting EOL or TAG or LINK"
+}

@@ -1,0 +1,15 @@
+directives {
+  date { year: 2014 month: 7 day: 11 }
+  transaction {
+    flag: "*"
+    narration: "Hello one line\nand yet another,\nand why not another!"
+    postings {
+      account: "Expenses:Restaurant"
+      spec { units { number { exact: "100" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Cash"
+      spec { units { number { exact: "-100" } currency: "USD" } }
+    }
+  }
+}

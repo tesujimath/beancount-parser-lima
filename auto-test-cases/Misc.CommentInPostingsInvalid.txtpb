@@ -1,0 +1,16 @@
+directives {
+  date { year: 2017 month: 6 day: 27 }
+  transaction {
+    flag: "*"
+    narration: "Bitcoin network fee"
+    postings {
+      account: "Expenses:Crypto:NetworkFees"
+      spec {
+        units { number { exact: "0.00082487" } currency: "BTC" }
+      }
+    }
+  }
+}
+errors {
+  message: "Syntax error, unexpected INDENT"
+}

@@ -1,0 +1,19 @@
+directives {
+  transaction {
+    postings {
+      spec {
+        units { number { exact: "-10" } currency: "MSFT" }
+        price { number { exact: "200.00" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec {
+        units { number { exact: "2000.00" } currency: "USD" }
+      }
+    }
+  }
+}
+errors {
+  message: 'Negative prices are not allowed (see http://furius.ca/beancount/doc/bug-negative-prices for workaround)'
+}

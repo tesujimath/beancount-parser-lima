@@ -1,0 +1,23 @@
+directives {
+  date { year: 2010 month: 5 day: 28 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Account1"
+      spec {
+        units { number { exact: "2" } currency: "HOOL" }
+        cost {
+          per_unit { number { exact: "150" } }
+          total { number { exact: "5" } }
+          currency: "USD"
+        }
+      }
+    }
+    postings {
+      account: "Assets:Account2"
+      spec {
+        units { number { exact: "120.00" } currency: "USD" }
+      }
+    }
+  }
+}

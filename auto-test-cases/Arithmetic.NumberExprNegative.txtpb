@@ -1,0 +1,25 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    narration: "Test"
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "-12" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "-7.5" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "-7.5" } currency: "USD" }
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+directives {
+  date { year: 2013 month: 5 day: 1 }
+  open {
+    account: "Assets:Cash"
+    currencies: "USD"
+    currencies: "CAD"
+    currencies: "EUR"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 2 }
+  close {
+    account: "Assets:US:BestBank:Checking"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 3 }
+  pad {
+    account: "Assets:US:BestBank:Checking"
+    source_account: "Equity:Opening-Balances"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 4 }
+  event {
+    type: "location"
+    description: "New York, USA"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 5 }
+  transaction {
+    flag: "*"
+    payee: "Payee"
+    narration: "Narration"
+    postings {
+      account: "Assets:US:BestBank:Checking"
+      spec { units { number { exact: "100.00" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Cash"
+      spec { units { number { exact: "-100.00" } currency: "USD" } }
+    }
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 6 }
+  note {
+    account: "Assets:US:BestBank:Checking"
+    comment: "Blah, di blah."
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 7 }
+  price {
+    currency: "USD"
+    amount { number { exact: "1.0290" } currency: "CAD" }
+  }
+}

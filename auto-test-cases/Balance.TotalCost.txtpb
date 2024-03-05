@@ -1,0 +1,40 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        cost { total { number { exact: "2000" } } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec {
+        units { number { exact: "-20000" } currency: "USD" }
+      }
+    }
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        cost {
+          total { number { exact: "2000" } }
+          currency: "USD"
+          date { year: 2014 month: 2 day: 25 }
+        }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "-20000" } currency: "USD" } }
+    }
+  }
+}

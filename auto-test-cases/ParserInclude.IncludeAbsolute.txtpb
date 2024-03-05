@@ -1,0 +1,3 @@
+info {
+  include: "/some/absolute/filename.beancount"
+}

@@ -1,0 +1,17 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "string" value { text: "Something" } }
+    kv { key: "account" value { account: "Assets:Investments:Cash" } }
+    kv { key: "date" value { date { year: 2012 month: 1 day: 1 } } }
+    kv { key: "currency" value { currency: "HOOL" } }
+    kv { key: "tag" value { tag: "trip-florida" } }
+    kv { key: "number" value { number { exact: "345.67" } } }
+    kv { key: "amount" value { amount { number { exact: "345.67" } currency: "USD" } } }
+    kv { key: "boolt" value { boolean: true } }
+    kv { key: "boolf" value { boolean: false } }
+  }
+  transaction {
+    flag: "*"
+  }
+}

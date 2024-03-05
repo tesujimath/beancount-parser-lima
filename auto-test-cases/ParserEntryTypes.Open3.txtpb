@@ -1,0 +1,9 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  open {
+    account: "Assets:Cash"
+    currencies: "USD"
+    currencies: "CAD"
+    currencies: "EUR"
+  }
+}

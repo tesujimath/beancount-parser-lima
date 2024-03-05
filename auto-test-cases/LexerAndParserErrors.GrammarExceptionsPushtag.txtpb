@@ -1,0 +1,12 @@
+directives {
+  date { year: 2000 month: 1 day: 1 }
+  open { account: "Assets:Before" }
+}
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  tags: "sometag"
+  close { account: "Assets:Before" }
+}
+errors {
+  message: "Unbalanced pushed tag: \'sometag\'"
+}

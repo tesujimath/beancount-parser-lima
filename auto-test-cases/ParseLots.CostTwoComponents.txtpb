@@ -1,0 +1,46 @@
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost {
+        per_unit { number { exact: "45.23" } }
+        currency: "USD"
+        date { year: 2014 month: 12 day: 26 }
+      } }
+    }
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost {
+        per_unit { number { exact: "45.23" } }
+        currency: "USD"
+        date { year: 2014 month: 12 day: 26 }
+      } }
+    }
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost { per_unit { number { exact: "45.23" } } currency: "USD"
+                    label: "d82d55a0dbe8" } }
+    }
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost { per_unit { number { exact: "45.23" } } currency: "USD"
+                    label: "d82d55a0dbe8" } }
+    }
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost { date { year: 2014 month: 12 day: 26 } label: "d82d55a0dbe8" } }
+    }
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "1" } currency: "AAPL" }
+             cost { date { year: 2014 month: 12 day: 26 } label: "d82d55a0dbe8" } }
+    }
+  }
+}

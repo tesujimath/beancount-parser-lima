@@ -1,0 +1,14 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  event {
+    type: "location"
+    description: "New York, USA"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  event {
+    type: "location"
+    description: ""
+  }
+}

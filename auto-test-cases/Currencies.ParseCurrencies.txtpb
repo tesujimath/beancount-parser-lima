@@ -1,0 +1,10 @@
+directives { date { year: 2014 month: 1 day: 19 }
+  open { account: "Assets:Underscore" currencies: "DJ_EURO" } }
+directives { date { year: 2014 month: 1 day: 19 }
+  open { account: "Assets:Period" currencies: "DJ.EURO" } }
+directives { date { year: 2014 month: 1 day: 19 }
+  open { account: "Assets:Apostrophe" currencies: "DJ\'EURO" } }
+directives { date { year: 2014 month: 1 day: 19 }
+  open { account: "Assets:Numbers" currencies: "EURO123" } }
+directives { date { year: 2014 month: 1 day: 19 }
+  open { account: "Assets:Futures" currencies: "/LOX21_211204_P100.25" } }

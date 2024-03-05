@@ -1,0 +1,20 @@
+# Note: no transaction is produced.
+
+errors {
+  message: "Syntax error, unexpected invalid token, expecting EOL or ATAT or AT"
+}
+errors {
+  message: "Syntax error, unexpected invalid token, expecting EOL or ATAT or AT"
+}
+errors {
+  message: "Syntax error, unexpected invalid token, expecting EOL or ATAT or AT"
+}
+errors {
+  message: "Syntax error, unexpected RPAREN, expecting EOL or ATAT or AT"
+}
+errors {
+  message: "Syntax error, unexpected RPAREN, expecting EOL or ATAT or AT"
+}
+errors {
+  message: "Syntax error, unexpected RPAREN, expecting EOL or ATAT or AT"
+}

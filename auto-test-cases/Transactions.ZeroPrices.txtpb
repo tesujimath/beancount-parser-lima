@@ -1,0 +1,22 @@
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  transaction {
+    flag: "*"
+    narration: "Like a conversion entry"
+    postings {
+      account: "Equity:Conversions"
+      spec { units { number { exact: "100" } currency: "USD" }
+             price { number { exact: "0" } currency: "XFER" } }
+    }
+    postings {
+      account: "Equity:Conversions"
+      spec { units { number { exact: "101" } currency: "CAD" }
+             price { number { exact: "0" } currency: "XFER" } }
+    }
+    postings {
+      account: "Equity:Conversions"
+      spec { units { number { exact: "102" } currency: "AUD" }
+             price { number { exact: "0" } currency: "XFER" } }
+    }
+  }
+}

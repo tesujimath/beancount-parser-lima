@@ -1,0 +1,56 @@
+ directives {
+   date { year: 2013 month: 5 day: 1 }
+   open { account: "Assets:US:Cash" }
+ }
+ directives {
+   date { year: 2013 month: 5 day: 03 }
+   balance {
+     account: "Assets:US:Cash"
+     amount { number { exact: "-100" } currency: "USD" }
+   }
+ }
+ errors {
+   message: "Syntax error, unexpected CURRENCY, expecting EOL or TAG or LINK"
+   location { lineno: 3 }
+ }
+  )", { .leave_lineno = true });
+}
+
+TEST(TestSyntaxErrors, ErrorInPosting) {
+  ExpectParse(R"(
+2013-05-01 open Assets:US:Cash
+
+2013-05-02 * "Dinner"
+  Expenses:Resta(urant              100 USD
+  Assets:US:Cash                   -100 USD
+
+2013-05-03 balance Assets:US:Cash  -100 USD
+  )", R"(
+ directives {
+   date { year: 2013 month: 5 day: 1 }
+   open { account: "Assets:US:Cash" }
+ }
+ directives {
+   date { year: 2013 month: 5 day: 03 }
+   balance {
+     account: "Assets:US:Cash"
+     amount { number { exact: "-100" } currency: "USD" }
+   }
+ }
+ errors {
+   message: "Syntax error, unexpected invalid token, expecting PLUS or MINUS or LPAREN or NUMBER"
+   location { lineno: 4 }
+ }
+  )", { .leave_lineno = true });
+}
+
+//------------------------------------------------------------------------------
+// TestParserOptions
+
+TEST(TestParserOptions, OptionSingleValue) {
+  ExpectParse(R"(
+option "title" "Super Rich"
+  )", R"(
+options {
+  title: "Super Rich"
+}

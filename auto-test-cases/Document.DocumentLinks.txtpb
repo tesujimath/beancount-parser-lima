@@ -1,0 +1,8 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  links: "something"
+  document {
+    account: "Assets:US:BestBank:Checking"
+    filename: "/statement.pdf"
+  }
+}

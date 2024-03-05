@@ -1,0 +1,8 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  open {
+    account: "Assets:US:Vanguard:VIIPX"
+    currencies: "VIIPX"
+    booking: STRICT
+  }
+}

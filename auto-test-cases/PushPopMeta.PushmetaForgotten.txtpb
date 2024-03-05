@@ -1,0 +1,3 @@
+errors {
+  message: "Unbalanced metadata key \'location\' has leftover metadata"
+}

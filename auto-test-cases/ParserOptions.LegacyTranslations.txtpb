@@ -1,0 +1,6 @@
+options {
+  account_types {
+    assets: 'Actifs'
+    liabilities: 'Passifs'
+  }
+}

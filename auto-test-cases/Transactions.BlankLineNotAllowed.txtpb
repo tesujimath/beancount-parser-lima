@@ -1,0 +1,14 @@
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  transaction {
+    flag: "*"
+    narration: "Busted!"
+    postings {
+      account: "Assets:Checking"
+      spec { units { number { exact: "100" } currency: "USD" } }
+    }
+  }
+}
+errors {
+  message: "Syntax error, unexpected INDENT"
+}

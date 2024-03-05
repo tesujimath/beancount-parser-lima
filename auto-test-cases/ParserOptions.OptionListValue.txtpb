@@ -1,0 +1,5 @@
+options {
+  documents: "/path/docs/a"
+  documents: "/path/docs/b"
+  documents: "/path/docs/c"
+}

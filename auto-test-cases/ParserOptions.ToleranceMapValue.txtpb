@@ -1,0 +1,5 @@
+options {
+  inferred_tolerance_default { key: "*" value: "0" }
+  inferred_tolerance_default { key: "JPY" value: "0.5" }
+  inferred_tolerance_default { key: "USD" value: "0.05" }
+}

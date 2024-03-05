@@ -1,0 +1,15 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  balance {
+    account: "Assets:US:BestBank:Checking"
+    amount { number { exact: "200" } currency: "USD" }
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  balance {
+    account: "Assets:US:BestBank:Checking"
+    amount { number { exact: "200" } currency: "USD" }
+    tolerance { exact: "0.002" }
+  }
+}

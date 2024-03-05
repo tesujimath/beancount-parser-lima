@@ -1,0 +1,7 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  price {
+    currency: "USD"
+    amount { number { exact: "1.0290" } currency: "CAD" }
+  }
+}

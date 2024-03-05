@@ -1,0 +1,24 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  custom {
+    type: "budget"
+    values {
+      text: "weekly < 1000.00 USD"
+    }
+    values {
+      date { year: 2016 month: 2 day: 28 }
+    }
+    values {
+      boolean: true
+    }
+    values {
+      number { exact: "43.03" }
+    }
+    values {
+      currency: "USD"
+    }
+    values {
+      number { exact: "23" }
+    }
+  }
+}

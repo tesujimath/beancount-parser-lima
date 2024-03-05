@@ -1,0 +1,14 @@
+directives {
+  date { year: 2015 month: 6 day: 7 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Cash"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Cash"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
+}

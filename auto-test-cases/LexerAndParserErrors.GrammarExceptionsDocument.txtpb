@@ -1,0 +1,15 @@
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  close { account: "Assets:Before" }
+}
+directives {
+  date { year: 2010 month: 1 day: 1 }
+  document {
+    account: "Assets:Before"
+    filename: "/path/to/document.png"
+  }
+}
+directives {
+  date { year: 2000 month: 1 day: 1 }
+  open { account: "Assets:Before" }
+}

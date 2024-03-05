@@ -1,0 +1,19 @@
+directives {
+  date { year: 2010 month: 5 day: 28 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Account1"
+      spec {
+        units { number { exact: "100.00" } currency: "USD" }
+        price { currency: "CAD" }
+      }
+    }
+    postings {
+      account: "Assets:Account2"
+      spec {
+        units { number { exact: "120.00" } currency: "CAD" }
+      }
+    }
+  }
+}

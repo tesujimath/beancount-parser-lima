@@ -1,0 +1,3 @@
+errors {
+  message: "Syntax error, unexpected OPEN, expecting ACCOUNT"
+}

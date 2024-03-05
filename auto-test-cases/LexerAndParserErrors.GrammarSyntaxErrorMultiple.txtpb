@@ -1,0 +1,18 @@
+directives {
+  date { year: 2000 month: 1 day: 1 }
+  open { account: "Assets:Before" }
+}
+directives {
+  date { year: 2000 month: 1 day: 3 }
+  open { account: "Assets:After" }
+}
+directives {
+  date { year: 2000 month: 1 day: 5 }
+  close { account: "Assets:After" }
+}
+errors {
+  message: "Syntax error, unexpected OPEN, expecting ACCOUNT"
+}
+errors {
+  message: "Syntax error, unexpected CLOSE, expecting ACCOUNT"
+}

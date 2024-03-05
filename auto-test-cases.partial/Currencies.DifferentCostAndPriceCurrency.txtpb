@@ -1,0 +1,6 @@
+directives {
+  # ..
+}
+errors {
+  message: "Cost and price currencies must match: USD != KRISFLYER"
+}

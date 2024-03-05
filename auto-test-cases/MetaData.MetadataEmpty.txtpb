@@ -1,0 +1,20 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "oranges" value {} }
+    kv { key: "bananas" value {} }
+  }
+  transaction {
+    flag: "*"
+    narration: "blabla"
+  }
+}
+directives {
+  date { year: 2013 month: 5 day: 19 }
+  meta {
+    kv { key: "apples" value {} }
+  }
+  open {
+    account: "Assets:Something"
+  }
+}

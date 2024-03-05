@@ -1,0 +1,17 @@
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  tags: "trip"
+  links: "610fa7f17e7a"
+  transaction {
+    flag: "*"
+    narration: "Money from CC"
+    postings {
+      account: "Expenses:Restaurant"
+      spec { units { number { exact: "100" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:US:Cash"
+      spec { units { number { exact: "-100" } currency: "USD" } }
+    }
+  }
+}

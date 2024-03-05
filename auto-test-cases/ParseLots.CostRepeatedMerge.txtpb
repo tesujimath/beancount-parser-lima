@@ -1,0 +1,3 @@
+errors {
+  message: "Duplicate `merge_cost` cost spec field."
+}

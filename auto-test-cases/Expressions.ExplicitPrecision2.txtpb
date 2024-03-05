@@ -1,0 +1,10 @@
+options {
+  decimal_evaluation_precision: 5
+}
+directives {
+  date { year: 2021 month: 9 day: 19 }
+  balance {
+    account: "Assets:US:Checking"
+    amount { number { exact: "2.8571" } currency: "USD" }
+  }
+}

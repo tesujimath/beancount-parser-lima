@@ -1,0 +1,18 @@
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Invest:AAPL"
+      spec { units { number { exact: "10" } currency: "AAPL" }
+             cost {
+        total { number { exact: "9.95" } }
+        currency: "USD"
+      } }
+    }
+    postings {
+      account: "Assets:Invest:Cash"
+      spec { units { number { exact: "-19.90" } currency: "USD" } }
+    }
+  }
+}

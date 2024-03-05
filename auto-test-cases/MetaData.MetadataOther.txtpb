@@ -1,0 +1,85 @@
+directives {
+  date { year: 2013 month: 1 day: 1 }
+  open {
+    account: "Equity:Other"
+  }
+}
+directives {
+  date { year: 2013 month: 1 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+    kv { key: "test2" value { text: "Something" } }
+  }
+  open {
+    account: "Assets:Investments"
+  }
+}
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  close {
+    account: "Assets:Investments"
+  }
+}
+directives {
+  date { year: 2013 month: 1 day: 10 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  note {
+    account: "Assets:Investments"
+    comment: "Bla"
+  }
+}
+directives {
+  date { year: 2013 month: 1 day: 31 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  pad {
+    account: "Assets:Investments"
+    source_account: "Equity:Other"
+  }
+}
+directives {
+  date { year: 2013 month: 2 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  balance {
+    account: "Assets:Investments"
+    amount { number { exact: "111.00" } currency: "USD" }
+  }
+}
+directives {
+  date { year: 2013 month: 3 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  event {
+    type: "location"
+    description: "Nowhere"
+  }
+}
+directives {
+  date { year: 2013 month: 3 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  document {
+    account: "Assets:Investments"
+    filename: "/path/to/something.pdf"
+  }
+}
+directives {
+  date { year: 2013 month: 3 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  price {
+    currency: "HOOL"
+    amount { number { exact: "500" } currency: "USD" }
+  }
+}

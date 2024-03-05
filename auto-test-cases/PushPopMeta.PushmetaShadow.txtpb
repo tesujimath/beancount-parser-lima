@@ -1,0 +1,62 @@
+directives {
+  date { year: 2015 month: 6 day: 7 }
+  meta {
+    kv { key: "location" value { text: "Lausanne, Switzerland" } }
+    kv { key: "location" value { text: "Paris, France" } }
+  }
+  transaction {
+    flag: "*"
+    narration: "Something"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
+}
+  )", { .allow_multi_meta = true });
+}
+
+TEST(TestMetaData, MetadataTransactionRepeated) {
+  ExpectParse(R"(
+2013-05-18 * ""
+  test: "Bananas"
+  test: "Apples"
+  test: "Oranges"
+  Assets:Investments   100 USD
+    test: "Mangos"
+    test: "Pineapple"
+  Income:Investments  -100 USD
+  )", R"(
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  meta {
+    kv { key: "test" value { text: "Bananas" } }
+  }
+  transaction {
+    flag: "*"
+    postings {
+      meta {
+        kv { key: "test" value { text: "Mangos" } }
+      }
+      account: "Assets:Investments"
+      spec { units { number { exact: "100" } currency: "USD" } }
+    }
+    postings {
+      account: "Income:Investments"
+      spec { units { number { exact: "-100" } currency: "USD" } }
+    }
+  }
+}
+errors {
+  message: "Duplicate metadata key: \'test\' with value \'text: \"Apples\"\n\'"
+}
+errors {
+  message: "Duplicate metadata key: \'test\' with value \'text: \"Oranges\"\n\'"
+}
+errors {
+  message: "Duplicate metadata key: \'test\' with value \'text: \"Pineapple\"\n\'"
+}

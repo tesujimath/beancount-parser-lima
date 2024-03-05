@@ -1,0 +1,13 @@
+directives {
+  transaction {
+    postings {
+      spec {
+        units { number { exact: "-10" } currency: "MSFT" }
+        cost { total { number { exact: "-200.00" } } currency: "USD" }
+      }
+    }
+    postings {
+      # ...
+    }
+  }
+}
