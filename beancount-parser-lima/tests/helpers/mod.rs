@@ -1,5 +1,5 @@
 use self::beancount::{
-    data::{Amount, Balance, Directive, Error, Posting, Transaction},
+    data::{meta_value, Amount, Balance, Directive, Error, Meta, MetaValue, Posting, Transaction},
     date::Date,
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
@@ -10,6 +10,7 @@ use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
 use std::{
+    collections::{HashMap, HashSet},
     env,
     fmt::Display,
     fs::read_to_string,
@@ -183,6 +184,9 @@ impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
         self.date()
             .expect_eq_unwrapped(expected.date.as_ref(), ctx.with("date"));
 
+        // TODO
+        // self.metadata().is(metadata);
+
         match self.variant() {
             lima::DirectiveVariant::Transaction(variant) if expected.has_transaction() => {
                 variant.expect_eq(expected.transaction(), ctx.with("transaction"));
@@ -271,6 +275,122 @@ impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
         assert_eq!(self.len(), expected.len(), "postings.len");
         for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
             actual.expect_eq(expected, ctx.with(format!("postings[{}]", i)))
+        }
+    }
+}
+
+// expected metadata
+struct Metadata {
+    tags: Vec<String>,
+    links: Vec<String>,
+    meta: Meta,
+}
+
+impl<'a> ExpectEq<Metadata> for lima::Metadata<'a> {
+    fn expect_eq(&self, expected: &Metadata, ctx: Context) {
+        let expected_tags = expected
+            .tags
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<HashSet<_>>();
+        let expected_links = expected
+            .links
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(
+            self.tags()
+                .map(|tag| tag.item().as_ref())
+                .collect::<HashSet<_>>(),
+            expected_tags,
+            "{}",
+            ctx.with("tags")
+        );
+
+        assert_eq!(
+            self.links()
+                .map(|link| link.item().as_ref())
+                .collect::<HashSet<_>>(),
+            expected_links,
+            "{}",
+            ctx.with("links")
+        );
+
+        self.key_values()
+            .map(|(k, v)| (k.item().as_ref(), v.item()))
+            .collect::<HashMap<_, _>>()
+            .expect_eq(&expected.meta, ctx.with("key_values"));
+    }
+}
+
+impl<'a> ExpectEq<Meta> for HashMap<&str, &lima::MetaValue<'a>> {
+    fn expect_eq(&self, expected: &Meta, ctx: Context) {
+        assert_eq!(self.len(), expected.kv.len(), "length at {}", &ctx);
+
+        for kv in expected.kv.iter() {
+            let key = kv.key.as_ref().unwrap().as_str();
+            match self.get(key) {
+                Some(actual) => actual.expect_eq_unwrapped(kv.value.as_ref(), ctx.with(key)),
+                None => panic!(
+                    "expected metadata key {} at {}",
+                    key,
+                    ctx.with("key_values")
+                ),
+            }
+        }
+    }
+}
+
+impl<'a> ExpectEq<MetaValue> for lima::MetaValue<'a> {
+    fn expect_eq(&self, expected: &MetaValue, ctx: Context) {
+        use lima::MetaValue::*;
+        use lima::SimpleValue;
+        use lima::SimpleValue::*;
+        use meta_value::Value;
+        use Option::None; // shadow SimpleValue::None
+
+        match (self, &expected.value) {
+            (Simple(String(actual)), Some(Value::Text(expected))) => {
+                actual.expect_eq(expected, ctx.with("text"));
+                // assert_eq!(*actual, expected.as_str(), "{}", ctx.with("text"))
+            }
+
+            (Simple(Currency(actual)), Some(Value::Currency(expected))) => {
+                actual.expect_eq(expected, ctx.with("currency"))
+            }
+
+            (Simple(Account(actual)), Some(Value::Account(expected))) => {
+                actual.expect_eq(expected, ctx.with("account"))
+            }
+
+            (Simple(Tag(actual)), Some(Value::Tag(expected))) => {
+                actual.as_ref().expect_eq(expected, ctx.with("tag"))
+            }
+
+            (Simple(Link(actual)), Some(Value::Link(expected))) => {
+                actual.as_ref().expect_eq(expected, ctx.with("link"))
+            }
+
+            (Simple(Date(actual)), Some(Value::Date(expected))) => {
+                actual.expect_eq(expected, ctx.with("date"))
+            }
+
+            (Simple(Bool(actual)), Some(Value::Boolean(expected))) => {
+                actual.expect_eq(expected, ctx.with("boolean"))
+            }
+
+            (Simple(SimpleValue::None), None) => (),
+
+            (Simple(Expr(actual)), Some(Value::Number(expected))) => {
+                actual.value().expect_eq(expected, ctx.with("number"))
+            }
+
+            (Amount(actual), Some(Value::Amount(expected))) => {
+                actual.expect_eq(expected, ctx.with("amount"))
+            }
+
+            _ => panic!("mismatched metavalue at {}", &ctx),
         }
     }
 }
