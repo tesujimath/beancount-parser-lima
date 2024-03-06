@@ -860,7 +860,9 @@ where
     choice((
         (compound_expr().then(currency())).map(|(amount, cur)| CurrencyAmount(amount, cur)),
         compound_expr().map(BareAmount),
-        currency().map(BareCurrency),
+        just(Token::Hash) // bare currency may or may not be preceeded by hash
+            .or_not()
+            .ignore_then(currency().map(BareCurrency)),
     ))
 }
 

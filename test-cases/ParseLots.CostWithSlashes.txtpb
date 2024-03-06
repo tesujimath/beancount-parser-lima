@@ -1,3 +1,3 @@
 errors {
-  message: "Syntax error, unexpected SLASH, expecting RCURL or COMMA"
+  message: "found '/' expected ',', or '}'"
 }
