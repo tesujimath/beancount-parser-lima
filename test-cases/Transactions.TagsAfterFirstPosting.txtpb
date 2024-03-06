@@ -1,0 +1,26 @@
+# ANOMALY: Lima counts any metadata after a posting as associated with that posting
+# which seems to match what is described at
+# https://beancount.github.io/docs/beancount_language_syntax.html#metadata_1
+# which also bears the comment
+# (the additional indentation from the posting is not strictly necessary but it helps with readability).
+# Futhermoew, wherever a line of metadata is accepted, so too is a tag or a link.
+#
+# Alas our protobuf schema doesn't allow for tags and links to appear in Meta,
+# so we are currently unable to write a test which verifies correct behaviour here.
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  tags: "basetag"
+  links: "baselink"
+  transaction {
+    flag: "*"
+    narration: "Links and tags on subsequent lines"
+    postings {
+      account: "Assets:Checking"
+      spec { units { number { exact: "100" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Checking"
+      spec { units { number { exact: "-99" } currency: "USD" } }
+    }
+  }
+}

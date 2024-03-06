@@ -7,6 +7,11 @@ directives {
       account: "Assets:Something"
       spec {
         units { number { exact: "-12" } currency: "HOOL" }
+        # ANOMALY: Lima calculates the values of expressions using scaled decimals
+        # which retain accuracy to the number of decimal places given.
+        # So here it results in a rounded value of 252.02, rather than 252.021
+        # See some discussion here:
+        # https://beancount.github.io/docs/rounding_precision_in_beancount.html#automatically-inferring-tolerance
         cost { per_unit { number { exact: "252.021" } } currency: "USD" }
         price { number { exact: "281.442" } currency: "USD" }
       }

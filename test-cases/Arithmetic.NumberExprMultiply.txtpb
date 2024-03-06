@@ -12,7 +12,9 @@ directives {
     postings {
       account: "Assets:Something"
       spec {
-        units { number { exact: "23.25" } currency: "USD" }
+        # ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
+        # see discussion in that test
+        units { number { exact: "23.3" } currency: "USD" }
       }
     }
   }

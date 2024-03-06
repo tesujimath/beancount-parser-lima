@@ -1,0 +1,3 @@
+errors {
+  message: "found 'Assets:Checking' expected transaction, or directive"
+}

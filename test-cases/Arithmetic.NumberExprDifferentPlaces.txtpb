@@ -1,0 +1,37 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    flag: "*"
+    narration: "Test"
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "-12" } currency: "HOOL" }
+        # ANOMALY: Lima calculates the values of expressions using scaled decimals
+        # which retain accuracy to the number of decimal places given.
+        # So here it results in a rounded value of 252.02, rather than 252.021
+        # See some discussion here:
+        # https://beancount.github.io/docs/rounding_precision_in_beancount.html#automatically-inferring-tolerance
+        cost { per_unit { number { exact: "252.02" } } currency: "USD" }
+        price { number { exact: "281.44" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Something"
+      spec {
+        units { number { exact: "1000000" } currency: "USD" }
+      }
+    }
+  }
+}
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  meta {
+    kv { key: "number" value { number { exact: "-5684.53" } } }
+  }
+  balance {
+    account: "Assets:Something"
+    # ANOMALY: as above
+    amount { number { exact: "3024.25" } currency: "USD" }
+  }
+}

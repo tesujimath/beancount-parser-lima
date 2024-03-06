@@ -5,6 +5,7 @@ directives {
   date { year: 2021 month: 9 day: 19 }
   balance {
     account: "Assets:US:Checking"
-    amount { number { exact: "2.8571" } currency: "USD" }
+    # ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
+    amount { number { exact: "2.9" } currency: "USD" }
   }
 }

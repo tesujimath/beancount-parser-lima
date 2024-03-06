@@ -1,0 +1,3 @@
+errors {
+  message: "found '\"C\"' expected something else"
+}

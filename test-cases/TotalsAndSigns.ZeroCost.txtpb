@@ -1,18 +1,20 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
     flag: "*"
     postings {
       account: "Assets:Investments:MSFT"
       spec {
         units { number { exact: "-10" } currency: "MSFT" }
-        cost { per_unit { number { exact: "-200.00" } } currency: "USD" }
+        cost { per_unit { number { exact: "0.00" } } currency: "USD" }
       }
     }
     postings {
       account: "Assets:Investments:Cash"
       spec {
-        units { number { exact: "2000.00" } currency: "USD" }
+        units { number { exact: "0.00" } currency: "USD" }
       }
     }
   }

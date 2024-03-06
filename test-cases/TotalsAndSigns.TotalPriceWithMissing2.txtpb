@@ -1,0 +1,20 @@
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { currency: "MSFT" }
+        # ANOMALY: Lima parser does not validate totals against units, that is for post-processing
+        price { number { exact: "2000" } currency: "USD" is_total: true }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "20000.00" } currency: "USD" } }
+    }
+  }
+}

@@ -62,8 +62,14 @@ fn check(
                     .enumerate()
                 {
                     if Some(actual.message()) != expected.message.as_deref() {
+                        let actual_message = actual.message().to_string();
                         sources.write(stderr, vec![actual]).unwrap();
-                        panic!("expected different error at errors[{}]", i);
+                        panic!(
+                            "expected '{}' found '{}' at errors[{}]",
+                            expected.message.as_deref().unwrap_or(""),
+                            actual_message,
+                            i,
+                        );
                     }
                 }
             } else {
