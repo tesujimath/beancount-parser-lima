@@ -1,0 +1,4 @@
+errors {
+  # cost spec may not specify both per-unit and total
+  message: "found '2000' expected something else"
+}
