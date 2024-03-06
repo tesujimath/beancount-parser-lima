@@ -1358,7 +1358,7 @@ pub struct Posting<'a> {
     pub(crate) amount: Option<Spanned<ExprValue>>,
     pub(crate) currency: Option<Spanned<Currency<'a>>>,
     pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
-    pub(crate) price_annotation: Option<Spanned<ScopedAmount<'a>>>,
+    pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
     pub(crate) metadata: Metadata<'a>,
 }
 
@@ -1389,7 +1389,7 @@ impl<'a> Posting<'a> {
     }
 
     /// Field accessor.
-    pub fn price_annotation(&self) -> Option<&Spanned<ScopedAmount>> {
+    pub fn price_annotation(&self) -> Option<&Spanned<PriceSpec>> {
         self.price_annotation.as_ref()
     }
 
@@ -1913,7 +1913,27 @@ impl fmt::Debug for Expr {
     }
 }
 
-/// An `ExprValue` which quantifies a total or per-unit.
+/// An `ExprValue` which quantifies a total or per-unit, or both.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum CompoundExprValue {
+    PerUnit(ExprValue),
+    Total(ExprValue),
+    PerUnitAndTotal(ExprValue, ExprValue),
+}
+
+impl Display for CompoundExprValue {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::CompoundExprValue::*;
+
+        match self {
+            PerUnit(e) => write!(format, "{}", e),
+            Total(e) => write!(format, "# {}", e),
+            PerUnitAndTotal(per_unit, total) => write!(format, "{} # {}", per_unit, total),
+        }
+    }
+}
+
+/// An `ExprValue` which quantifies either a total or per-unit, but not both.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ScopedExprValue {
     PerUnit(ExprValue),
@@ -2025,17 +2045,17 @@ impl<'a> LooseAmount<'a> {
     }
 }
 
-/// An amount which specifies a total or per-unit `ScopedExprValue`, or simply just a `Currency`.
+/// An amount which specifies a total or per-unit value or both, with or without a currency, or simply just a `Currency`.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum ScopedAmount<'a> {
+pub enum CompoundAmount<'a> {
     BareCurrency(Currency<'a>),
-    BareAmount(ScopedExprValue),
-    CurrencyAmount(ScopedExprValue, Currency<'a>),
+    BareAmount(CompoundExprValue),
+    CurrencyAmount(CompoundExprValue, Currency<'a>),
 }
 
-impl<'a> Display for ScopedAmount<'a> {
+impl<'a> Display for CompoundAmount<'a> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
-        use self::ScopedAmount::*;
+        use self::CompoundAmount::*;
         match self {
             BareCurrency(cur) => write!(format, "{}", cur),
             BareAmount(ce) => write!(format, "{}", ce),
@@ -2146,12 +2166,15 @@ pub(crate) struct CostSpecBuilder<'a> {
 }
 
 impl<'a> CostSpecBuilder<'a> {
-    pub(crate) fn compound_expr(self, value: ScopedExprValue, span: Span) -> Self {
-        use ScopedExprValue::*;
+    pub(crate) fn compound_expr(self, value: CompoundExprValue, span: Span) -> Self {
+        use CompoundExprValue::*;
 
         match value {
             PerUnit(value) => self.per_unit(spanned(value, span)),
             Total(value) => self.total(spanned(value, span)),
+            PerUnitAndTotal(per_unit, total) => self
+                .per_unit(spanned(per_unit, span))
+                .total(spanned(total, span)),
         }
     }
 
@@ -2301,5 +2324,25 @@ impl Display for CostSpecErrors {
 }
 
 impl std::error::Error for CostSpecErrors {}
+
+/// An amount which specifies a total or per-unit value, with or without a currency, or simply just a `Currency`.
+/// Unlike a `CompoundAmount` it is forbidden to have both total and per-unit.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum PriceSpec<'a> {
+    BareCurrency(Currency<'a>),
+    BareAmount(ScopedExprValue),
+    CurrencyAmount(ScopedExprValue, Currency<'a>),
+}
+
+impl<'a> Display for PriceSpec<'a> {
+    fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
+        use self::PriceSpec::*;
+        match self {
+            BareCurrency(cur) => write!(format, "{}", cur),
+            BareAmount(ce) => write!(format, "{}", ce),
+            CurrencyAmount(ce, cur) => write!(format, "{} {}", ce, cur),
+        }
+    }
+}
 
 mod tests;

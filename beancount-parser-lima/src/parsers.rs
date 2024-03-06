@@ -847,11 +847,11 @@ where
     .map(LooseAmount::new)
 }
 
-pub(crate) fn compound_amount<'src, I>() -> impl Parser<'src, I, ScopedAmount<'src>, Extra<'src>>
+pub(crate) fn compound_amount<'src, I>() -> impl Parser<'src, I, CompoundAmount<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use ScopedAmount::*;
+    use CompoundAmount::*;
 
     choice((
         (compound_expr().then(currency())).map(|(amount, cur)| CurrencyAmount(amount, cur)),
@@ -860,7 +860,25 @@ where
     ))
 }
 
-pub(crate) fn compound_expr<'src, I>() -> impl Parser<'src, I, ScopedExprValue, Extra<'src>>
+pub(crate) fn compound_expr<'src, I>() -> impl Parser<'src, I, CompoundExprValue, Extra<'src>>
+where
+    I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
+{
+    use CompoundExprValue::*;
+
+    choice((
+        // try for both per-unit and total first
+        expr_value()
+            .then_ignore(just(Token::Hash))
+            .then(expr_value())
+            .map(|(per_unit, total)| PerUnitAndTotal(per_unit, total)),
+        expr_value().then_ignore(just(Token::Hash)).map(PerUnit),
+        expr_value().map(PerUnit),
+        just(Token::Hash).ignore_then(expr_value()).map(Total),
+    ))
+}
+
+pub(crate) fn scoped_expr<'src, I>() -> impl Parser<'src, I, ScopedExprValue, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -873,11 +891,11 @@ where
     ))
 }
 
-pub(crate) fn price_annotation<'src, I>() -> impl Parser<'src, I, ScopedAmount<'src>, Extra<'src>>
+pub(crate) fn price_annotation<'src, I>() -> impl Parser<'src, I, PriceSpec<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use ScopedAmount::*;
+    use PriceSpec::*;
 
     fn scope(amount: ExprValue, is_total: bool) -> ScopedExprValue {
         use ScopedExprValue::*;
@@ -908,7 +926,7 @@ fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
-    use self::ScopedAmount::*;
+    use self::CompoundAmount::*;
     use CostComp::*;
 
     just(Token::Lcurl)
@@ -926,7 +944,7 @@ where
                     // accumulate the `CostComp`s in a `CostSpecBuilder`
                     CostSpecBuilder::default(),
                     |builder, cost_comp| match cost_comp.item {
-                        ScopedAmount(compound_amount) => match compound_amount {
+                        CompoundAmount(compound_amount) => match compound_amount {
                             BareCurrency(cur) => builder.currency(cur, cost_comp.span),
                             BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
                             CurrencyAmount(amount, cur) => builder
@@ -947,7 +965,7 @@ where
 /// One component of a cost specification.
 /// Setting a field type multiple times is rejected by methods in [CostSpec].
 enum CostComp<'a> {
-    ScopedAmount(ScopedAmount<'a>),
+    CompoundAmount(CompoundAmount<'a>),
     Date(Date),
     Label(&'a str),
     Merge,
@@ -961,7 +979,7 @@ where
     use CostComp::*;
 
     choice((
-        compound_amount().map(ScopedAmount),
+        compound_amount().map(CompoundAmount),
         date().map(Date),
         string().map(Label),
         just(Token::Asterisk).to(Merge),

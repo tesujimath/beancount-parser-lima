@@ -97,7 +97,7 @@ impl Converter {
             .map(|cost_spec| self.cost_spec(py, cost_spec.item()));
         let price_annotation = x
             .price_annotation()
-            .map(|price_annotation| self.scoped_amount(py, price_annotation.item()));
+            .map(|price_annotation| self.price_spec(py, price_annotation.item()));
         let metadata = self.metadata(py, x.metadata())?;
 
         Ok(Posting {
@@ -510,12 +510,8 @@ impl Converter {
         }
     }
 
-    pub(crate) fn scoped_amount(
-        &mut self,
-        py: Python<'_>,
-        x: &lima::ScopedAmount<'_>,
-    ) -> ScopedAmount {
-        use lima::ScopedAmount::*;
+    pub(crate) fn price_spec(&mut self, py: Python<'_>, x: &lima::PriceSpec<'_>) -> PriceSpec {
+        use lima::PriceSpec::*;
         use lima::ScopedExprValue::*;
 
         let per_unit = match x {
@@ -537,7 +533,7 @@ impl Converter {
         }
         .map(|currency| self.string.create_or_reuse(py, currency.as_ref()));
 
-        ScopedAmount {
+        PriceSpec {
             per_unit,
             total,
             currency,

@@ -610,13 +610,13 @@ impl Display for CostSpec {
 }
 
 #[pymethods]
-impl ScopedAmount {
+impl PriceSpec {
     fn __str__(&self, _py: Python<'_>) -> String {
         self.to_string()
     }
 }
 
-impl Display for ScopedAmount {
+impl Display for PriceSpec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut prefix = "";
         let space = " ";

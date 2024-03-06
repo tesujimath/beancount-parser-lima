@@ -47,7 +47,7 @@ pub(crate) struct Posting {
     #[pyo3(get)]
     pub(crate) cost_spec: Option<CostSpec>,
     #[pyo3(get)]
-    pub(crate) price_annotation: Option<ScopedAmount>,
+    pub(crate) price_annotation: Option<PriceSpec>,
     #[pyo3(get)]
     pub(crate) metadata: Option<Metadata>,
 }
@@ -192,7 +192,7 @@ pub(crate) struct CostSpec {
 /// An amount which specifies a total or per-unit and/or a currency.
 #[derive(Clone, Debug)]
 #[pyclass(frozen)]
-pub(crate) struct ScopedAmount {
+pub(crate) struct PriceSpec {
     #[pyo3(get)]
     pub(crate) per_unit: Option<Decimal>,
     #[pyo3(get)]

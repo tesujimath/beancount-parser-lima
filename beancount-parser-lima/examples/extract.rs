@@ -9,9 +9,9 @@ use time::Date;
 
 use beancount_parser_lima::{
     Account, AccountType, Amount, AmountWithTolerance, Balance, BeancountParser, BeancountSources,
-    Booking, Close, Commodity, CostSpec, Currency, Directive, DirectiveVariant, Document, Event,
-    ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad, ParseError,
-    ParseSuccess, Plugin, PluginProcessingMode, Posting, Price, Query, ScopedAmount,
+    Booking, Close, Commodity, CompoundExprValue, CostSpec, Currency, Directive, DirectiveVariant,
+    Document, Event, ExprValue, Flag, Key, Link, MetaValue, Metadata, Note, Open, Options, Pad,
+    ParseError, ParseSuccess, Plugin, PluginProcessingMode, Posting, Price, PriceSpec, Query,
     ScopedExprValue, SimpleValue, Subaccount, Tag, Transaction,
 };
 
@@ -513,11 +513,7 @@ fn posting<'a>(x: &'a Posting) -> impl Iterator<Item = Primitive<'a>> {
                 .chain(account(x.account()))
                 .chain(x.currency().into_iter().flat_map(|x| currency(x)))
                 .chain(x.cost_spec().into_iter().flat_map(|x| cost_spec(x)))
-                .chain(
-                    x.price_annotation()
-                        .into_iter()
-                        .flat_map(|x| scoped_amount(x)),
-                )
+                .chain(x.price_annotation().into_iter().flat_map(|x| price_spec(x)))
                 .spaced(),
         )
         .chain(keys_values(m))
@@ -624,8 +620,8 @@ fn cost_spec<'a>(x: &'a CostSpec<'a>) -> impl Iterator<Item = Primitive<'a>> {
         .chain(bool(x.merge()))
 }
 
-fn scoped_amount<'a>(x: &'a ScopedAmount<'a>) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
-    use ScopedAmount::*;
+fn price_spec<'a>(x: &'a PriceSpec<'a>) -> Box<dyn Iterator<Item = Primitive<'a>> + 'a> {
+    use PriceSpec::*;
 
     match x {
         BareCurrency(c) => Box::new(currency(c)),
@@ -640,6 +636,16 @@ fn scoped_expr_value(x: &ScopedExprValue) -> impl Iterator<Item = Primitive<'_>>
     match x {
         PerUnit(x) => Box::new(expr_value(x)),
         Total(x) => Box::new(expr_value(x)),
+    }
+}
+
+fn compound_expr_value(x: &CompoundExprValue) -> impl Iterator<Item = Primitive<'_>> {
+    use CompoundExprValue::*;
+
+    match x {
+        PerUnit(x) => Box::new(expr_value(x)),
+        Total(x) => Box::new(expr_value(x)),
+        PerUnitAndTotal(per_unit, total) => Box::new(expr_value(per_unit)), // TODO this is wrong, but the whole extract example is heading for imminent destruction
     }
 }
 

@@ -1,4 +1,21 @@
-errors {
-  # cost spec may not specify both per-unit and total
-  message: "found '2000' expected something else"
+# ANOMALY:
+directives {
+  date { year: 2013 month: 5 day: 18 }
+  transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
+    flag: "*"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        # ANOMALY: Lima accepts both per-unit and total
+        cost { per_unit { number { exact: "100" } } total { number { exact: "2000" } } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "-20000" } currency: "USD" } }
+    }
+  }
 }

@@ -442,9 +442,9 @@ impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
     }
 }
 
-impl<'a> ExpectEq<PriceSpec> for lima::ScopedAmount<'a> {
+impl<'a> ExpectEq<PriceSpec> for lima::PriceSpec<'a> {
     fn expect_eq(&self, expected: &PriceSpec, ctx: Context) {
-        use lima::ScopedAmount::*;
+        use lima::PriceSpec::*;
         use lima::ScopedExprValue::*;
 
         // it seems that expected proto defaults to false for is_total

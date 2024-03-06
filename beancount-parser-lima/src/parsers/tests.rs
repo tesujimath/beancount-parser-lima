@@ -66,12 +66,28 @@ fn test_transaction(
     )
 }
 
-#[test_case("GBP", ScopedAmount::BareCurrency(Currency::try_from("GBP").unwrap()))]
-#[test_case("456.78", ScopedAmount::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
-#[test_case("# 1456.98", ScopedAmount::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
-#[test_case("456.78 NZD", ScopedAmount::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap()))]
-#[test_case("# 1456.98 USD", ScopedAmount::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
-fn test_compound_amount(s: &str, expected: ScopedAmount) {
+#[test_case("@ GBP", PriceSpec::BareCurrency(Currency::try_from("GBP").unwrap()))]
+#[test_case("@ 456.78", PriceSpec::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
+#[test_case("@@ 1456.98", PriceSpec::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
+#[test_case("@ 456.78 NZD", PriceSpec::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap()))]
+#[test_case("@@ 1456.98 USD", PriceSpec::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
+fn test_price_annotation(s: &str, expected: PriceSpec) {
+    let source_id = SourceId::default();
+    let tokens = bare_lex_with_source(source_id, s);
+    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+
+    let result = price_annotation().parse(spanned_tokens).into_result();
+
+    assert_eq!(result, Ok(expected));
+}
+
+#[test_case("GBP", CompoundAmount::BareCurrency(Currency::try_from("GBP").unwrap()))]
+#[test_case("456.78", CompoundAmount::BareAmount(CompoundExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
+#[test_case("# 1456.98", CompoundAmount::BareAmount(CompoundExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
+#[test_case("456.78 NZD", CompoundAmount::CurrencyAmount(CompoundExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap()))]
+#[test_case("# 1456.98 USD", CompoundAmount::CurrencyAmount(CompoundExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
+#[test_case("123 # 1456.98 USD", CompoundAmount::CurrencyAmount(CompoundExprValue::PerUnitAndTotal(Expr::Value(dec!(123)).into(), Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
+fn test_compound_amount(s: &str, expected: CompoundAmount) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
@@ -81,10 +97,10 @@ fn test_compound_amount(s: &str, expected: ScopedAmount) {
     assert_eq!(result, Ok(expected));
 }
 
-#[test_case("123.45", ScopedExprValue::PerUnit(Expr::Value(dec!(123.45)).into()))]
-#[test_case("789.45 #", ScopedExprValue::PerUnit(Expr::Value(dec!(789.45)).into()))]
-#[test_case("# 123.45", ScopedExprValue::Total(Expr::Value(dec!(123.45)).into()))]
-fn test_compound_expr(s: &str, expected: ScopedExprValue) {
+#[test_case("123.45", CompoundExprValue::PerUnit(Expr::Value(dec!(123.45)).into()))]
+#[test_case("789.45 #", CompoundExprValue::PerUnit(Expr::Value(dec!(789.45)).into()))]
+#[test_case("# 123.45", CompoundExprValue::Total(Expr::Value(dec!(123.45)).into()))]
+fn test_compound_expr(s: &str, expected: CompoundExprValue) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
