@@ -4,8 +4,8 @@ directives {
     flag: "*"
     postings {
       account: "Assets:Invest:AAPL"
-      spec { units { number { exact: "20" } currency: "AAPL" }
-             cost { } }
+      # ANOMALY: Lima omits empty cost spec
+      spec { units { number { exact: "20" } currency: "AAPL" } }
     }
     postings {
       account: "Assets:Invest:Cash"

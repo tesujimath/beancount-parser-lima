@@ -654,7 +654,11 @@ where
                 account().map_with(spanned_extra),
                 expr_value().map_with(spanned_extra).or_not(),
                 currency().map_with(spanned_extra).or_not(),
-                cost_spec().map_with(spanned_extra).or_not(),
+                cost_spec().or_not().map_with(|cost_spec, e| {
+                    cost_spec
+                        .flatten()
+                        .map(|cost_spec| spanned(cost_spec, e.span()))
+                }),
                 price_annotation().map_with(spanned_extra).or_not(),
             ))
             .then_ignore(just(Token::Eol))
@@ -922,7 +926,7 @@ where
 
 /// Matches a [CostSpec].
 /// For now we only match the new syntax of single braces.
-fn cost_spec<'src, I>() -> impl Parser<'src, I, CostSpec<'src>, Extra<'src>>
+fn cost_spec<'src, I>() -> impl Parser<'src, I, Option<CostSpec<'src>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -930,34 +934,41 @@ where
     use CostComp::*;
 
     just(Token::Lcurl)
-        .ignore_then(group((
-            cost_comp().map_with(spanned_extra),
-            (just(Token::Comma).ignore_then(cost_comp().map_with(spanned_extra)))
-                .repeated()
-                .collect::<Vec<_>>(),
-        )))
+        .ignore_then(
+            group((
+                cost_comp().map_with(spanned_extra),
+                (just(Token::Comma).ignore_then(cost_comp().map_with(spanned_extra)))
+                    .repeated()
+                    .collect::<Vec<_>>(),
+            ))
+            .or_not(), // allow for empty cost spec
+        )
         .then_ignore(just(Token::Rcurl))
-        .try_map(move |(head, tail), span| {
-            once(head)
-                .chain(tail)
-                .fold(
-                    // accumulate the `CostComp`s in a `CostSpecBuilder`
-                    CostSpecBuilder::default(),
-                    |builder, cost_comp| match cost_comp.item {
-                        CompoundAmount(compound_amount) => match compound_amount {
-                            BareCurrency(cur) => builder.currency(cur, cost_comp.span),
-                            BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
-                            CurrencyAmount(amount, cur) => builder
-                                .compound_expr(amount, cost_comp.span)
-                                .currency(cur, cost_comp.span),
+        .try_map(move |cost_spec, span| match cost_spec {
+            Some((head, tail)) => {
+                once(head)
+                    .chain(tail)
+                    .fold(
+                        // accumulate the `CostComp`s in a `CostSpecBuilder`
+                        CostSpecBuilder::default(),
+                        |builder, cost_comp| match cost_comp.item {
+                            CompoundAmount(compound_amount) => match compound_amount {
+                                BareCurrency(cur) => builder.currency(cur, cost_comp.span),
+                                BareAmount(amount) => builder.compound_expr(amount, cost_comp.span),
+                                CurrencyAmount(amount, cur) => builder
+                                    .compound_expr(amount, cost_comp.span)
+                                    .currency(cur, cost_comp.span),
+                            },
+                            Date(date) => builder.date(date, cost_comp.span),
+                            Label(s) => builder.label(s, cost_comp.span),
+                            Merge => builder.merge(cost_comp.span),
                         },
-                        Date(date) => builder.date(date, cost_comp.span),
-                        Label(s) => builder.label(s, cost_comp.span),
-                        Merge => builder.merge(cost_comp.span),
-                    },
-                )
-                .build()
-                .map_err(|e| Rich::custom(span, e.to_string()))
+                    )
+                    .build()
+                    .map(Some)
+                    .map_err(|e| Rich::custom(span, e.to_string()))
+            }
+            None => Ok(None),
         })
 }
 
