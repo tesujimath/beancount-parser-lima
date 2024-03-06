@@ -52,14 +52,6 @@ This is important as semantic errors are not the business of the core parser to 
 cargo run --example check -- ./examples/data/full.beancount
 ```
 
-### extract
-
-This is more of a sanity check than anything else, that applications are able to extract parsed values without relying on the Display trait used by `dump`.
-
-```Shell
-cargo run --example extract -- ./examples/data/full.beancount
-```
-
 ## Uncertainties / TODOs
 
 Yeah, Beancount is complicated, and I may have made some mistakes here.  Current list of uncertainties, which is certainly not comprehensive.
