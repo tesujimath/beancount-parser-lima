@@ -1,5 +1,7 @@
 use self::beancount::{
-    data::{meta_value, Amount, Balance, Directive, Error, Meta, MetaValue, Posting, Transaction},
+    data::{
+        meta::KV, meta_value, Amount, Balance, Directive, Error, MetaValue, Posting, Transaction,
+    },
     date::Date,
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
@@ -168,7 +170,10 @@ impl Display for Context {
     }
 }
 
-trait ExpectEq<Rhs> {
+trait ExpectEq<Rhs>
+where
+    Rhs: ?Sized,
+{
     fn expect_eq(&self, expected: &Rhs, ctx: Context);
 }
 
@@ -207,8 +212,13 @@ impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
         self.date()
             .expect_eq_unwrapped(expected.date.as_ref(), ctx.with("date"));
 
-        // TODO
-        // self.metadata().is(metadata);
+        let expected_metadata = Metadata {
+            tags: &expected.tags,
+            links: &expected.links,
+            kv: expected.meta.as_ref().map(|m| m.kv.as_slice()),
+        };
+        self.metadata()
+            .expect_eq(&expected_metadata, ctx.with("metadata"));
 
         match self.variant() {
             lima::DirectiveVariant::Transaction(variant) if expected.has_transaction() => {
@@ -303,24 +313,80 @@ impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
 }
 
 // expected metadata
-struct Metadata {
-    tags: Vec<String>,
-    links: Vec<String>,
-    meta: Meta,
+struct Metadata<'a> {
+    tags: &'a [String],
+    links: &'a [String],
+    kv: Option<&'a [KV]>,
 }
 
-impl<'a> ExpectEq<Metadata> for lima::Metadata<'a> {
+impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
     fn expect_eq(&self, expected: &Metadata, ctx: Context) {
-        let expected_tags = expected
+        // tags and links on subsequent lines show up in kv as values without keys
+
+        let expected_inline_tags = expected
             .tags
             .iter()
             .map(|s| s.as_str())
             .collect::<HashSet<_>>();
-        let expected_links = expected
+        let expected_kv_tags = expected
+            .kv
+            .map(|kv| {
+                kv.iter()
+                    .filter_map(|kv| {
+                        match (
+                            kv.key.is_none(),
+                            kv.value.as_ref().and_then(|mv| mv.value.as_ref()),
+                        ) {
+                            (true, Some(meta_value::Value::Tag(tag))) => Some(tag.as_str()),
+                            _ => None,
+                        }
+                    })
+                    .collect::<HashSet<_>>()
+            })
+            .unwrap_or_default();
+        let expected_tags = expected_inline_tags
+            .into_iter()
+            .chain(expected_kv_tags)
+            .collect();
+
+        let expected_inline_links = expected
             .links
             .iter()
             .map(|s| s.as_str())
             .collect::<HashSet<_>>();
+        let expected_kv_links = expected
+            .kv
+            .map(|kv| {
+                kv.iter()
+                    .filter_map(|kv| {
+                        match (
+                            kv.key.is_none(),
+                            kv.value.as_ref().and_then(|mv| mv.value.as_ref()),
+                        ) {
+                            (true, Some(meta_value::Value::Link(link))) => Some(link.as_str()),
+                            _ => None,
+                        }
+                    })
+                    .collect::<HashSet<_>>()
+            })
+            .unwrap_or_default();
+        let expected_links = expected_inline_links
+            .into_iter()
+            .chain(expected_kv_links)
+            .collect();
+
+        let expected_kv = expected
+            .kv
+            .map(|kv| {
+                kv.iter()
+                    .filter_map(|kv| {
+                        kv.key
+                            .as_ref()
+                            .map(|k| (k.as_str(), kv.value.as_ref().unwrap()))
+                    })
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
 
         assert_eq!(
             self.tags()
@@ -343,18 +409,17 @@ impl<'a> ExpectEq<Metadata> for lima::Metadata<'a> {
         self.key_values()
             .map(|(k, v)| (k.item().as_ref(), v.item()))
             .collect::<HashMap<_, _>>()
-            .expect_eq(&expected.meta, ctx.with("key_values"));
+            .expect_eq(&expected_kv, ctx.with("key_values"));
     }
 }
 
-impl<'a> ExpectEq<Meta> for HashMap<&str, &lima::MetaValue<'a>> {
-    fn expect_eq(&self, expected: &Meta, ctx: Context) {
-        assert_eq!(self.len(), expected.kv.len(), "length at {}", &ctx);
+impl<'a, 'e> ExpectEq<HashMap<&'e str, &'e MetaValue>> for HashMap<&str, &lima::MetaValue<'a>> {
+    fn expect_eq(&self, expected: &HashMap<&str, &MetaValue>, ctx: Context) {
+        assert_eq!(self.len(), expected.len(), "length at {}", &ctx);
 
-        for kv in expected.kv.iter() {
-            let key = kv.key.as_ref().unwrap().as_str();
-            match self.get(key) {
-                Some(actual) => actual.expect_eq_unwrapped(kv.value.as_ref(), ctx.with(key)),
+        for (key, actual) in self {
+            match expected.get(key) {
+                Some(expected) => actual.expect_eq(expected, ctx.with(key)),
                 None => panic!("expected metadata key {} at {}", key, &ctx),
             }
         }
