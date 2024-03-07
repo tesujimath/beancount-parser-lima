@@ -330,7 +330,7 @@ impl ElementType for Booking {
 #[derive(
     EnumString, EnumIter, IntoStaticStr, PartialEq, Eq, Default, Clone, Copy, Display, Debug,
 )]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum PluginProcessingMode {
     #[default]
     Default,

@@ -1,3 +1,3 @@
 errors {
-  message: "Expected one of default, raw"
+  message: "Expected one of DEFAULT, RAW"
 }
