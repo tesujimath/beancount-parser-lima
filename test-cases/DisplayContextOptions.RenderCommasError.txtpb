@@ -1,0 +1,4 @@
+# ANOMALY: Lima parses this successfully
+options {
+  render_commas: true
+}

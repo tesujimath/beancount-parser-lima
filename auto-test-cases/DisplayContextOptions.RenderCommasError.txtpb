@@ -1,3 +1,0 @@
-errors {
-  message: "Could not parse and set option 'render_commas' with value 'TRUE'; ignored."
-}

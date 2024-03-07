@@ -135,7 +135,10 @@ impl<'a> BeancountOption<'a> {
 
             "operating_currency" => parse_currency(value.item).map(OperatingCurrency),
 
-            "render_commas" => parse_bool(value.item).map(RenderCommas),
+            // any of case-insensitive true, false, 0, 1
+            "render_commas" => parse_bool(value.item)
+                .or(parse_zero_or_one_as_bool(value.item))
+                .map(RenderCommas),
 
             "long_string_maxlines" => value
                 .item
@@ -213,6 +216,16 @@ fn parse_bool(value: &str) -> Result<bool, BeancountOptionError> {
     if value.eq_ignore_ascii_case("true") {
         Ok(true)
     } else if value.eq_ignore_ascii_case("false") {
+        Ok(false)
+    } else {
+        Err(BadValueErrorKind::Bool.wrap())
+    }
+}
+
+fn parse_zero_or_one_as_bool(value: &str) -> Result<bool, BeancountOptionError> {
+    if value == "1" {
+        Ok(true)
+    } else if value == "0" {
         Ok(false)
     } else {
         Err(BadValueErrorKind::Bool.wrap())
