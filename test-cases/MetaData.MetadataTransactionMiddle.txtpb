@@ -1,6 +1,8 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
     flag: "*"
     postings {
       meta {

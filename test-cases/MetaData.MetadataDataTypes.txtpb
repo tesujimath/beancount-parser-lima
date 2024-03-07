@@ -12,6 +12,8 @@ directives {
     kv { key: "boolf" value { boolean: false } }
   }
   transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
     flag: "*"
   }
 }

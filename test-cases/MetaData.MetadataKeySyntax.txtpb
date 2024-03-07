@@ -7,6 +7,8 @@ directives {
     kv { key: "name_on_card" value { text: "John" } }
   }
   transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
     flag: "*"
   }
 }

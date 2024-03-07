@@ -19,11 +19,11 @@ directives {
   }
 }
 errors {
-  message: "Duplicate metadata key: \'test\' with value \'text: \"Apples\"\n\'"
+  message: "duplicate key test"
 }
 errors {
-  message: "Duplicate metadata key: \'test\' with value \'text: \"Oranges\"\n\'"
+  message: "duplicate key test"
 }
 errors {
-  message: "Duplicate metadata key: \'test\' with value \'text: \"Pineapple\"\n\'"
+  message: "duplicate key test"
 }

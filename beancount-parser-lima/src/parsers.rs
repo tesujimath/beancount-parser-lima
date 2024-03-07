@@ -787,8 +787,6 @@ where
 }
 
 /// Matches a [SimpleValue].
-/// TODO: the original parser allowed for the SimpleValue to be empty, which we don't support here,
-/// unless and until it becomes necessary, because it seems a bit nasty to me. 🤷
 pub(crate) fn simple_value<'src, I>() -> impl Parser<'src, I, SimpleValue<'src>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
@@ -805,6 +803,7 @@ where
         bool().map(Bool),
         just(Token::Null).to(None),
         expr_value().map(Expr),
+        empty().to(None),
     ))
 }
 
