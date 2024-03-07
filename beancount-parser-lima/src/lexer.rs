@@ -495,13 +495,14 @@ impl<'a, I: Iterator<Item = RangedToken<'a>>> KeywordThenColonToKeyIteratorAdapt
 /// 1. Expand EolThenIndent into separate Eol and Indent tokens
 /// 2. Fold consecutive Eol tokens into a single one
 /// 3. Drop any initial Eol
-/// 4. Optionally, force a final Eol
+/// 4. Optionally, force a final Eol (unless input was empty)
 struct EolIndentHandler<'a, I> {
     iter: I,
     first_tok: Option<RangedToken<'a>>,
     pending: [Option<RangedToken<'a>>; 2],
     final_eol: Option<Range<usize>>,
     previous_was_eol: bool,
+    any: bool,
 }
 
 impl<'a, I> EolIndentHandler<'a, I>
@@ -520,6 +521,7 @@ where
             pending: [None, None],
             final_eol,
             previous_was_eol: false,
+            any: false,
         }
     }
 
@@ -587,7 +589,13 @@ where
             (None, Some(span)) => {
                 if !self.previous_was_eol {
                     self.previous_was_eol = true;
-                    Some((Token::Eol, span.clone()))
+
+                    // only force a final Eol if we've emitted anything at all
+                    if self.any {
+                        Some((Token::Eol, span.clone()))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -597,6 +605,8 @@ where
                 if item.0 == Token::Eol {
                     self.previous_was_eol = true;
                 }
+
+                self.any = true;
                 Some(item)
             }
         }
@@ -604,7 +614,7 @@ where
 }
 
 trait EolIndentHandlerIteratorAdaptor<'a>: Iterator<Item = RangedToken<'a>> + Sized {
-    /// Iterator adapter for mapping keyword-then-colon to key.
+    /// See comment for `EolIndentHandler`
     fn handle_eol_indent(self, final_eol: Option<Range<usize>>) -> EolIndentHandler<'a, Self> {
         EolIndentHandler::new(self, final_eol)
     }

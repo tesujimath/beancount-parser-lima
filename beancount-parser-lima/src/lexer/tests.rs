@@ -612,7 +612,7 @@ fn ignored_lines_comment() {
         r#"
     ;; Long comment line about something something.
 "#,
-        vec![Eol],
+        Vec::default(),
     );
 }
 
@@ -694,7 +694,7 @@ fn ignored_lines_non_comment_org_mode_title() {
         r#"
 * This sentence is an org-mode title.
 "#,
-        vec![Eol],
+        Vec::default(),
     );
 }
 
@@ -707,7 +707,7 @@ fn ignored_lines_non_comment_org_mode_drawer() {
     :this: is an org-mode property drawer
     :END:
 "#,
-        vec![Eol],
+        Vec::default(),
     );
 }
 
