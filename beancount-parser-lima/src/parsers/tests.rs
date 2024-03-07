@@ -66,12 +66,13 @@ fn test_transaction(
     )
 }
 
-#[test_case("@ GBP", PriceSpec::BareCurrency(Currency::try_from("GBP").unwrap()))]
-#[test_case("@ 456.78", PriceSpec::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into())))]
-#[test_case("@@ 1456.98", PriceSpec::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into())))]
-#[test_case("@ 456.78 NZD", PriceSpec::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap()))]
-#[test_case("@@ 1456.98 USD", PriceSpec::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap()))]
-fn test_price_annotation(s: &str, expected: PriceSpec) {
+#[test_case("@ GBP", Some(PriceSpec::BareCurrency(Currency::try_from("GBP").unwrap())))]
+#[test_case("@ 456.78", Some(PriceSpec::BareAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()))))]
+#[test_case("@@ 1456.98", Some(PriceSpec::BareAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()))))]
+#[test_case("@ 456.78 NZD", Some(PriceSpec::CurrencyAmount(ScopedExprValue::PerUnit(Expr::Value(dec!(456.78)).into()), Currency::try_from("NZD").unwrap())))]
+#[test_case("@@ 1456.98 USD", Some(PriceSpec::CurrencyAmount(ScopedExprValue::Total(Expr::Value(dec!(1456.98)).into()), Currency::try_from("USD").unwrap())))]
+#[test_case("@", None)]
+fn test_price_annotation(s: &str, expected: Option<PriceSpec>) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
     let spanned_tokens = tokens.spanned(end_of_input(source_id, s));

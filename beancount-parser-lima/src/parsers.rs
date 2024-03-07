@@ -659,7 +659,11 @@ where
                         .flatten()
                         .map(|cost_spec| spanned(cost_spec, e.span()))
                 }),
-                price_annotation().map_with(spanned_extra).or_not(),
+                price_annotation().or_not().map_with(|price_spec, e| {
+                    price_spec
+                        .flatten()
+                        .map(|price_spec| spanned(price_spec, e.span()))
+                }),
             ))
             .then_ignore(just(Token::Eol))
             .then(metadata())
@@ -897,7 +901,8 @@ where
     ))
 }
 
-pub(crate) fn price_annotation<'src, I>() -> impl Parser<'src, I, PriceSpec<'src>, Extra<'src>>
+pub(crate) fn price_annotation<'src, I>(
+) -> impl Parser<'src, I, Option<PriceSpec<'src>>, Extra<'src>>
 where
     I: BorrowInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -918,11 +923,11 @@ where
         expr_value().or_not(),
         currency().or_not(),
     ))
-    .try_map(|(is_total, amount, cur), span| match (amount, cur) {
-        (Some(amount), Some(cur)) => Ok(CurrencyAmount(scope(amount, is_total), cur)),
-        (Some(amount), None) => Ok(BareAmount(scope(amount, is_total))),
-        (None, Some(cur)) => Ok(BareCurrency(cur)),
-        (None, None) => Err(Rich::custom(span, "empty price annotation")),
+    .try_map(|(is_total, amount, cur), _span| match (amount, cur) {
+        (Some(amount), Some(cur)) => Ok(Some(CurrencyAmount(scope(amount, is_total), cur))),
+        (Some(amount), None) => Ok(Some(BareAmount(scope(amount, is_total)))),
+        (None, Some(cur)) => Ok(Some(BareCurrency(cur))),
+        (None, None) => Ok(None),
     })
 }
 
