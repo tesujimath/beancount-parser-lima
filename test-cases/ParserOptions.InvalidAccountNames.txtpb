@@ -3,7 +3,7 @@ directives {
   open { account: "Assets:US:Checking" }
 }
 errors {
-  message: "Invalid account name: \'Assets:US:Checking\'"
+  message: "unknown account type Assets, must be one of Actifs, Passifs, Equity, Income, Expenses"
 }
 options {
   account_types {

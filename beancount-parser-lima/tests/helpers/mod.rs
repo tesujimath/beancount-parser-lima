@@ -7,12 +7,13 @@ use self::beancount::{
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
     number::Number,
-    options::Booking,
+    options::{options::ProcessingMode, AccountTypes, Booking, Options},
 };
 use ::beancount_parser_lima as lima;
 use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -23,27 +24,18 @@ use std::{
     str::FromStr,
 };
 
-fn check(
-    sources: &BeancountSources,
-    parser: &BeancountParser,
-    expected_directives: Vec<Directive>,
-    expected_errors: Vec<Error>,
-) {
+fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: Ledger) {
     let stderr = &std::io::stderr();
 
+    let expected_directives = expected_ledger.directives;
+    let expected_options = expected_ledger.options.as_ref();
+    let expected_errors = expected_ledger.errors;
     match parser.parse() {
-        Ok(ParseSuccess { directives, .. }) => {
-            assert_eq!(
-                directives.len(),
-                expected_directives.len(),
-                "directives.len()"
-            );
-            assert_eq!(
-                0,
-                expected_errors.len(),
-                "expected {} errors, found none",
-                expected_errors.len()
-            );
+        Ok(ParseSuccess {
+            directives,
+            options,
+            ..
+        }) => {
             for (i, (actual, expected)) in directives
                 .iter()
                 .zip(expected_directives.iter())
@@ -51,6 +43,24 @@ fn check(
             {
                 actual.expect_eq(expected, context(format!("directives[{}]", i)));
             }
+            assert_eq!(
+                directives.len(),
+                expected_directives.len(),
+                "directives.len()"
+            );
+
+            let default_options = Options::default();
+            options.expect_eq(
+                expected_options.unwrap_or(&default_options),
+                context("options"),
+            );
+
+            assert_eq!(
+                0,
+                expected_errors.len(),
+                "expected {} errors, found none",
+                expected_errors.len()
+            );
         }
         Err(ParseError { errors, .. }) => {
             let n_errors = errors.len();
@@ -83,17 +93,14 @@ fn check(
     }
 }
 
-fn create_sources_and_check<P>(
-    input_path: P,
-    expected_directives: Vec<Directive>,
-    expected_errors: Vec<Error>,
-) where
+fn create_sources_and_check<P>(input_path: P, expected_ledger: Ledger)
+where
     P: AsRef<Path>,
 {
     let sources = BeancountSources::from(input_path.as_ref());
     let parser = BeancountParser::new(&sources);
 
-    check(&sources, &parser, expected_directives, expected_errors);
+    check(&sources, &parser, expected_ledger);
 }
 
 pub fn check_parse<S>(test_name: S)
@@ -123,11 +130,7 @@ where
             )
         });
 
-    create_sources_and_check(
-        input_path,
-        expected_output_ledger.directives,
-        expected_output_ledger.errors,
-    );
+    create_sources_and_check(input_path, expected_output_ledger);
 }
 
 #[derive(Clone, Debug)]
@@ -176,6 +179,15 @@ where
     Rhs: ?Sized,
 {
     fn expect_eq(&self, expected: &Rhs, ctx: Context);
+}
+
+impl<'a, Rhs, T> ExpectEq<Rhs> for &'a T
+where
+    T: ExpectEq<Rhs>,
+{
+    fn expect_eq(&self, expected: &Rhs, ctx: Context) {
+        (*self).expect_eq(expected, ctx);
+    }
 }
 
 impl<'r, 't, Rhs, T> ExpectEq<Option<&'r Rhs>> for Option<&'t T>
@@ -609,6 +621,185 @@ impl<'a> ExpectEq<MetaValue> for lima::MetaValue<'a> {
     }
 }
 
+impl<'a> ExpectEq<Options> for lima::Options<'a> {
+    fn expect_eq(&self, expected: &Options, ctx: Context) {
+        // Since the default values are returned from out parser, we have to supply the same defaults here.
+        // The defaults come from:
+        // https://github.com/beancount/beancount/blob/master/beancount/parser/options.py#L238
+
+        self.title().expect_eq(
+            expected.title.as_deref().unwrap_or("Beancount"),
+            ctx.with("title"),
+        );
+
+        self.account_previous_balances().expect_eq(
+            expected
+                .account_previous_balances
+                .as_deref()
+                .unwrap_or("Opening-Balances"),
+            ctx.with("account_previous_balances"),
+        );
+
+        self.account_previous_earnings().expect_eq(
+            expected
+                .account_previous_earnings
+                .as_deref()
+                .unwrap_or("Earnings:Previous"),
+            ctx.with("account_previous_earnings"),
+        );
+
+        self.account_previous_conversions().expect_eq(
+            expected
+                .account_previous_conversions
+                .as_deref()
+                .unwrap_or("Conversions:Previous"),
+            ctx.with("account_previous_conversions"),
+        );
+
+        self.account_current_earnings().expect_eq(
+            expected
+                .account_current_earnings
+                .as_deref()
+                .unwrap_or("Earnings:Current"),
+            ctx.with("account_current_earnings"),
+        );
+
+        self.account_current_conversions().expect_eq(
+            expected
+                .account_current_conversions
+                .as_deref()
+                .unwrap_or("Conversions:Current"),
+            ctx.with("account_current_conversions"),
+        );
+
+        self.account_unrealized_gains().expect_eq(
+            expected
+                .account_unrealized_gains
+                .as_deref()
+                .unwrap_or("Earnings:Unrealized"),
+            ctx.with("account_unrealized_gains"),
+        );
+
+        self.account_rounding().expect_eq(
+            &expected.account_rounding.as_ref(),
+            ctx.with("account_rounding"),
+        );
+
+        self.conversion_currency().expect_eq(
+            expected.conversion_currency.as_deref().unwrap_or("NOTHING"),
+            ctx.with("conversion_currency"),
+        );
+
+        self.inferred_tolerance_defaults()
+            .collect::<Vec<_>>()
+            .expect_eq(
+                &expected.inferred_tolerance_default,
+                ctx.with("inferred_tolerance_defaults"),
+            );
+
+        assert_eq!(
+            self.inferred_tolerance_multiplier(),
+            expected
+                .inferred_tolerance_multiplier
+                .as_ref()
+                .map(|s| Decimal::from_str_exact(s).unwrap())
+                .unwrap_or(dec!(0.5)),
+            "{}",
+            ctx.with("inferred_tolerance_multiplier")
+        );
+
+        assert_eq!(
+            self.infer_tolerance_from_cost(),
+            expected.infer_tolerance_from_cost.unwrap_or(false),
+            "{}",
+            ctx.with("infer_tolerance_from_cost")
+        );
+
+        self.documents()
+            .collect::<Vec<_>>()
+            .expect_eq(&expected.documents, ctx.with("documents"));
+
+        self.operating_currency()
+            .collect::<Vec<_>>()
+            .expect_eq(&expected.operating_currency, ctx.with("operating_currency"));
+
+        assert_eq!(
+            self.render_commas(),
+            expected.render_commas.unwrap_or(false),
+            "{}",
+            ctx.with("render_commas")
+        );
+
+        self.booking_method().expect_eq(
+            &expected
+                .booking_method
+                .map(|b| b.enum_value().unwrap())
+                .unwrap_or(Booking::STRICT),
+            ctx.with("booking_method"),
+        );
+
+        let expected_plugin_processing_mode = expected.plugin_processing_mode();
+        self.plugin_processing_mode().expect_eq(
+            &expected_plugin_processing_mode,
+            ctx.with("plugin_processing_mode"),
+        );
+
+        // account type names must be checked individually
+        fn expected_account_type<'a, F>(
+            expected: &'a Options,
+            field_extractor: F,
+            default: &'static str,
+        ) -> &'a str
+        where
+            F: FnOnce(&'a AccountTypes) -> &'a Option<String>,
+        {
+            expected
+                .account_types
+                .as_ref()
+                .and_then(|x| field_extractor(x).as_ref())
+                .map(|s| s.as_str())
+                .unwrap_or(default)
+        }
+
+        self.account_type_name(lima::AccountType::Assets)
+            .as_ref()
+            .expect_eq(
+                expected_account_type(expected, |t| &t.assets, "Assets"),
+                ctx.with("account_type_name.Assets"),
+            );
+
+        self.account_type_name(lima::AccountType::Liabilities)
+            .as_ref()
+            .expect_eq(
+                expected_account_type(expected, |t| &t.liabilities, "Liabilities"),
+                ctx.with("account_type_name.Liabilities"),
+            );
+
+        self.account_type_name(lima::AccountType::Equity)
+            .as_ref()
+            .expect_eq(
+                expected_account_type(expected, |t| &t.equity, "Equity"),
+                ctx.with("account_type_name.Equity"),
+            );
+
+        self.account_type_name(lima::AccountType::Income)
+            .as_ref()
+            .expect_eq(
+                expected_account_type(expected, |t| &t.income, "Income"),
+                ctx.with("account_type_name.Income"),
+            );
+
+        self.account_type_name(lima::AccountType::Expenses)
+            .as_ref()
+            .expect_eq(
+                expected_account_type(expected, |t| &t.expenses, "Expenses"),
+                ctx.with("account_type_name.Expenses"),
+            );
+
+        // Note: long_string_maxlines does not appear in expected options
+    }
+}
+
 impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
     fn expect_eq(&self, expected: &CostSpec, ctx: Context) {
         self.per_unit()
@@ -667,7 +858,7 @@ impl<'a> ExpectEq<PriceSpec> for lima::PriceSpec<'a> {
 
 impl<'a, S> ExpectEq<S> for lima::Account<'a>
 where
-    S: AsRef<str>,
+    S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(self, &account(expected.as_ref()), "{}", &ctx);
@@ -688,6 +879,22 @@ fn account(s: &str) -> lima::Account {
     )
 }
 
+impl<'a, S> ExpectEq<S> for lima::Subaccount<'a>
+where
+    S: AsRef<str> + ?Sized,
+{
+    fn expect_eq(&self, expected: &S, ctx: Context) {
+        assert_eq!(self, &subaccount(expected.as_ref()), "{}", &ctx);
+    }
+}
+
+fn subaccount(s: &str) -> lima::Subaccount {
+    s.split(':')
+        .map(lima::AccountName::try_from)
+        .collect::<Result<lima::Subaccount, _>>()
+        .unwrap()
+}
+
 impl<'a> ExpectEq<Amount> for lima::Amount<'a> {
     fn expect_eq(&self, expected: &Amount, ctx: Context) {
         self.number()
@@ -699,18 +906,56 @@ impl<'a> ExpectEq<Amount> for lima::Amount<'a> {
     }
 }
 
-impl<'a, S> ExpectEq<S> for &lima::Currency<'a>
+impl<'a, S> ExpectEq<S> for lima::Currency<'a>
 where
-    S: AsRef<str>,
+    S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(self.as_ref(), expected.as_ref(), "{}", &ctx);
     }
 }
 
+impl<'a> ExpectEq<HashMap<String, String>> for Vec<(Option<lima::Currency<'a>>, Decimal)> {
+    fn expect_eq(&self, expected: &HashMap<String, String>, ctx: Context) {
+        let actual = self
+            .iter()
+            .map(|(c, d)| (*c, *d))
+            .collect::<HashMap<Option<lima::Currency>, Decimal>>();
+        let expected = expected
+            .iter()
+            .map(|(k, v)| {
+                (
+                    if k == "*" {
+                        None
+                    } else {
+                        Some(lima::Currency::try_from(k.as_str()).unwrap())
+                    },
+                    Decimal::from_str_exact(v).unwrap(),
+                )
+            })
+            .collect::<HashMap<Option<lima::Currency>, Decimal>>();
+        assert_eq!(actual, expected, "{}", &ctx);
+    }
+}
+
+impl<'a> ExpectEq<Vec<String>> for Vec<&lima::Currency<'a>> {
+    fn expect_eq(&self, expected: &Vec<String>, ctx: Context) {
+        let actual = expected.iter().map(|p| p.as_str()).collect::<HashSet<_>>();
+        let expected = expected.iter().map(|s| s.as_str()).collect::<HashSet<_>>();
+        assert_eq!(actual, expected, "{}", &ctx);
+    }
+}
+impl ExpectEq<Vec<String>> for Vec<&PathBuf> {
+    fn expect_eq(&self, expected: &Vec<String>, ctx: Context) {
+        let actual = expected.iter().map(|p| p.as_str()).collect::<HashSet<_>>();
+        let expected = expected.iter().map(|s| s.as_str()).collect::<HashSet<_>>();
+        assert_eq!(actual, expected, "{}", &ctx);
+    }
+}
+
 impl<S> ExpectEq<S> for &str
 where
-    S: AsRef<str>,
+    S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
         assert_eq!(*self, expected.as_ref(), "{}", &ctx);
@@ -774,6 +1019,24 @@ impl ExpectEq<Booking> for lima::Booking {
             (lima::Average, AVERAGE) => true,
             (lima::Fifo, FIFO) => true,
             (lima::Lifo, LIFO) => true,
+            _ => false,
+        };
+
+        if !eq {
+            panic!("expected {:?} found {} at {}", expected, self, &ctx);
+        }
+    }
+}
+
+impl ExpectEq<ProcessingMode> for lima::PluginProcessingMode {
+    fn expect_eq(&self, expected: &ProcessingMode, ctx: Context) {
+        use lima::PluginProcessingMode as lima;
+        use ProcessingMode::*;
+
+        let eq = match (self, expected) {
+            // UNKNOWN = 0,
+            (lima::Default, DEFAULT) => true,
+            (lima::Raw, RAW) => true,
             _ => false,
         };
 
