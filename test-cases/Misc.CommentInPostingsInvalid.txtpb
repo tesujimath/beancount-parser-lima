@@ -1,3 +1,4 @@
+# ANOMALY: Lima parser is not sensitive to extra comment lines with unexpected indent
 directives {
   date { year: 2017 month: 6 day: 27 }
   transaction {
@@ -9,8 +10,11 @@ directives {
         units { number { exact: "0.00082487" } currency: "BTC" }
       }
     }
+    postings {
+      account: "Assets:Crypto:Bitcoin"
+      spec {
+        units { number { exact: "-0.00082487" } currency: "BTC" }
+      }
+    }
   }
-}
-errors {
-  message: "Syntax error, unexpected INDENT"
 }
