@@ -1,37 +1,10 @@
-directives {
-  date { year: 2013 month: 5 day: 18 }
-  meta {
-    kv { key: "test" value { text: "Bananas" } }
-    kv { key: "test" value { text: "Apples" } }
-    kv { key: "test" value { text: "Oranges" } }
-  }
-  transaction {
-    flag: "*"
-    postings {
-      meta {
-        kv { key: "test" value { text: "Mangos" } }
-        kv { key: "test" value { text: "Pineapple" } }
-      }
-      account: "Assets:Investments"
-      spec { units { number { exact: "100" } currency: "USD" } }
-    }
-    postings {
-      account: "Income:Investments"
-      spec { units { number { exact: "-100" } currency: "USD" } }
-    }
-  }
+# ANOMALY: duplicated metadata keys is a parse error for Lima
+errors {
+  message: "duplicate key test"
 }
-  )", { .allow_multi_meta = true } );
+errors {
+  message: "duplicate key test"
 }
-
-TEST(TestExpressions, ExplicitPrecision) {
-  ExpectParse(R"(
-2021-09-19 balance Assets:US:Checking   (1 + 5) / 2.1 USD
-  )", R"(
-directives {
-  date { year: 2021 month: 9 day: 19 }
-  balance {
-    account: "Assets:US:Checking"
-    amount { number { exact: "2.857142857142857142857142857" } currency: "USD" }
-  }
+errors {
+  message: "duplicate key test"
 }

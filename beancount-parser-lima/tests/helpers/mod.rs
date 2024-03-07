@@ -1,11 +1,13 @@
 use self::beancount::{
     data::{
-        meta::KV, meta_value, Amount, Balance, Directive, Error, MetaValue, Posting, Transaction,
+        meta::KV, meta_value, Amount, Balance, Close, Commodity, Directive, Document, Error, Event,
+        MetaValue, Note, Open, Pad, Posting, Price, Query, Transaction,
     },
     date::Date,
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
     number::Number,
+    options::Booking,
 };
 use ::beancount_parser_lima as lima;
 use derive_more::Display;
@@ -28,11 +30,6 @@ fn check(
     expected_errors: Vec<Error>,
 ) {
     let stderr = &std::io::stderr();
-
-    println!(
-        "Expected ledger contains {} directives",
-        expected_directives.len()
-    );
 
     match parser.parse() {
         Ok(ParseSuccess { directives, .. }) => {
@@ -76,7 +73,11 @@ fn check(
                 }
             } else {
                 sources.write(stderr, errors).unwrap();
-                panic!("parse failed with {} errors", n_errors);
+                panic!(
+                    "parse failed with {} errors, expected {}",
+                    n_errors,
+                    expected_errors.len()
+                );
             }
         }
     }
@@ -225,8 +226,44 @@ impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
                 variant.expect_eq(expected.transaction(), ctx.with("transaction"));
             }
 
+            lima::DirectiveVariant::Price(variant) if expected.has_price() => {
+                variant.expect_eq(expected.price(), ctx.with("price"));
+            }
+
             lima::DirectiveVariant::Balance(variant) if expected.has_balance() => {
                 variant.expect_eq(expected.balance(), ctx.with("balance"));
+            }
+
+            lima::DirectiveVariant::Open(variant) if expected.has_open() => {
+                variant.expect_eq(expected.open(), ctx.with("open"));
+            }
+
+            lima::DirectiveVariant::Close(variant) if expected.has_close() => {
+                variant.expect_eq(expected.close(), ctx.with("close"));
+            }
+
+            lima::DirectiveVariant::Commodity(variant) if expected.has_commodity() => {
+                variant.expect_eq(expected.commodity(), ctx.with("commodity"));
+            }
+
+            lima::DirectiveVariant::Pad(variant) if expected.has_pad() => {
+                variant.expect_eq(expected.pad(), ctx.with("pad"));
+            }
+
+            lima::DirectiveVariant::Document(variant) if expected.has_document() => {
+                variant.expect_eq(expected.document(), ctx.with("document"));
+            }
+
+            lima::DirectiveVariant::Note(variant) if expected.has_note() => {
+                variant.expect_eq(expected.note(), ctx.with("note"));
+            }
+
+            lima::DirectiveVariant::Event(variant) if expected.has_event() => {
+                variant.expect_eq(expected.event(), ctx.with("event"));
+            }
+
+            lima::DirectiveVariant::Query(variant) if expected.has_query() => {
+                variant.expect_eq(expected.query(), ctx.with("query"));
             }
 
             _ => panic!(
@@ -262,6 +299,18 @@ impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
     }
 }
 
+impl<'a> ExpectEq<Price> for lima::Price<'a> {
+    fn expect_eq(&self, expected: &Price, ctx: Context) {
+        self.currency()
+            .item()
+            .as_ref()
+            .expect_eq_unwrapped(expected.currency.as_ref(), ctx.with("currency"));
+        self.amount()
+            .item()
+            .expect_eq(&expected.amount, ctx.with("amount"));
+    }
+}
+
 impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
     fn expect_eq(&self, expected: &Balance, ctx: Context) {
         self.account()
@@ -273,6 +322,84 @@ impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
             .tolerance()
             .item()
             .expect_eq(&expected.tolerance.as_ref(), ctx.with("tolerance"));
+    }
+}
+
+impl<'a> ExpectEq<Open> for lima::Open<'a> {
+    fn expect_eq(&self, expected: &Open, ctx: Context) {
+        self.account()
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
+        self.currencies()
+            .map(|currency| currency.item().as_ref())
+            .collect::<HashSet<_>>()
+            .expect_eq(&expected.currencies, ctx.with("currencies"));
+
+        let expected_booking = expected.booking.as_ref().map(|expected| expected.unwrap());
+        self.booking()
+            .as_ref()
+            .map(|booking| booking.item())
+            .expect_eq(&expected_booking.as_ref(), ctx.with("booking"));
+    }
+}
+
+impl<'a> ExpectEq<Close> for lima::Close<'a> {
+    fn expect_eq(&self, expected: &Close, ctx: Context) {
+        self.account()
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
+    }
+}
+
+impl<'a> ExpectEq<Commodity> for lima::Commodity<'a> {
+    fn expect_eq(&self, expected: &Commodity, ctx: Context) {
+        self.currency()
+            .item()
+            .as_ref()
+            .expect_eq_unwrapped(expected.currency.as_ref(), ctx.with("currency"));
+    }
+}
+
+impl<'a> ExpectEq<Pad> for lima::Pad<'a> {
+    fn expect_eq(&self, expected: &Pad, ctx: Context) {
+        self.account()
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
+        self.source()
+            .expect_eq_unwrapped(expected.source_account.as_ref(), ctx.with("source"));
+    }
+}
+
+impl<'a> ExpectEq<Document> for lima::Document<'a> {
+    fn expect_eq(&self, expected: &Document, ctx: Context) {
+        self.account()
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
+        self.path()
+            .expect_eq_unwrapped(expected.filename.as_ref(), ctx.with("path"));
+    }
+}
+
+impl<'a> ExpectEq<Note> for lima::Note<'a> {
+    fn expect_eq(&self, expected: &Note, ctx: Context) {
+        self.account()
+            .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
+        self.comment()
+            .expect_eq_unwrapped(expected.comment.as_ref(), ctx.with("comment"));
+    }
+}
+
+impl<'a> ExpectEq<Event> for lima::Event<'a> {
+    fn expect_eq(&self, expected: &Event, ctx: Context) {
+        self.event_type()
+            .expect_eq_unwrapped(expected.type_.as_ref(), ctx.with("event_type"));
+        self.description()
+            .expect_eq_unwrapped(expected.description.as_ref(), ctx.with("description"));
+    }
+}
+
+impl<'a> ExpectEq<Query> for lima::Query<'a> {
+    fn expect_eq(&self, expected: &Query, ctx: Context) {
+        self.name()
+            .expect_eq_unwrapped(expected.name.as_ref(), ctx.with("name"));
+        self.content()
+            .expect_eq_unwrapped(expected.query_string.as_ref(), ctx.with("content"));
     }
 }
 
@@ -590,6 +717,16 @@ where
     }
 }
 
+impl ExpectEq<[String]> for HashSet<&str> {
+    fn expect_eq(&self, expected: &[String], ctx: Context) {
+        let expected = expected
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<HashSet<&str>>();
+        assert_eq!(self, &expected, "{}", &ctx);
+    }
+}
+
 impl ExpectEq<Vec<u8>> for lima::Flag {
     fn expect_eq(&self, expected: &Vec<u8>, ctx: Context) {
         match bytes_to_flag(expected) {
@@ -620,6 +757,28 @@ fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
             c => lima::FlagLetter::try_from(c)
                 .map(lima::Flag::Letter)
                 .map_err(|e| BytesToFlagError(e.to_string())),
+        }
+    }
+}
+
+impl ExpectEq<Booking> for lima::Booking {
+    fn expect_eq(&self, expected: &Booking, ctx: Context) {
+        use lima::Booking as lima;
+        use Booking::*;
+
+        let eq = match (self, expected) {
+            // UNKNOWN = 0,
+            (lima::Strict, STRICT) => true,
+            (lima::StrictWithSize, STRICT_WITH_SIZE) => true,
+            (lima::None, NONE) => true,
+            (lima::Average, AVERAGE) => true,
+            (lima::Fifo, FIFO) => true,
+            (lima::Lifo, LIFO) => true,
+            _ => false,
+        };
+
+        if !eq {
+            panic!("expected {:?} found {} at {}", expected, self, &ctx);
         }
     }
 }

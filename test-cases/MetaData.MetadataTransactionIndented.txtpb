@@ -1,46 +1,33 @@
+# ANOMALY: Lima parser is robust to varying levels of indentation,
+# so succeeds in parsing this input
 directives {
   date { year: 2013 month: 5 day: 18 }
   meta {
     kv { key: "test1" value { text: "Something" } }
   }
   transaction {
+    # ANOMALY: Lima distinguishes empty string from no string
+    narration: ""
     flag: "*"
-  }
-}
-errors {
-  message: "Syntax error, unexpected ACCOUNT"
-}
-)");
-  // This is a difference with the Python version; indentation is more strict in
-  // the RE-Flex/C++ version and this generates an error.
-}
-
-TEST(TestMetaData, MetadataEmpty) {
-  ExpectParse(R"(
-2013-05-18 * "blabla"
-  oranges:
-  bananas:
-
-2013-05-19 open Assets:Something
-  apples:
-  )", R"(
-directives {
-  date { year: 2013 month: 5 day: 18 }
-  meta {
-    kv { key: "oranges" value {} }
-    kv { key: "bananas" value {} }
-  }
-  transaction {
-    flag: "*"
-    narration: "blabla"
-  }
-}
-directives {
-  date { year: 2013 month: 5 day: 19 }
-  meta {
-    kv { key: "apples" value {} }
-  }
-  open {
-    account: "Assets:Something"
+    postings {
+      account: "Assets:Investments:MSFT"
+      spec {
+        units { number { exact: "10" } currency: "MSFT" }
+        price { number { exact: "2000" } currency: "USD" is_total: true }
+      }
+      meta {
+        kv { key: "test2" value { text: "has" } }
+        kv { key: "test3" value { text: "to" } }
+      }
+    }
+    postings {
+      account: "Assets:Investments:Cash"
+      spec { units { number { exact: "-20000" } currency: "USD" } }
+      meta {
+        kv { key: "test4" value { text: "come" } }
+        kv { key: "test5" value { text: "from" } }
+        kv { key: "test6" value { text: "this" } }
+      }
+    }
   }
 }

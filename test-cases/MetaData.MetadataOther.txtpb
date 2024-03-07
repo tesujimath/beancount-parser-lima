@@ -15,15 +15,6 @@ directives {
   }
 }
 directives {
-  date { year: 2014 month: 1 day: 1 }
-  meta {
-    kv { key: "test1" value { text: "Something" } }
-  }
-  close {
-    account: "Assets:Investments"
-  }
-}
-directives {
   date { year: 2013 month: 1 day: 10 }
   meta {
     kv { key: "test1" value { text: "Something" } }
@@ -81,5 +72,15 @@ directives {
   price {
     currency: "HOOL"
     amount { number { exact: "500" } currency: "USD" }
+  }
+}
+# ANOMALY: Lima parser returns directives in date order
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  meta {
+    kv { key: "test1" value { text: "Something" } }
+  }
+  close {
+    account: "Assets:Investments"
   }
 }
