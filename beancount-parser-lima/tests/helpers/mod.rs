@@ -213,8 +213,8 @@ impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
             .expect_eq_unwrapped(expected.date.as_ref(), ctx.with("date"));
 
         let expected_metadata = Metadata {
-            tags: &expected.tags,
-            links: &expected.links,
+            tags: Some(&expected.tags),
+            links: Some(&expected.links),
             kv: expected.meta.as_ref().map(|m| m.kv.as_slice()),
         };
         self.metadata()
@@ -298,8 +298,14 @@ impl<'a> ExpectEq<Posting> for lima::Posting<'a> {
         self.price_annotation()
             .item()
             .expect_eq(&expected.spec.price.as_ref(), ctx.with("price"));
-        // TODO
-        // self.metadata().is(metadata);
+
+        let expected_metadata = Metadata {
+            tags: None,
+            links: None,
+            kv: expected.meta.as_ref().map(|m| m.kv.as_slice()),
+        };
+        self.metadata()
+            .expect_eq(&expected_metadata, ctx.with("metadata"));
     }
 }
 
@@ -314,8 +320,8 @@ impl<'a> ExpectEq<Vec<Posting>> for Vec<&'a lima::Posting<'a>> {
 
 // expected metadata
 struct Metadata<'a> {
-    tags: &'a [String],
-    links: &'a [String],
+    tags: Option<&'a [String]>,
+    links: Option<&'a [String]>,
     kv: Option<&'a [KV]>,
 }
 
@@ -325,9 +331,8 @@ impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
 
         let expected_inline_tags = expected
             .tags
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<HashSet<_>>();
+            .map(|tags| tags.iter().map(|s| s.as_str()).collect::<HashSet<_>>())
+            .unwrap_or_default();
         let expected_kv_tags = expected
             .kv
             .map(|kv| {
@@ -351,9 +356,8 @@ impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
 
         let expected_inline_links = expected
             .links
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<HashSet<_>>();
+            .map(|links| links.iter().map(|s| s.as_str()).collect::<HashSet<_>>())
+            .unwrap_or_default();
         let expected_kv_links = expected
             .kv
             .map(|kv| {

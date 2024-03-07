@@ -4,9 +4,6 @@
 # which also bears the comment
 # (the additional indentation from the posting is not strictly necessary but it helps with readability).
 # Futhermore, wherever a line of metadata is accepted, so too is a tag or a link.
-#
-# Alas our protobuf schema doesn't allow for tags and links to appear in Meta,
-# so we are currently unable to write a test which verifies correct behaviour here.
 directives {
   date { year: 2014 month: 4 day: 20 }
   tags: "basetag"
@@ -17,6 +14,7 @@ directives {
     postings {
       account: "Assets:Checking"
       spec { units { number { exact: "100" } currency: "USD" } }
+      meta { kv { value { tag: "tag1" } } }
     }
     postings {
       account: "Assets:Checking"
