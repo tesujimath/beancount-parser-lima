@@ -782,7 +782,8 @@ where
 {
     use MetaValue::*;
 
-    choice((simple_value().map(Simple), amount().map(Amount)))
+    // try for amount first
+    choice((amount().map(Amount), simple_value().map(Simple)))
 }
 
 /// Matches a [SimpleValue].
