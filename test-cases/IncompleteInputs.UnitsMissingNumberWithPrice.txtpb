@@ -13,7 +13,7 @@ directives {
       account: "Assets:Account1"
       spec {
         units { number { exact: "100.00" } currency: "USD" }
-        price {}
+        # ANOMALY: Lima parser doesn't include empty price in result
       }
     }
   }
