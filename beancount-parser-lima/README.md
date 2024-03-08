@@ -83,7 +83,7 @@ The test cases for the parser tests are a work-in-progress.
 ### Work in progress
 
 The [parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc)
-were split out into auto-test-cases and auto-test-cases.partial from where they will be moved into test-cases.
+were split out into test-cases.  Still some in test-cases-todo (not tested yet), and others in test-cases-unsupported.
 
 A quick visual classification was done to split out tests which may require a little more work.
 
