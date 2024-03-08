@@ -1,0 +1,16 @@
+directives {
+  date { year: 2015 month: 6 day: 7 }
+  tags: "stack-em-up"
+  transaction {
+    flag: "*"
+    narration: "Something"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
+}

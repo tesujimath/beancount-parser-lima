@@ -1234,10 +1234,11 @@ impl<'a> Metadata<'a> {
 
     // Augment only for tags which are not already present, others silently ignored.
     // This is so that tags attached to directives take precedence over the push stack.
-    pub(crate) fn augment_tags(&mut self, tags: &HashSet<Spanned<Tag<'a>>>) {
-        for tag in tags {
+    pub(crate) fn augment_tags(&mut self, tags: &HashMap<Spanned<Tag<'a>>, Vec<Spanned<Tag<'a>>>>) {
+        for (tag, spans) in tags.iter() {
             if !self.tags.contains(tag) {
-                self.tags.insert(*tag);
+                let most_recently_pushed_tag = spans.last().unwrap_or(tag);
+                self.tags.insert(*most_recently_pushed_tag);
             }
         }
     }
@@ -1265,12 +1266,13 @@ impl<'a> Metadata<'a> {
     // This is so that key/values attached to directives take precedence over the push stack.
     pub(crate) fn augment_key_values(
         &mut self,
-        key_values: &HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
+        key_values: &HashMap<Spanned<Key<'a>>, Vec<(Span, Spanned<MetaValue<'a>>)>>,
     ) {
-        for (key, value) in key_values {
+        for (key, values) in key_values {
             if !self.key_values.contains_key(key) {
+                let (key_span, value) = values.last().unwrap();
                 self.key_values.insert(
-                    *key,
+                    spanned(*key.item(), *key_span),
                     // Sadly we do have to clone the value here, so we can
                     // merge in metadata key/values from the push/pop stack
                     // without consuming it.

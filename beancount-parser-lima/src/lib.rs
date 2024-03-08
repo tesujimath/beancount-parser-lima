@@ -502,8 +502,8 @@ struct PragmaProcessor<'s, 't> {
     stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
     // tags and meta key/values for pragma push/pop
-    tags: HashSet<Spanned<Tag<'t>>>,
-    meta_key_values: HashMap<Spanned<Key<'t>>, Spanned<MetaValue<'t>>>,
+    tags: HashMap<Spanned<Tag<'t>>, Vec<Spanned<Tag<'t>>>>,
+    meta_key_values: HashMap<Spanned<Key<'t>>, Vec<(Span, Spanned<MetaValue<'t>>)>>,
     options: Options<'t>,
     plugins: Vec<Plugin<'t>>,
     // errors, for collection when the iterator is exhausted
@@ -524,7 +524,7 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
             current,
             stacked: VecDeque::new(),
             remaining,
-            tags: HashSet::new(),
+            tags: HashMap::new(),
             meta_key_values: HashMap::new(),
             options,
             plugins: Vec::new(),
@@ -545,9 +545,17 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
             errors.push(e);
         }
 
-        for tag in self.tags {
+        for (tag, others) in self.tags {
             let e = Error::new("invalid pushtag", "missing corresponding poptag", tag.span);
             errors.push(e);
+            for other in others {
+                let e = Error::new(
+                    "invalid pushtag",
+                    "missing corresponding poptag",
+                    other.span,
+                );
+                errors.push(e);
+            }
         }
 
         (self.options, self.plugins, errors)
@@ -572,37 +580,74 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                         use Pragma::*;
 
                         match pragma {
-                            Pushtag(tag) => {
-                                self.tags.insert(tag);
-                            }
+                            Pushtag(tag) => match self.tags.get_mut(&tag) {
+                                Some(others) => {
+                                    others.push(tag);
+                                }
+                                None => {
+                                    self.tags.insert(tag, Vec::default());
+                                }
+                            },
                             Poptag(tag) => {
-                                if self.tags.contains(&tag) {
-                                    self.tags.remove(&tag);
-                                } else {
-                                    let e = Error::new(
-                                        "invalid poptag",
-                                        "missing corresponding pushtag",
-                                        tag.span,
-                                    );
-                                    self.errors.push(e);
-                                }
-                            }
-                            Pushmeta(meta) => {
-                                self.meta_key_values.insert(meta.key, meta.value);
-                            }
-                            Popmeta(key) => {
-                                if self.meta_key_values.contains_key(&key) {
-                                    self.meta_key_values.remove(&key);
-                                } else {
-                                    let e = Error::new(
-                                        "invalid popmeta",
-                                        "missing corresponding pushmeta",
-                                        key.span,
-                                    );
-                                    self.errors.push(e);
-                                }
-                            }
+                                let mut last_tag = false;
 
+                                match self.tags.get_mut(&tag) {
+                                    Some(others) => {
+                                        if others.is_empty() {
+                                            last_tag = true;
+                                            // need to remove later because of borrowing
+                                        } else {
+                                            others.pop();
+                                        }
+                                    }
+                                    None => {
+                                        let e = Error::new(
+                                            "invalid poptag",
+                                            "missing corresponding pushtag",
+                                            tag.span,
+                                        );
+                                        self.errors.push(e);
+                                    }
+                                }
+
+                                if last_tag {
+                                    self.tags.remove(&tag);
+                                }
+                            }
+                            Pushmeta(meta) => match self.meta_key_values.get_mut(&meta.key) {
+                                Some(values) => {
+                                    values.push((meta.key.span, meta.value));
+                                }
+                                None => {
+                                    self.meta_key_values
+                                        .insert(meta.key, vec![(meta.key.span, meta.value)]);
+                                }
+                            },
+                            Popmeta(meta) => {
+                                let mut last_meta = false;
+
+                                match self.meta_key_values.get_mut(&meta) {
+                                    Some(values) => {
+                                        values.pop();
+                                        if values.is_empty() {
+                                            last_meta = true;
+                                            // need to remove later because of borrowing
+                                        }
+                                    }
+                                    None => {
+                                        let e = Error::new(
+                                            "invalid popmeta",
+                                            "missing corresponding pushmeta",
+                                            meta.span,
+                                        );
+                                        self.errors.push(e);
+                                    }
+                                }
+
+                                if last_meta {
+                                    self.meta_key_values.remove(&meta);
+                                }
+                            }
                             Include(_path) => {
                                 // TODO need to validate the path against what we have in remaining
                                 match self.remaining.pop_front() {
