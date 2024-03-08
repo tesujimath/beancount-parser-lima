@@ -533,7 +533,24 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
     }
 
     fn result(self) -> (Options<'t>, Vec<Plugin<'t>>, Vec<Error>) {
-        (self.options, self.plugins, self.errors)
+        // any leftover tags or key/values is an error
+        let mut errors = self.errors;
+
+        for (key, _value) in self.meta_key_values {
+            let e = Error::new(
+                "invalid pushmeta",
+                "missing corresponding popmeta",
+                key.span,
+            );
+            errors.push(e);
+        }
+
+        for tag in self.tags {
+            let e = Error::new("invalid pushtag", "missing corresponding poptag", tag.span);
+            errors.push(e);
+        }
+
+        (self.options, self.plugins, errors)
     }
 }
 
