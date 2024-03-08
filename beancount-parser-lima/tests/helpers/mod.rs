@@ -7,7 +7,7 @@ use self::beancount::{
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
     number::Number,
-    options::{options::ProcessingMode, AccountTypes, Booking, Options},
+    options::{options::ProcessingMode, processing_info::Plugin, AccountTypes, Booking, Options},
 };
 use ::beancount_parser_lima as lima;
 use derive_more::Display;
@@ -29,11 +29,14 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
 
     let expected_directives = expected_ledger.directives;
     let expected_options = expected_ledger.options.as_ref();
+    let expected_plugins = expected_ledger.info.as_ref().map(|info| &info.plugin);
     let expected_errors = expected_ledger.errors;
+
     match parser.parse() {
         Ok(ParseSuccess {
             directives,
             options,
+            plugins,
             ..
         }) => {
             for (i, (actual, expected)) in directives
@@ -52,6 +55,12 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
             let default_options = Options::default();
             options.expect_eq(
                 expected_options.unwrap_or(&default_options),
+                context("options"),
+            );
+
+            let default_plugins = Vec::default();
+            plugins.expect_eq(
+                expected_plugins.unwrap_or(&default_plugins),
                 context("options"),
             );
 
@@ -807,6 +816,26 @@ impl<'a> ExpectEq<Options> for lima::Options<'a> {
             );
 
         // Note: long_string_maxlines does not appear in expected options
+    }
+}
+
+impl<'a> ExpectEq<Vec<Plugin>> for Vec<lima::Plugin<'a>> {
+    fn expect_eq(&self, expected: &Vec<Plugin>, ctx: Context) {
+        assert_eq!(self.len(), expected.len(), "postings.len");
+        for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
+            actual.expect_eq(expected, ctx.with(format!("plugins[{}]", i)))
+        }
+    }
+}
+
+impl<'a> ExpectEq<Plugin> for lima::Plugin<'a> {
+    fn expect_eq(&self, expected: &Plugin, ctx: Context) {
+        self.module_name()
+            .expect_eq_unwrapped(expected.name.as_ref(), ctx.with("name"));
+        self.config()
+            .as_ref()
+            .map(|s| s.item())
+            .expect_eq(&expected.config.as_ref(), ctx.with("config"));
     }
 }
 
