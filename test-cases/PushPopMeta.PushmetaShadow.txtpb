@@ -1,0 +1,21 @@
+directives {
+  date { year: 2015 month: 6 day: 7 }
+  meta {
+    # ANOMALY: Lima does not allow duplicated keys for metadata.
+    # The explicit key/values for a directive take precedence over
+    # any on the push/pop stack.
+    kv { key: "location" value { text: "Paris, France" } }
+  }
+  transaction {
+    flag: "*"
+    narration: "Something"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
+}

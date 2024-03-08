@@ -1232,6 +1232,16 @@ impl<'a> Metadata<'a> {
         }
     }
 
+    // Augment only for tags which are not already present, others silently ignored.
+    // This is so that tags attached to directives take precedence over the push stack.
+    pub(crate) fn augment_tags(&mut self, tags: &HashSet<Spanned<Tag<'a>>>) {
+        for tag in tags {
+            if !self.tags.contains(tag) {
+                self.tags.insert(*tag);
+            }
+        }
+    }
+
     pub(crate) fn merge_links<E>(&mut self, links: &HashSet<Spanned<Link<'a>>>, emitter: &mut E)
     where
         E: Emit<ParserError<'a>>,
@@ -1251,30 +1261,21 @@ impl<'a> Metadata<'a> {
         }
     }
 
-    pub(crate) fn merge_key_values<E>(
+    // Augment only for keys which are not already present, others silently ignored.
+    // This is so that key/values attached to directives take precedence over the push stack.
+    pub(crate) fn augment_key_values(
         &mut self,
         key_values: &HashMap<Spanned<Key<'a>>, Spanned<MetaValue<'a>>>,
-        emitter: &mut E,
-    ) where
-        E: Emit<ParserError<'a>>,
-    {
+    ) {
         for (key, value) in key_values {
-            match self.key_values.get_key_value(key) {
-                None => {
-                    self.key_values.insert(
-                        *key,
-                        // Sadly we do have to clone the value here, so we can
-                        // merge in metadata key/values from the push/pop stack
-                        // without consuming it.
-                        value.clone(),
-                    );
-                }
-                Some((existing_key, _existing_value)) => {
-                    let mut error =
-                        Rich::custom(existing_key.span, format!("duplicate key {}", key));
-                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "key", key.span);
-                    emitter.emit(error);
-                }
+            if !self.key_values.contains_key(key) {
+                self.key_values.insert(
+                    *key,
+                    // Sadly we do have to clone the value here, so we can
+                    // merge in metadata key/values from the push/pop stack
+                    // without consuming it.
+                    value.clone(),
+                );
             }
         }
     }

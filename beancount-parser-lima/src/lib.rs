@@ -545,10 +545,8 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
             Some(declaration) => {
                 match declaration.item {
                     Declaration::Directive(mut directive) => {
-                        directive.metadata.merge_tags(&self.tags, &mut self.errors);
-                        directive
-                            .metadata
-                            .merge_key_values(&self.meta_key_values, &mut self.errors);
+                        directive.metadata.augment_tags(&self.tags);
+                        directive.metadata.augment_key_values(&self.meta_key_values);
 
                         Some(spanned(directive, declaration.span))
                     }

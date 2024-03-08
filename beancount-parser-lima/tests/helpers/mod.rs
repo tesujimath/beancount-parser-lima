@@ -527,9 +527,19 @@ impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
                             .as_ref()
                             .map(|k| (k.as_str(), kv.value.as_ref().unwrap()))
                     })
-                    .collect::<HashMap<_, _>>()
+                    .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let expected_kv_count_with_duplicates = expected_kv.len();
+        let expected_kv = expected_kv.into_iter().collect::<HashMap<_, _>>();
+
+        // check we didn't have any repeated keys in the expected key/values
+        assert_eq!(
+            expected_kv_count_with_duplicates,
+            expected_kv.len(),
+            "unsupported duplicate keys in expected data at {}",
+            &ctx
+        );
 
         assert_eq!(
             self.tags()
