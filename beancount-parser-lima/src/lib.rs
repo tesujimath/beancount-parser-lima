@@ -576,13 +576,31 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                 self.tags.insert(tag);
                             }
                             Poptag(tag) => {
-                                self.tags.remove(&tag);
+                                if self.tags.contains(&tag) {
+                                    self.tags.remove(&tag);
+                                } else {
+                                    let e = Error::new(
+                                        "invalid poptag",
+                                        "missing corresponding pushtag",
+                                        tag.span,
+                                    );
+                                    self.errors.push(e);
+                                }
                             }
                             Pushmeta(meta) => {
                                 self.meta_key_values.insert(meta.key, meta.value);
                             }
                             Popmeta(key) => {
-                                self.meta_key_values.remove(&key);
+                                if self.meta_key_values.contains_key(&key) {
+                                    self.meta_key_values.remove(&key);
+                                } else {
+                                    let e = Error::new(
+                                        "invalid popmeta",
+                                        "missing corresponding pushmeta",
+                                        key.span,
+                                    );
+                                    self.errors.push(e);
+                                }
                             }
 
                             Include(_path) => {
