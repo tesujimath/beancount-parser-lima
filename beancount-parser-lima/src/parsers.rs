@@ -104,7 +104,7 @@ where
             .map_with(|key, e| Pragma::Popmeta(spanned(key, e.span()))),
         just(Token::Include)
             .ignore_then(string())
-            .map(Pragma::Include),
+            .map_with(|path, e| Pragma::Include(spanned(path, e.span()))),
         option(source_path).map(Pragma::Option),
         just(Token::Plugin)
             .ignore_then(string().map_with(spanned_extra))

@@ -620,7 +620,7 @@ pub(crate) enum Pragma<'a> {
     Poptag(Spanned<Tag<'a>>),
     Pushmeta(MetaKeyValue<'a>),
     Popmeta(Spanned<Key<'a>>),
-    Include(&'a str),
+    Include(Spanned<&'a str>),
     Option(BeancountOption<'a>),
     Plugin(Plugin<'a>),
 }
