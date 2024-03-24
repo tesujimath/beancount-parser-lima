@@ -6,7 +6,7 @@
 :this: is an org-mode property drawer which should be ignored if there is no preceeding whitespace on the line
 :END:
 
-option "plugin_processing_mode" "raw"
+option "plugin_processing_mode" "RAW"
 
 plugin "a_simple_but_entirely_mythical_plugin"
 
