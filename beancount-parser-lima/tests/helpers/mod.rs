@@ -106,7 +106,7 @@ fn create_sources_and_check<P>(input_path: P, expected_ledger: Ledger)
 where
     P: AsRef<Path>,
 {
-    let sources = BeancountSources::from(input_path.as_ref());
+    let sources = BeancountSources::try_from(input_path.as_ref()).unwrap();
     let parser = BeancountParser::new(&sources);
 
     check(&sources, &parser, expected_ledger);

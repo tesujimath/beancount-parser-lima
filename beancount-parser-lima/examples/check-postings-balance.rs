@@ -14,17 +14,19 @@ use beancount_parser_lima::{
 /// but this example does not implement all of that (because it is quite complex).
 ///
 /// For this example, we ignore everything about a posting except its amount, and we don't care about currency.
-fn main() {
+fn main() -> io::Result<()> {
     let flags = xflags::parse_or_exit! {
         /// File to parse
         required path: PathBuf
     };
 
     let stderr = &io::stderr();
-    let sources = BeancountSources::from(flags.path);
+    let sources = BeancountSources::try_from(flags.path)?;
     let parser = BeancountParser::new(&sources);
 
     parse(&sources, &parser, stderr);
+
+    Ok(())
 }
 
 fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)

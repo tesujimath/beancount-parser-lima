@@ -13,9 +13,9 @@ pub struct BeancountSources(lima::BeancountSources);
 #[pymethods]
 impl BeancountSources {
     #[new]
-    fn new(path: &str) -> BeancountSources {
-        let sources = lima::BeancountSources::from(PathBuf::from(path));
-        BeancountSources(sources)
+    fn new(path: &str) -> PyResult<Self> {
+        let sources = lima::BeancountSources::try_from(PathBuf::from(path))?;
+        Ok(BeancountSources(sources))
     }
 
     fn parse(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

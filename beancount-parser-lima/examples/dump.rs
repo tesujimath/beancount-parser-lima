@@ -12,7 +12,7 @@ use beancount_parser_lima::{
     BeancountParser, BeancountSources, Directive, ParseError, ParseSuccess,
 };
 
-fn main() {
+fn main() -> io::Result<()> {
     let flags = xflags::parse_or_exit! {
         /// Show allocations
         optional --show-allocations
@@ -21,20 +21,21 @@ fn main() {
         required path: PathBuf
     };
 
-    let mut stderr = &io::stderr();
+    let stderr = &io::stderr();
 
     let sources = if flags.path.to_str() == Some("STDIN") {
         let mut source_string = String::new();
         io::stdin().read_to_string(&mut source_string).unwrap();
         BeancountSources::from(source_string)
     } else {
-        BeancountSources::from(flags.path)
+        BeancountSources::try_from(flags.path)?
     };
 
     let parser = BeancountParser::new(&sources);
-    writeln!(stderr, "{:?}", &sources).unwrap();
 
     parse(&sources, &parser, flags.show_allocations, stderr);
+
+    Ok(())
 }
 
 fn parse<W>(

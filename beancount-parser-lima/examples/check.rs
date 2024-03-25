@@ -17,17 +17,19 @@ use beancount_parser_lima::{
 /// 1. A transaction with all postings specifying an amount must sum to zero. (It is good practice to let the last posting amount be inferred.)
 ///
 /// 2. No posting must refer to an unknown or closed account.
-fn main() {
+fn main() -> io::Result<()> {
     let flags = xflags::parse_or_exit! {
         /// File to parse
         required path: PathBuf
     };
 
     let stderr = &io::stderr();
-    let sources = BeancountSources::from(flags.path);
+    let sources = BeancountSources::try_from(flags.path)?;
     let parser = BeancountParser::new(&sources);
 
     parse(&sources, &parser, stderr);
+
+    Ok(())
 }
 
 fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)

@@ -25,7 +25,6 @@ chumsky = { version = "1.0.0-alpha.6", features = ["label", "regex"] }
 either = "1.8.1"
 lazy_format = "2.0.0"
 logos = "0.14.0"
-path-clean = "1.0.1"
 protobuf = "3.4.0"
 rust_decimal = "1.29.1"
 rust_decimal_macros = "1.29.1"

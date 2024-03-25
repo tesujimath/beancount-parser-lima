@@ -1,6 +1,5 @@
 use super::format::{format, plain};
 use super::types::*;
-use path_clean::PathClean;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::path::{Path, PathBuf};
@@ -128,9 +127,7 @@ impl<'a> BeancountOption<'a> {
             "documents" => Ok(Documents(
                 source_path
                     .and_then(|path| path.parent())
-                    .map_or(PathBuf::from(value.item), |parent| {
-                        parent.join(value.item).clean()
-                    }),
+                    .map_or(PathBuf::from(value.item), |parent| parent.join(value.item)),
             )),
 
             "operating_currency" => parse_currency(value.item).map(OperatingCurrency),

@@ -18,7 +18,7 @@
 //!};
 //!
 //!fn main() {
-//!    let sources = BeancountSources::from(PathBuf::from("examples/data/error-post-balancing.beancount"));
+//!    let sources = BeancountSources::try_from(PathBuf::from("examples/data/error-post-balancing.beancount")).unwrap();
 //!    let parser = BeancountParser::new(&sources);
 //!
 //!    parse(&sources, &parser, &io::stderr());
@@ -84,18 +84,17 @@
 
 use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
-use either::Either::{self, Left, Right};
 use lazy_format::lazy_format;
 use lexer::{lex, Token};
 use parsers::{file, includes, ParserState};
-use path_clean::PathClean;
 use sort::SortIteratorAdaptor;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    env::current_dir,
+    ffi::OsStr,
     fmt::{self, Formatter},
     fs::File,
     io::{self, stderr, Read, Write},
+    iter::once,
     path::{Path, PathBuf},
 };
 pub use types::*;
@@ -110,91 +109,120 @@ pub use types::*;
 /// # use std::path::PathBuf;
 /// use beancount_parser_lima::{BeancountParser, BeancountSources};
 ///
-/// let sources = BeancountSources::from(PathBuf::from("examples/data/full.beancount"));
+/// let sources = BeancountSources::try_from(PathBuf::from("examples/data/full.beancount")).unwrap();
 /// let beancount_parser = BeancountParser::new(&sources);
 ///
 /// let result = beancount_parser.parse();
 /// ```
 pub struct BeancountSources {
-    // The source_id is the index in `content`, and the first of these is the root source.
+    // `source_id - 1` is the index in `included_content`, or zero for root_content.
     // To support parsing from inline strings, we allow for the path to be optional, but
     // there can only ever be one of these, the root.
-    all_content: Vec<(Option<PathBuf>, String, String)>,
-    all_errors: Vec<(PathBuf, anyhow::Error)>,
-    current_dir: Option<PathBuf>,
+    root_path: Option<PathBuf>,
+    root_source_id_string: String,
+    root_content: String,
+    included_content: Vec<(PathBuf, String, io::Result<String>)>,
+}
+
+// get all includes, discarding errors
+fn get_includes(content: &str, include_count: Option<usize>) -> Vec<String> {
+    fn get_includes_for_tokens(
+        tokens: Vec<(Token, Span)>,
+        source_id: SourceId,
+        end_of_input: Span,
+    ) -> Vec<String> {
+        let spanned_tokens = tokens.spanned(end_of_input).with_context(source_id);
+
+        // ignore any errors in parsing, we'll pick them up in the next pass
+        includes()
+            .parse(spanned_tokens)
+            .into_output()
+            .unwrap_or_default()
+    }
+
+    let source_id = include_count.map(SourceId::from).unwrap_or_default();
+    let tokens = lex_with_source(source_id, content);
+    get_includes_for_tokens(tokens, source_id, end_of_input(source_id, content))
+}
+
+// get directory for a path if any
+fn path_dir(p: &Path) -> Option<&Path> {
+    p.parent().and_then(|p| {
+        if !AsRef::<OsStr>::as_ref(&p).is_empty() {
+            Some(p)
+        } else {
+            None
+        }
+    })
+}
+
+// get included path relative to including path
+fn resolve_included_path(including_path: Option<&PathBuf>, included_path: &Path) -> PathBuf {
+    match including_path.and_then(|p| path_dir(p.as_ref())) {
+        Some(p) => p.join(included_path),
+        None => included_path.to_path_buf(),
+    }
 }
 
 impl BeancountSources {
-    fn read_with_includes(root: Either<String, PathBuf>) -> Self {
-        let mut all_content = Vec::new();
-        let mut all_errors = Vec::new();
+    fn try_read_with_includes(root_path: PathBuf) -> io::Result<Self> {
+        let root_content = read(&root_path)?;
+        Ok(Self::read_with_includes(Some(root_path), root_content))
+    }
 
-        let mut pending = VecDeque::from([root]);
-        let mut all_paths = HashSet::new();
+    fn read_with_includes(root_path: Option<PathBuf>, root_content: String) -> Self {
+        let mut pending_paths = get_includes(&root_content, None)
+            .into_iter()
+            .map(|included_path| resolve_included_path(root_path.as_ref(), included_path.as_ref()))
+            .collect::<VecDeque<_>>();
 
-        let current_dir = current_dir().ok();
+        let mut included_content: Vec<(PathBuf, String, io::Result<String>)> = Vec::new();
 
-        while !pending.is_empty() {
-            let (path, content) = match pending.pop_front().unwrap() {
-                Left(content) => (None, Some(content)),
-                Right(path) => {
-                    all_paths.insert(path.clone());
-                    match read(&path) {
-                        Ok(content) => (Some(path), Some(content)),
-                        Err(e) => {
-                            all_errors.push((path, e));
-                            (None, None)
-                        }
-                    }
+        // for cycle detection
+        let mut all_paths = HashSet::from([root_path.as_ref().and_then(|p| p.canonicalize().ok())]);
+
+        while !pending_paths.is_empty() {
+            let pending_path = pending_paths.pop_front().unwrap();
+            let canonical_pending_path = pending_path.canonicalize().ok();
+
+            if !all_paths.contains(&canonical_pending_path) {
+                all_paths.insert(canonical_pending_path);
+
+                let source_id_string = pending_path.to_string_lossy().into();
+                let content = read(&pending_path);
+                included_content.push((pending_path, source_id_string, content));
+
+                let (ref pending_path, _, ref content) = included_content.last().unwrap();
+                if let Ok(content) = content {
+                    let mut includes = get_includes(content, Some(included_content.len()))
+                        .into_iter()
+                        .map(|included_path| {
+                            resolve_included_path(Some(pending_path), included_path.as_ref())
+                        })
+                        .collect::<VecDeque<_>>();
+                    pending_paths.append(&mut includes);
                 }
-            };
-
-            if let Some(content) = content {
-                let source_id = SourceId::from(all_content.len());
-                let source_id_string = path.as_ref().map_or("inline".to_owned(), |path| {
-                    path.to_string_lossy().into_owned()
-                });
-
-                all_content.push((path, source_id_string, content));
-                let (path, source_id_string, content) = all_content.last().unwrap();
-
-                let tokens = Some(lex_with_source(source_id, content));
-                let spanned_tokens = tokens
-                    .as_ref()
-                    .unwrap()
-                    .spanned(end_of_input(source_id, content))
-                    .with_context(source_id);
-
-                // ignore any errors in parsing, we'll pick them up in the next pass
-                if let Some(includes) = includes().parse(spanned_tokens).into_output() {
-                    for include in includes {
-                        let included_path = path
-                            .as_ref()
-                            .and_then(|path| path.parent())
-                            .map_or(PathBuf::from(&include), |parent| {
-                                parent.join(include).clean()
-                            });
-                        if !all_paths.contains(included_path.as_path()) {
-                            pending.push_back(Right(included_path));
-                        } else {
-                            // TODO include cycle error
-                            writeln!(
-                                &mut stderr(),
-                                "warning: ignoring include cycle in {} for {}",
-                                source_id_string,
-                                &included_path.display()
-                            )
-                            .unwrap();
-                        }
-                    }
-                };
+            } else {
+                // TODO include cycle error
+                writeln!(
+                    &mut stderr(),
+                    "warning: ignoring include cycle for {:?}",
+                    &canonical_pending_path
+                )
+                .unwrap();
             }
         }
 
+        let root_source_id_string = root_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().into())
+            .unwrap_or("inline".to_string());
+
         Self {
-            all_content,
-            all_errors,
-            current_dir,
+            root_path,
+            root_source_id_string,
+            root_content,
+            included_content,
         }
     }
 
@@ -246,51 +274,70 @@ impl BeancountSources {
         use chumsky::span::Span;
 
         let source_index: usize = span.context().into();
-        &self.all_content[source_index].1
+        if source_index > 0 {
+            self.included_content[source_index - 1].1.as_str()
+        } else {
+            self.root_source_id_string.as_str()
+        }
     }
 
     fn sources(&self) -> Vec<(String, &str)> {
-        self.all_content
+        self.included_content
             .iter()
-            .map(|(_, source_id_string, content)| (source_id_string.to_string(), content.as_str()))
+            .filter_map(|(_, source_id_string, content)| {
+                content
+                    .as_ref()
+                    .ok()
+                    .map(|content| (source_id_string.clone(), content.as_str()))
+            })
             .collect()
     }
 
     fn content_iter(&self) -> impl Iterator<Item = (SourceId, Option<&Path>, &str)> {
-        self.all_content
-            .iter()
-            .enumerate()
-            .map(|(i, (pathbuf, _, content))| {
-                (
-                    SourceId::from(i),
-                    pathbuf.as_ref().map(|pathbuf| pathbuf.as_path()),
-                    content.as_str(),
-                )
-            })
+        once((
+            SourceId::default(),
+            self.root_path.as_deref(),
+            self.root_content.as_str(),
+        ))
+        .chain(self.included_content.iter().enumerate().filter_map(
+            |(i, (pathbuf, _, content))| {
+                content.as_ref().ok().map(|content| {
+                    (
+                        SourceId::from(i + 1),
+                        Some(pathbuf.as_path()),
+                        content.as_str(),
+                    )
+                })
+            },
+        ))
     }
 }
 
-impl From<PathBuf> for BeancountSources {
-    fn from(source_path: PathBuf) -> Self {
-        Self::read_with_includes(Right(source_path))
+impl TryFrom<PathBuf> for BeancountSources {
+    type Error = io::Error;
+
+    fn try_from(source_path: PathBuf) -> io::Result<Self> {
+        Self::try_read_with_includes(source_path)
     }
 }
 
-impl From<&Path> for BeancountSources {
-    fn from(source_path: &Path) -> Self {
-        Self::read_with_includes(Right(source_path.to_owned()))
+impl TryFrom<&Path> for BeancountSources {
+    type Error = io::Error;
+
+    fn try_from(source_path: &Path) -> io::Result<Self> {
+        Self::try_read_with_includes(source_path.to_owned())
     }
 }
 
 impl From<String> for BeancountSources {
     fn from(source_string: String) -> Self {
-        Self::read_with_includes(Left(source_string))
+        Self::read_with_includes(None, source_string)
     }
 }
 
 impl From<&str> for BeancountSources {
     fn from(source_string: &str) -> Self {
-        Self::read_with_includes(Left(source_string.to_owned()))
+        Self::read_with_includes(None, source_string.to_owned())
     }
 }
 
@@ -298,12 +345,11 @@ impl std::fmt::Debug for BeancountSources {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "BeancountSources(",)?;
 
-        for (_path, source_id_string, content) in &self.all_content {
-            writeln!(f, "    {} ok len {},", source_id_string, content.len())?;
-        }
-
-        for (path, error) in &self.all_errors {
-            writeln!(f, "    {} {},", path.display(), error)?;
+        for (_path, source_id_string, content) in &self.included_content {
+            match content {
+                Ok(content) => writeln!(f, "    {} ok len {},", source_id_string, content.len())?,
+                Err(e) => writeln!(f, "    {} err {},", source_id_string, e)?,
+            }
         }
 
         writeln!(f, ")",)
@@ -316,7 +362,7 @@ pub fn lex_with_source(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
         .collect::<Vec<_>>()
 }
 
-fn read<P>(file_path: P) -> anyhow::Result<String>
+fn read<P>(file_path: P) -> io::Result<String>
 where
     P: AsRef<Path>,
 {
@@ -341,7 +387,7 @@ type SpannedToken<'t> = (Token<'t>, Span);
 /// use beancount_parser_lima::{BeancountParser, BeancountSources, ParseError, ParseSuccess};
 ///
 /// fn main() {
-///     let sources = BeancountSources::from(PathBuf::from("examples/data/full.beancount"));
+///     let sources = BeancountSources::try_from(PathBuf::from("examples/data/full.beancount")).unwrap();
 ///     let parser = BeancountParser::new(&sources);
 ///
 ///     parse(&sources, &parser, &io::stderr());
