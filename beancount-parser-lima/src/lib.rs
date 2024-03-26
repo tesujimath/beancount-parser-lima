@@ -197,7 +197,10 @@ impl BeancountSources {
             let canonical_path = path.canonicalize().ok();
 
             if canonical_paths.contains(&canonical_path) {
-                included_content.insert(path, IncludedSource::Duplicate);
+                // don't overwrite existing content
+                if !included_content.contains_key(&path) {
+                    included_content.insert(path, IncludedSource::Duplicate);
+                }
             } else {
                 canonical_paths.insert(canonical_path);
 
@@ -591,6 +594,7 @@ struct PragmaProcessor<'s, 't> {
     stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>)>,
     remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>>,
     error_paths: HashMap<Option<PathBuf>, &'s io::Error>,
+    include_span_by_canonical_path: HashMap<PathBuf, Span>,
     // tags and meta key/values for pragma push/pop
     tags: HashMap<Spanned<Tag<'t>>, Vec<Spanned<Tag<'t>>>>,
     meta_key_values: HashMap<Spanned<Key<'t>>, Vec<(Span, Spanned<MetaValue<'t>>)>>,
@@ -630,6 +634,7 @@ where
             stacked: VecDeque::new(),
             remaining,
             error_paths,
+            include_span_by_canonical_path: HashMap::default(),
             tags: HashMap::new(),
             meta_key_values: HashMap::new(),
             options,
@@ -765,6 +770,9 @@ where
                                     )),
                                     *relpath.span(),
                                 );
+                                let canonical_path =
+                                    path.as_ref().and_then(|p| p.canonicalize().ok());
+
                                 match self.remaining.remove_entry(&path) {
                                     Some((included_path, included_declarations)) => {
                                         let stacked_path = std::mem::replace(
@@ -777,6 +785,12 @@ where
                                         );
                                         self.stacked
                                             .push_front((stacked_path, stacked_declarations));
+
+                                        // record the span in case of a duplicate include error later
+                                        if let Some(canonical_path) = canonical_path {
+                                            self.include_span_by_canonical_path
+                                                .insert(canonical_path, span);
+                                        }
                                     }
 
                                     None => {
@@ -785,11 +799,22 @@ where
                                             Some(e) => {
                                                 Error::new("can't read file", e.to_string(), span)
                                             }
-                                            None => Error::new(
-                                                "duplicate include",
-                                                "file already included",
-                                                span,
-                                            ),
+                                            None => {
+                                                let e = Error::new(
+                                                    "duplicate include",
+                                                    "file already included",
+                                                    span,
+                                                );
+
+                                                // relate the error to the first include if we can
+                                                if let Some(span) = canonical_path.and_then(|p| {
+                                                    self.include_span_by_canonical_path.get(&p)
+                                                }) {
+                                                    e.related_to_named_span("file", *span)
+                                                } else {
+                                                    e
+                                                }
+                                            }
                                         };
                                         self.errors.push(e);
                                     }
