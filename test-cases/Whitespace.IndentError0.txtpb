@@ -1,0 +1,5 @@
+# ANOMALY: if there are parse errors, Lima only returns the errors
+# and we don't test the error location here
+errors {
+  message: "found '2020-07-28' expected something else"
+}

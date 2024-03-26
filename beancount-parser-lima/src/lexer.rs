@@ -16,8 +16,8 @@ use unescaper::unescape;
 #[logos(error = LexerError, skip r"[ \t]+")]
 // ANOMALY: to be ignored, we have to require a flag occurs at the beginning of a line, otherwise
 // indented tag or flagged postings are consumed by this rule.  Colon is the only one which is not so fragile.
-#[logos(subpattern ignored_whole_line= r"(([*!&#?%]|\s*:)[^\n]*\n)")] // rolled into end-of-line handling below
-#[logos(subpattern comment_to_eol= r"(;[^\n]*)")] // rolled into end-of-line handling below
+#[logos(subpattern ignored_whole_line= r"(([*!&#?%]|\s*:).*\n)")] // rolled into end-of-line handling below
+#[logos(subpattern comment_to_eol= r"(;.*)")] // rolled into end-of-line handling below
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[0-9'\._-]*[A-Z][A-Z0-9'\._-]*")]
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
 #[logos(subpattern time = r"\d{1,2}:\d{2}(:\d{2})?")]
