@@ -766,12 +766,17 @@ where
                                     *relpath.span(),
                                 );
                                 match self.remaining.remove_entry(&path) {
-                                    Some((path, mut switcheroo)) => {
-                                        std::mem::swap(
-                                            &mut self.current_declarations,
-                                            &mut switcheroo,
+                                    Some((included_path, included_declarations)) => {
+                                        let stacked_path = std::mem::replace(
+                                            &mut self.current_path,
+                                            included_path,
                                         );
-                                        self.stacked.push_front((path, switcheroo));
+                                        let stacked_declarations = std::mem::replace(
+                                            &mut self.current_declarations,
+                                            included_declarations,
+                                        );
+                                        self.stacked
+                                            .push_front((stacked_path, stacked_declarations));
                                     }
 
                                     None => {
