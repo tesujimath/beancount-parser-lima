@@ -700,7 +700,26 @@ fn ignored_lines_non_comment_org_mode_title() {
 
 // whitespace prefix *is* allowed here
 #[test]
-fn ignored_lines_non_comment_org_mode_drawer() {
+fn ignored_lines_non_comment_org_mode_drawer_not_at_start_of_file() {
+    lex_and_check(
+        r#"
+2021-01-13 open Assets:Bank:Current
+    :PROPERTIES:
+    :this: is an org-mode property drawer
+    :END:
+"#,
+        vec![
+            date("2021-01-13"),
+            Open,
+            Account("Assets:Bank:Current"),
+            Eol,
+        ],
+    );
+}
+
+// whitespace prefix *is* allowed here
+#[test]
+fn ignored_lines_non_comment_org_mode_drawer_at_start_of_file() {
     lex_and_check(
         r#"
     :PROPERTIES:

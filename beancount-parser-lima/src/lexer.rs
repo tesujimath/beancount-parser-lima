@@ -499,6 +499,7 @@ impl<'a, I: Iterator<Item = RangedToken<'a>>> KeywordThenColonToKeyIteratorAdapt
 /// 2. Fold consecutive Eol tokens into a single one
 /// 3. Drop any initial Eol
 /// 4. Optionally, force a final Eol (unless input was empty)
+/// 5. Drop tokens for indent followed by colon (Logos deficiency precludes using Logos regexes for this)
 struct EolIndentHandler<'a, I> {
     iter: I,
     first_tok: Option<RangedToken<'a>>,
@@ -514,10 +515,23 @@ where
 {
     fn new(mut iter: I, final_eol: Option<Range<usize>>) -> Self {
         let mut first_tok = Some((Token::Eol, Range::default()));
-        while first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
-            first_tok = iter.next()
-        }
+        let mut ready = false;
 
+        while !ready {
+            while first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
+                first_tok = iter.next()
+            }
+            // handle the colon-at-start-of-file case here
+            if first_tok.as_ref().is_some_and(|tok| tok.0 == Token::Colon) {
+                first_tok = iter.next();
+
+                while first_tok.as_ref().is_some_and(|tok| !tok.0.is_eol()) {
+                    first_tok = iter.next();
+                }
+            } else {
+                ready = true;
+            }
+        }
         EolIndentHandler {
             iter,
             first_tok,
@@ -528,14 +542,30 @@ where
         }
     }
 
-    fn merge(&mut self) -> Option<RangedToken<'a>> {
-        let mut first_tok = self.iter.next();
-        // only get a second token if the first is some kind of EOL, because only then is there anything to merge
-        let mut second_tok = if first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
+    fn skip_to_end_of_line(&mut self) -> Option<RangedToken<'a>> {
+        let mut tok = self.iter.next();
+        while tok.as_ref().is_some_and(|tok| !tok.0.is_eol()) {
+            tok = self.iter.next();
+        }
+
+        tok
+    }
+
+    // only get a second token if the first is some kind of EOL, because only then is there anything to merge
+    fn get_second_tok_if_required(
+        &mut self,
+        first_tok: &Option<RangedToken<'a>>,
+    ) -> Option<RangedToken<'a>> {
+        if first_tok.as_ref().is_some_and(|tok| tok.0.is_eol()) {
             self.iter.next()
         } else {
             None
-        };
+        }
+    }
+
+    fn merge(&mut self) -> Option<RangedToken<'a>> {
+        let mut first_tok = self.iter.next();
+        let mut second_tok = self.get_second_tok_if_required(&first_tok);
 
         let mut merging = true;
         while merging {
@@ -544,6 +574,12 @@ where
                     let (tok, span) = second_tok.take().unwrap();
                     first_tok = Some((tok, first.1.start..span.end));
                     second_tok = self.iter.next();
+                }
+                (Some(first), Some(second))
+                    if first.0 == Token::EolThenIndent && second.0 == Token::Colon =>
+                {
+                    first_tok = self.skip_to_end_of_line();
+                    second_tok = self.get_second_tok_if_required(&first_tok);
                 }
                 _ => {
                     merging = false;
