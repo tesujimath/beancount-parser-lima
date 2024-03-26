@@ -810,6 +810,49 @@ fn unicode_utf8() {
 }
 
 #[test]
+fn whitespace_indent_error0() {
+    lex_and_check(
+        r#"
+2020-07-28 open Assets:Foo
+  2020-07-29 open Assets:Bar
+"#,
+        vec![
+            date("2020-07-28"),
+            Open,
+            Account("Assets:Foo"),
+            Eol,
+            Indent,
+            date("2020-07-29"),
+            Open,
+            Account("Assets:Bar"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
+fn whitespace_indent_error1() {
+    lex_and_check(
+        r#"
+2020-07-28 open Assets:Foo
+
+  2020-07-29 open Assets:Bar
+"#,
+        vec![
+            date("2020-07-28"),
+            Open,
+            Account("Assets:Foo"),
+            Eol,
+            Indent,
+            date("2020-07-29"),
+            Open,
+            Account("Assets:Bar"),
+            Eol,
+        ],
+    );
+}
+
+#[test]
 fn keywords_as_key() {
     lex_and_check(
         r#"
