@@ -125,7 +125,7 @@ pub struct BeancountSources {
 enum IncludedSource {
     Content(SourceId, String),
     IoError(io::Error),
-    IncludeCycleError,
+    Duplicate,
 }
 
 // get all includes, discarding errors
@@ -188,7 +188,7 @@ impl BeancountSources {
 
         let mut included_content: HashMap<PathBuf, IncludedSource> = HashMap::new();
 
-        // for cycle detection
+        // for duplicate detection
         let mut canonical_paths =
             HashSet::from([root_path.as_ref().and_then(|p| p.canonicalize().ok())]);
 
@@ -197,7 +197,7 @@ impl BeancountSources {
             let canonical_path = path.canonicalize().ok();
 
             if canonical_paths.contains(&canonical_path) {
-                included_content.insert(path, IncludedSource::IncludeCycleError);
+                included_content.insert(path, IncludedSource::Duplicate);
             } else {
                 canonical_paths.insert(canonical_path);
 
@@ -328,6 +328,18 @@ impl BeancountSources {
                 }),
         )
     }
+
+    fn error_path_iter(&self) -> impl Iterator<Item = (Option<&Path>, &io::Error)> {
+        self.included_content
+            .iter()
+            .filter_map(|(pathbuf, included_source)| {
+                if let IncludedSource::IoError(e) = included_source {
+                    Some((Some(pathbuf.as_path()), e))
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 impl TryFrom<PathBuf> for BeancountSources {
@@ -371,10 +383,7 @@ impl std::fmt::Debug for BeancountSources {
                     content.len()
                 )?,
                 IncludedSource::IoError(e) => writeln!(f, "    {:?} err {},", path, e)?,
-                IncludedSource::IncludeCycleError => {
-                    writeln!(f, "    {:?} include cycle error", path)?
-                }
-          
+                IncludedSource::Duplicate => writeln!(f, "    {:?} duplicate include", path)?,
             }
         }
 
@@ -474,8 +483,8 @@ pub struct ParseError {
 }
 
 // result of parse_declarations
-type ParseDeclarationsResult<'t> = (
-    Vec<Vec<Spanned<Declaration<'t>>>>,
+type ParseDeclarationsResult<'s, 't> = (
+    HashMap<Option<&'s Path>, Vec<Spanned<Declaration<'t>>>>,
     Options<'t>,
     Vec<Error>,
     Vec<Warning>,
@@ -489,7 +498,7 @@ where
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = Vec::new();
 
-        for (source_id, _source_path, content) in sources.content_iter() {
+        for (source_id, _path, content) in sources.content_iter() {
             tokenized_sources.push(lex_with_source(source_id, content));
         }
 
@@ -504,8 +513,9 @@ where
     where
         's: 't,
     {
-        let (all_declarations, options, mut errors, warnings) = self.parse_declarations();
-        let mut p = PragmaProcessor::new(all_declarations, options);
+        let (parsed_sources, options, mut errors, warnings) = self.parse_declarations();
+        let error_paths = self.sources.error_path_iter().collect::<HashMap<_, _>>();
+        let mut p = PragmaProcessor::new(self.root_path(), parsed_sources, error_paths, options);
 
         let directives = p
             .by_ref()
@@ -526,13 +536,20 @@ where
         }
     }
 
-    /// Parse the sources, returning declarations and any errors.
-    /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> ParseDeclarationsResult<'t>
+    fn root_path(&'t self) -> Option<&'s Path>
     where
         's: 't,
     {
-        let mut all_outputs = Vec::new();
+        self.sources.root_path.as_deref()
+    }
+
+    /// Parse the sources, returning declarations and any errors.
+    /// The declarations are indexed by SourceId
+    fn parse_declarations(&'t self) -> ParseDeclarationsResult<'s, 't>
+    where
+        's: 't,
+    {
+        let mut all_outputs = HashMap::new();
         let mut all_errors = Vec::new();
         let mut parser_state = ParserState::default();
 
@@ -549,7 +566,7 @@ where
                 .parse_with_state(spanned_tokens, &mut parser_state)
                 .into_output_errors();
 
-            all_outputs.push(output.unwrap_or(Vec::new()));
+            all_outputs.insert(source_path, output.unwrap_or(Vec::new()));
             all_errors.extend(errors);
         }
 
@@ -569,10 +586,11 @@ where
 /// When the iterator is exhausted, any errors should be collected by the caller.
 #[derive(Debug)]
 struct PragmaProcessor<'s, 't> {
-    included: HashMap<&'s Path, Span>,
-    current: VecDeque<Spanned<Declaration<'t>>>,
-    stacked: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
-    remaining: VecDeque<VecDeque<Spanned<Declaration<'t>>>>,
+    current_path: Option<PathBuf>,
+    current_declarations: VecDeque<Spanned<Declaration<'t>>>,
+    stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>)>,
+    remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>>,
+    error_paths: HashMap<Option<PathBuf>, &'s io::Error>,
     // tags and meta key/values for pragma push/pop
     tags: HashMap<Spanned<Tag<'t>>, Vec<Spanned<Tag<'t>>>>,
     meta_key_values: HashMap<Spanned<Key<'t>>, Vec<(Span, Spanned<MetaValue<'t>>)>>,
@@ -582,20 +600,36 @@ struct PragmaProcessor<'s, 't> {
     errors: Vec<Error>,
 }
 
-impl<'s, 't> PragmaProcessor<'s, 't> {
-    fn new(all_declarations: Vec<Vec<Spanned<Declaration<'t>>>>, options: Options<'t>) -> Self {
-        let mut remaining = all_declarations
+impl<'s, 't> PragmaProcessor<'s, 't>
+where
+    's: 't,
+{
+    fn new(
+        root_path: Option<&Path>,
+        parsed_sources: HashMap<Option<&Path>, Vec<Spanned<Declaration<'t>>>>,
+        error_paths: HashMap<Option<&Path>, &'s io::Error>,
+        options: Options<'t>,
+    ) -> Self {
+        let mut remaining = parsed_sources
             .into_iter()
-            .map(VecDeque::from)
-            .collect::<VecDeque<_>>();
+            .map(|(path, declarations)| {
+                (path.map(|p| p.to_path_buf()), VecDeque::from(declarations))
+            })
+            .collect::<HashMap<_, _>>();
+        let error_paths = error_paths
+            .into_iter()
+            .map(|(path, e)| (path.map(|p| p.to_path_buf()), e))
+            .collect::<HashMap<_, _>>();
 
-        let current = remaining.pop_front().unwrap_or(VecDeque::new());
+        let current_path = root_path.map(|p| p.to_path_buf());
+        let current_declarations = remaining.remove(&current_path).unwrap();
 
         PragmaProcessor {
-            included: HashMap::new(),
-            current,
+            current_path,
+            current_declarations,
             stacked: VecDeque::new(),
             remaining,
+            error_paths,
             tags: HashMap::new(),
             meta_key_values: HashMap::new(),
             options,
@@ -634,11 +668,14 @@ impl<'s, 't> PragmaProcessor<'s, 't> {
     }
 }
 
-impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
+impl<'s, 't> Iterator for PragmaProcessor<'s, 't>
+where
+    's: 't,
+{
     type Item = Spanned<Directive<'t>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.current.pop_front() {
+        match self.current_declarations.pop_front() {
             Some(declaration) => {
                 match declaration.item {
                     Declaration::Directive(mut directive) => {
@@ -720,16 +757,36 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                                     self.meta_key_values.remove(&meta);
                                 }
                             }
-                            Include(_path) => {
-                                // TODO need to validate the path against what we have in remaining
-                                match self.remaining.pop_front() {
-                                    Some(mut switcheroo) => {
-                                        std::mem::swap(&mut self.current, &mut switcheroo);
-                                        self.stacked.push_front(switcheroo);
+                            Include(relpath) => {
+                                let (path, span) = (
+                                    Some(resolve_included_path(
+                                        self.current_path.as_ref(),
+                                        AsRef::<Path>::as_ref(*relpath.item()),
+                                    )),
+                                    *relpath.span(),
+                                );
+                                match self.remaining.remove_entry(&path) {
+                                    Some((path, mut switcheroo)) => {
+                                        std::mem::swap(
+                                            &mut self.current_declarations,
+                                            &mut switcheroo,
+                                        );
+                                        self.stacked.push_front((path, switcheroo));
                                     }
 
                                     None => {
-                                        eprintln!("warning, include found but nothing remaining");
+                                        // either a known error path or a duplicate
+                                        let e = match self.error_paths.get(&path) {
+                                            Some(e) => {
+                                                Error::new("can't read file", e.to_string(), span)
+                                            }
+                                            None => Error::new(
+                                                "duplicate include",
+                                                "file already included",
+                                                span,
+                                            ),
+                                        };
+                                        self.errors.push(e);
                                     }
                                 }
                             }
@@ -749,8 +806,9 @@ impl<'s, 't> Iterator for PragmaProcessor<'s, 't> {
                 }
             }
             None => match self.stacked.pop_front() {
-                Some(current) => {
-                    self.current = current;
+                Some((path, declarations)) => {
+                    self.current_path = path;
+                    self.current_declarations = declarations;
                     self.next()
                 }
                 None => None,
