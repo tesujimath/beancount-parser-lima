@@ -198,9 +198,9 @@ impl BeancountSources {
 
             if canonical_paths.contains(&canonical_path) {
                 // don't overwrite existing content
-                if !included_content.contains_key(&path) {
-                    included_content.insert(path, IncludedSource::Duplicate);
-                }
+                included_content
+                    .entry(path)
+                    .or_insert(IncludedSource::Duplicate);
             } else {
                 canonical_paths.insert(canonical_path);
 
