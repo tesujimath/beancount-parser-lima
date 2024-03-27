@@ -79,7 +79,7 @@ Also, unary options are not supported.
 
 ## Parser Tests
 
-The [parser test cases](beancount-parser-lima/test-cases) are based on the
+The [parser test cases](test-cases) are based on the
 [parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc),
 extracted into a language independent format.
 That is, all the original tests have been replicated here, with some additions.
