@@ -1,6 +1,5 @@
 use super::*;
 use lazy_format::lazy_format;
-use pyo3::{pymethods, PyRef, Python};
 use std::{
     borrow::Borrow,
     fmt::{self, Display, Formatter},
@@ -51,7 +50,7 @@ fn fmt_posting(x: &Posting, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.account.as_ref(py),
+        x.account.bind(py),
         plain,
         ":",
         x.flag.as_ref().and(Some(" ")),
@@ -139,7 +138,7 @@ fn fmt_open(
 ) -> fmt::Result {
     write!(f, "{} open ", date)?;
     fmt_account(&x.account, py, f)?;
-    format(f, x.currencies.as_ref(py), plain, ",", Some(" "))?;
+    format(f, x.currencies.bind(py), plain, ",", Some(" "))?;
     format(f, &x.booking, double_quoted, " ", Some(" "))?;
 
     fmt_optional_metadata_inline(metadata, py, f)
@@ -338,15 +337,15 @@ fn fmt_optional_metadata_inline(
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
     if let Some(metadata) = x.as_ref() {
-        if let Some(tags) = metadata.tags.as_ref().map(|tags| tags.as_ref(py)) {
+        if let Some(tags) = metadata.tags.as_ref().map(|tags| tags.bind(py)) {
             fmt_tags_inline(tags, f)?;
         }
 
-        if let Some(links) = metadata.links.as_ref().map(|links| links.as_ref(py)) {
+        if let Some(links) = metadata.links.as_ref().map(|links| links.bind(py)) {
             fmt_links_inline(links, f)?;
         }
 
-        if let Some(kv) = metadata.key_values.as_ref().map(|kv| kv.as_ref(py)) {
+        if let Some(kv) = metadata.key_values.as_ref().map(|kv| kv.bind(py)) {
             fmt_metadata_keys_values(kv, f)?;
         }
     }
@@ -367,15 +366,15 @@ fn fmt_optional_metadata(
 }
 
 fn fmt_metadata(x: &Metadata, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
-    if let Some(tags) = x.tags.as_ref().map(|tags| tags.as_ref(py)) {
+    if let Some(tags) = x.tags.as_ref().map(|tags| tags.bind(py)) {
         format(f, tags.iter(), tag, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
     }
 
-    if let Some(links) = x.links.as_ref().map(|links| links.as_ref(py)) {
+    if let Some(links) = x.links.as_ref().map(|links| links.bind(py)) {
         format(f, links.iter(), link, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
     }
 
-    if let Some(key_values) = x.key_values.as_ref().map(|kv| kv.as_ref(py)) {
+    if let Some(key_values) = x.key_values.as_ref().map(|kv| kv.bind(py)) {
         format(
             f,
             key_values.iter(),
@@ -388,15 +387,15 @@ fn fmt_metadata(x: &Metadata, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Res
     Ok(())
 }
 
-fn fmt_metadata_keys_values(x: &PyDict, f: &mut Formatter<'_>) -> fmt::Result {
+fn fmt_metadata_keys_values(x: &Bound<'_, PyDict>, f: &mut Formatter<'_>) -> fmt::Result {
     format(f, x.iter(), key_value, NEWLINE_INDENT, Some(NEWLINE_INDENT))
 }
 
-fn fmt_tags_inline(tags: &PyList, f: &mut Formatter<'_>) -> fmt::Result {
+fn fmt_tags_inline(tags: &Bound<'_, PyList>, f: &mut Formatter<'_>) -> fmt::Result {
     format(f, tags.iter(), tag, SPACE, Some(SPACE))
 }
 
-fn fmt_links_inline(links: &PyList, f: &mut Formatter<'_>) -> fmt::Result {
+fn fmt_links_inline(links: &Bound<'_, PyList>, f: &mut Formatter<'_>) -> fmt::Result {
     format(f, links.iter(), link, SPACE, Some(SPACE))
 }
 
@@ -699,7 +698,7 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.inferred_tolerance_default.as_ref(py).iter(),
+        x.inferred_tolerance_default.bind(py).iter(),
         |(c, d)| format!("{}={}", c, d),
         ",",
         Some("\ninferred_tolerance_default: "),
@@ -719,7 +718,7 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.documents.as_ref(py).iter(),
+        x.documents.bind(py).iter(),
         plain,
         ",",
         Some("\ndocuments: "),
@@ -727,7 +726,7 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.operating_currency.as_ref(py).iter(),
+        x.operating_currency.bind(py).iter(),
         plain,
         ",",
         Some("\noperating_currency: "),
@@ -739,7 +738,7 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.account_name_by_type.as_ref(py).iter(),
+        x.account_name_by_type.bind(py).iter(),
         |(t, n)| format!("{}={}", t, n),
         ",",
         Some("\naccount_name_by_type: "),
@@ -747,7 +746,7 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
 
     format(
         f,
-        x.account_type_by_name.as_ref(py).iter(),
+        x.account_type_by_name.bind(py).iter(),
         |(n, t)| format!("{}={}", n, t),
         ",",
         Some("\naccount_type_by_name: "),
@@ -769,7 +768,7 @@ fn fmt_account_option(
 }
 
 fn fmt_account(x: &Py<PyList>, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
-    format(f, x.as_ref(py).iter(), plain, ":", None)
+    format(f, x.bind(py).iter(), plain, ":", None)
 }
 
 struct Fmt<F>(pub F)

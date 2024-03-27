@@ -9,8 +9,8 @@ use std::{
 use crate::types::*;
 use beancount_parser_lima as lima;
 use pyo3::{
+    prelude::*,
     types::{PyDate, PyDateAccess, PyDict, PyList, PySet, PyString},
-    IntoPy, Py, PyAny, PyErr, PyResult, Python,
 };
 use smallvec::SmallVec;
 use string_interner::{symbol::SymbolU32, DefaultStringInterner, StringInterner, Symbol};
@@ -166,7 +166,7 @@ impl Converter {
             .account
             .create_or_reuse(py, x.account(), &mut self.string);
 
-        let currencies = PyList::new(
+        let currencies = PyList::new_bound(
             py,
             x.currencies()
                 .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref())),
@@ -347,7 +347,7 @@ impl Converter {
             let key_values = if key_values.len() == 0 {
                 None
             } else {
-                let key_value_dict = PyDict::new(py);
+                let key_value_dict = PyDict::new_bound(py);
                 for (k, v) in key_values {
                     key_value_dict.set_item(
                         self.string.create_or_reuse(py, k.item().as_ref()),
@@ -361,7 +361,7 @@ impl Converter {
                 None
             } else {
                 Some(
-                    PyList::new(
+                    PyList::new_bound(
                         py,
                         tags.map(|tag| self.string.create_or_reuse(py, tag.item().as_ref())),
                     )
@@ -373,7 +373,7 @@ impl Converter {
                 None
             } else {
                 Some(
-                    PyList::new(
+                    PyList::new_bound(
                         py,
                         links.map(|link| self.string.create_or_reuse(py, link.item().as_ref())),
                     )
@@ -580,7 +580,7 @@ impl Converter {
             .string
             .create_or_reuse(py, x.conversion_currency().as_ref());
 
-        let inferred_tolerance_default = PyDict::new(py);
+        let inferred_tolerance_default = PyDict::new_bound(py);
         for (c, d) in x.inferred_tolerance_defaults() {
             // let c = match c {
             //     Some(c) => (Some(self.string.create_or_reuse(py, c.as_ref())), d),
@@ -595,7 +595,7 @@ impl Converter {
         let inferred_tolerance_multiplier = x.inferred_tolerance_multiplier();
         let infer_tolerance_from_cost = x.infer_tolerance_from_cost();
 
-        let documents = PySet::new(
+        let documents = PySet::new_bound(
             py,
             x.documents()
                 .map(|p| {
@@ -608,7 +608,7 @@ impl Converter {
         .unwrap()
         .into();
 
-        let operating_currency = PySet::new(
+        let operating_currency = PySet::new_bound(
             py,
             x.operating_currency()
                 .map(|c| self.string.create_or_reuse(py, c.as_ref()))
@@ -627,8 +627,8 @@ impl Converter {
             .map(|t| (t, x.account_type_name(t)))
             .collect::<HashMap<lima::AccountType, &lima::AccountTypeName>>();
 
-        let account_name_by_type = PyDict::new(py);
-        let account_type_by_name = PyDict::new(py);
+        let account_name_by_type = PyDict::new_bound(py);
+        let account_type_by_name = PyDict::new_bound(py);
         for (t, n) in account_type_name {
             account_name_by_type.set_item(
                 self.string.create_or_reuse(py, t.as_ref()),
@@ -716,7 +716,7 @@ impl StringFactory {
         match i_sym.cmp(&self.py_strings.len()) {
             Less => (),
             Equal => {
-                self.py_strings.push(PyString::new(py, x).into());
+                self.py_strings.push(PyString::new_bound(py, x).into());
             }
             Greater => {
                 // impossible
@@ -789,7 +789,7 @@ impl AccountFactory {
 
                 entry
                     .insert(
-                        PyList::new(
+                        PyList::new_bound(
                             py,
                             once(account_type_sym)
                                 .chain(subaccount)
@@ -865,7 +865,7 @@ impl DateFactory {
 
         self.cached_date = match cached_date {
             Some(cached_date) => {
-                let py_date = cached_date.as_ref(py);
+                let py_date = cached_date.bind(py);
                 if py_date.get_year() == x.year()
                     && py_date.get_month() == x.month() as u8
                     && py_date.get_day() == x.day()
@@ -883,7 +883,7 @@ impl DateFactory {
 }
 
 fn create_date(py: Python<'_>, x: &Date) -> Py<PyDate> {
-    PyDate::new(py, x.year(), x.month() as u8, x.day())
+    PyDate::new_bound(py, x.year(), x.month() as u8, x.day())
         .unwrap()
         .into()
 }

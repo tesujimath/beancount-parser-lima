@@ -2,9 +2,8 @@
 #![allow(dead_code)]
 
 use pyo3::{
-    pyclass,
+    prelude::*,
     types::{PyDate, PyDict, PyList, PySet, PyString},
-    Py,
 };
 use rust_decimal::Decimal;
 

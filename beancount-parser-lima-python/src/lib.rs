@@ -31,14 +31,14 @@ impl BeancountSources {
     // Would be nice to be able to pass in a File object from Python, but this:
     // https://github.com/PyO3/pyo3/issues/933
     fn write(&self, py: Python<'_>, errors_and_warnings: Py<PyList>) -> PyResult<()> {
-        let errors_and_warnings = errors_and_warnings.as_ref(py);
+        let errors_and_warnings = errors_and_warnings.bind(py);
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
         for x in errors_and_warnings.iter() {
-            match Error::extract(x) {
+            match Error::extract_bound(&x) {
                 Ok(e) => errors.push(e.0),
-                Err(_) => match Warning::extract(x) {
+                Err(_) => match Warning::extract_bound(&x) {
                     Ok(w) => warnings.push(w.0),
                     Err(_) => {
                         eprintln!("Failed to extract error or warning");
@@ -55,7 +55,7 @@ impl BeancountSources {
 
 /// The Python module in Rust.
 #[pymodule]
-fn beancount_parser_lima(_py: Python, m: &PyModule) -> PyResult<()> {
+fn beancount_parser_lima(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BeancountSources>()?;
     m.add_class::<ParseSuccess>()?;
     m.add_class::<ParseError>()?;
