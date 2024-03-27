@@ -78,16 +78,6 @@ This is an incomplete list of what is currently unsupported.
 Also, unary options are not supported.
 
 ## Parser Tests
-The test cases for the parser tests are a work-in-progress.
-
-### Work in progress
-
-The [parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc)
-were split out into test-cases.  Still some in test-cases-todo (not tested yet), and others in test-cases-unsupported.
-
-A quick visual classification was done to split out tests which may require a little more work.
-
-### Desired outcome
 
 The [parser test cases](beancount-parser-lima/test-cases) are based on the
 [parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc),
@@ -95,11 +85,15 @@ extracted into a language independent format.
 That is, all the original tests have been replicated here, with some additions.
 
 Each test comprises a Beancount file and expected parse output formatted as
-Protobuf Text Format Language (https://protobuf.dev/reference/protobuf/textformat-spec/),
-using the [Protobuf schema](https://github.com/beancount/beancount/blob/master/beancount/cparser/ledger.proto)
+[Protobuf Text Format Language](https://protobuf.dev/reference/protobuf/textformat-spec/),
+using the [Beancount Protobuf schema](https://github.com/beancount/beancount/blob/master/beancount/cparser/ledger.proto)
 from the Beancount repo.
 
 Error cases in this repo have been converted to match the expected error message output of this parser.
+
+Behaviour which differs from original Beancount parser has been annotated in the test with `ANOMALY`.
+
+Tests for features unsupported in the Lima parser are left in test-cases-unsupported.
 
 ## Alpha Status Dependencies
 
