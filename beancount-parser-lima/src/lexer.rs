@@ -135,11 +135,7 @@ pub enum Token<'a> {
 
     #[regex(r"(?&string_literal)", |lex| {
         let len = lex.slice().len();
-        if len >= 16384 {
-            Err(LexerError::new("string too long"))
-        } else {
-            unescape_string_literal(&lex.slice()[1..len-1])
-        }
+        unescape_string_literal(&lex.slice()[1..len-1])
     })]
     StringLiteral(Cow<'a, str>),
 
