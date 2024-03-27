@@ -1,0 +1,3 @@
+errors {
+  message: "found 'A' expected something else"
+}

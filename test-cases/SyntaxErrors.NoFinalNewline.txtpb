@@ -1,0 +1,3 @@
+errors {
+  message: "found end of input expected '{', '@', '@@', or '\\n'"
+}
