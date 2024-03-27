@@ -1,0 +1,4 @@
+# ANOMALY: if there are parse errors, Lima only returns the errors
+errors {
+  message: "found 'ERROR month out of range' expected transaction, or directive"
+}

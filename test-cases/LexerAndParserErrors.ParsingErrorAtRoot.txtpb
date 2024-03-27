@@ -1,0 +1,3 @@
+errors {
+  message: "found 'ERROR unrecognized token' expected transaction, or directive"
+}

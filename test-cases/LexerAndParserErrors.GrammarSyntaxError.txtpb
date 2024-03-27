@@ -1,0 +1,3 @@
+errors {
+  message: "found 'open' expected something else"
+}

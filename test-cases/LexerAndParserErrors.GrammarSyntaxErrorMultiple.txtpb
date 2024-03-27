@@ -1,0 +1,7 @@
+# ANOMALY: if there are parse errors, Lima only returns the errors
+errors {
+  message: "found 'open' expected something else"
+}
+errors {
+  message: "found 'close' expected something else"
+}
