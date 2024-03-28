@@ -1,3 +1,11 @@
 [workspace]
 resolver = "2"
 members = ["beancount-parser-lima", "beancount-parser-lima-python"]
+
+[workspace.dependencies]
+lazy_format = "2.0.0"
+rust_decimal = "1.29.1"
+smallvec = "2.0.0-alpha.5"
+strum = "0.26.1"
+strum_macros = "0.26.1"
+time = "0.3.28"
