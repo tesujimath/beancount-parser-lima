@@ -763,15 +763,15 @@ impl AccountFactory {
             .collect::<AccountKey>()
     }
 
-    fn composite_create_or_reuse<'a, 'src>(
+    fn composite_create_or_reuse<'a, 's>(
         &mut self,
         py: Python<'_>,
         account_type_sym: SymbolU32,
-        subaccount_names: &[lima::AccountName<'src>],
+        subaccount_names: &[lima::AccountName<'s>],
         string: &mut StringFactory,
     ) -> Py<PyList>
     where
-        'src: 'a,
+        's: 'a,
     {
         use hash_map::Entry::*;
 
