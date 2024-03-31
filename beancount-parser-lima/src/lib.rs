@@ -455,10 +455,10 @@ type SpannedToken<'t> = (Token<'t>, Span);
 ///     }
 /// }
 /// ````
-pub struct BeancountParser<'s, 't> {
+pub struct BeancountParser<'s> {
     sources: &'s BeancountSources,
     // indexed by source_id as per sources
-    tokenized_sources: Vec<Vec<SpannedToken<'t>>>,
+    tokenized_sources: Vec<Vec<SpannedToken<'s>>>,
 }
 
 // We seem to need to actual input type in places, ugh!
@@ -486,17 +486,14 @@ pub struct ParseError {
 }
 
 // result of parse_declarations
-type ParseDeclarationsResult<'s, 't> = (
-    HashMap<Option<&'s Path>, Vec<Spanned<Declaration<'t>>>>,
+type ParseDeclarationsResult<'t> = (
+    HashMap<Option<&'t Path>, Vec<Spanned<Declaration<'t>>>>,
     Options<'t>,
     Vec<Error>,
     Vec<Warning>,
 );
 
-impl<'s, 't> BeancountParser<'s, 't>
-where
-    's: 't,
-{
+impl<'s> BeancountParser<'s> {
     /// Create a `BeancountParser` from `BeancountSources` read from all input files.
     pub fn new(sources: &'s BeancountSources) -> Self {
         let mut tokenized_sources = Vec::new();
@@ -512,10 +509,7 @@ where
     }
 
     /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
-    pub fn parse(&'t self) -> Result<ParseSuccess<'t>, ParseError>
-    where
-        's: 't,
-    {
+    pub fn parse(&self) -> Result<ParseSuccess, ParseError> {
         let (parsed_sources, options, mut errors, warnings) = self.parse_declarations();
         let error_paths = self.sources.error_path_iter().collect::<HashMap<_, _>>();
         let mut p = PragmaProcessor::new(self.root_path(), parsed_sources, error_paths, options);
@@ -539,19 +533,13 @@ where
         }
     }
 
-    fn root_path(&'t self) -> Option<&'s Path>
-    where
-        's: 't,
-    {
+    fn root_path(&self) -> Option<&'s Path> {
         self.sources.root_path.as_deref()
     }
 
     /// Parse the sources, returning declarations and any errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&'t self) -> ParseDeclarationsResult<'s, 't>
-    where
-        's: 't,
-    {
+    fn parse_declarations(&self) -> ParseDeclarationsResult {
         let mut all_outputs = HashMap::new();
         let mut all_errors = Vec::new();
         let mut parser_state = ParserState::default();
@@ -588,31 +576,28 @@ where
 ///
 /// When the iterator is exhausted, any errors should be collected by the caller.
 #[derive(Debug)]
-struct PragmaProcessor<'s, 't> {
+struct PragmaProcessor<'s> {
     current_path: Option<PathBuf>,
-    current_declarations: VecDeque<Spanned<Declaration<'t>>>,
-    stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>)>,
-    remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'t>>>>,
+    current_declarations: VecDeque<Spanned<Declaration<'s>>>,
+    stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>)>,
+    remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>>,
     error_paths: HashMap<Option<PathBuf>, &'s io::Error>,
     include_span_by_canonical_path: HashMap<PathBuf, Span>,
     // tags and meta key/values for pragma push/pop
-    tags: HashMap<Spanned<Tag<'t>>, Vec<Spanned<Tag<'t>>>>,
-    meta_key_values: HashMap<Spanned<Key<'t>>, Vec<(Span, Spanned<MetaValue<'t>>)>>,
-    options: Options<'t>,
-    plugins: Vec<Plugin<'t>>,
+    tags: HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
+    meta_key_values: HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
+    options: Options<'s>,
+    plugins: Vec<Plugin<'s>>,
     // errors, for collection when the iterator is exhausted
     errors: Vec<Error>,
 }
 
-impl<'s, 't> PragmaProcessor<'s, 't>
-where
-    's: 't,
-{
+impl<'s> PragmaProcessor<'s> {
     fn new(
         root_path: Option<&Path>,
-        parsed_sources: HashMap<Option<&Path>, Vec<Spanned<Declaration<'t>>>>,
+        parsed_sources: HashMap<Option<&Path>, Vec<Spanned<Declaration<'s>>>>,
         error_paths: HashMap<Option<&Path>, &'s io::Error>,
-        options: Options<'t>,
+        options: Options<'s>,
     ) -> Self {
         let mut remaining = parsed_sources
             .into_iter()
@@ -643,7 +628,7 @@ where
         }
     }
 
-    fn result(self) -> (Options<'t>, Vec<Plugin<'t>>, Vec<Error>) {
+    fn result(self) -> (Options<'s>, Vec<Plugin<'s>>, Vec<Error>) {
         // any leftover tags or key/values is an error
         let mut errors = self.errors;
 
@@ -673,11 +658,8 @@ where
     }
 }
 
-impl<'s, 't> Iterator for PragmaProcessor<'s, 't>
-where
-    's: 't,
-{
-    type Item = Spanned<Directive<'t>>;
+impl<'s> Iterator for PragmaProcessor<'s> {
+    type Item = Spanned<Directive<'s>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.current_declarations.pop_front() {
