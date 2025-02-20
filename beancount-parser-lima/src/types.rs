@@ -1437,6 +1437,11 @@ pub struct Metadata<'a> {
 }
 
 impl<'a> Metadata<'a> {
+    /// is the metadata empty?
+    pub fn is_empty(&self) -> bool {
+        self.key_values().len() == 0 && self.tags().len() == 0 && self.links().len() == 0
+    }
+
     /// Field accessor.
     pub fn key_values(
         &self,
@@ -1804,6 +1809,11 @@ impl ExprValue {
     /// Field accessor.
     pub fn value(&self) -> Decimal {
         self.value
+    }
+
+    /// Field accessor.
+    pub fn expr(&self) -> &Expr {
+        &self.expr
     }
 }
 
