@@ -34,6 +34,7 @@
               cargo-nightly
               cargo-udeps
               cargo-outdated
+              cargo-edit
               gcc
               gdb
               rust-analyzer

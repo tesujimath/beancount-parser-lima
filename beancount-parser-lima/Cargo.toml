@@ -7,9 +7,7 @@ description = "A zero-copy parser for Beancount"
 homepage = "https://github.com/tesujimath/beancount-parser-lima"
 repository = "https://github.com/tesujimath/beancount-parser-lima"
 readme = "README.md"
-exclude = [
-    "examples/images/*"
-]
+exclude = ["examples/images/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,7 +18,7 @@ smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 time = { workspace = true }
-anyhow = "1.0.71"
+anyhow = "1.0.96"
 ariadne = "0.4.0"
 # for bleeding edge ariadne
 # ariadne= { path = "../../../../third-party/rust/ariadne" }
@@ -28,21 +26,21 @@ chumsky = { version = "1.0.0-alpha.6", features = ["label", "regex"] }
 # for bleeding edge chumsky:
 # chumsky = { git = "https://github.com/tesujimath/chumsky", branch = "one_of_ref-not_ref", features = ["label", "regex"] }
 # chumsky = { path = "../../../../third-party/rust/chumsky", features = ["label", "regex"] }
-either = "1.8.1"
-logos = "0.14.0"
-protobuf = "3.4.0"
-rust_decimal_macros = "1.29.1"
-unescaper = "0.1.4"
+either = "1.13.0"
+logos = "0.15.0"
+protobuf = "3.7.1"
+rust_decimal_macros = "1.36.0"
+unescaper = "0.1.5"
 
 [dev-dependencies]
-derive_more = "0.99.17"
-itertools = "0.12.1"
-proptest = "1.2.0"
-rstest = "0.18.2"
+derive_more = { version = "2.0.1", features = ["display"] }
+itertools = "0.14.0"
+proptest = "1.6.0"
+rstest = "0.24.0"
 stats_alloc = "0.1.10"
-test-case = "3.1.0"
-time = { version = "0.3.28", features = ["parsing"] }
-xflags = "0.3.1"
+test-case = "3.3.1"
+time = { version = "0.3.37", features = ["parsing"] }
+xflags = "0.3.2"
 
 [build-dependencies]
-protobuf-codegen = "3.4.0"
+protobuf-codegen = "3.7.1"
