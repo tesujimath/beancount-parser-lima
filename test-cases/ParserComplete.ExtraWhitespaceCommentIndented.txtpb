@@ -1,4 +1,4 @@
 # ANOMALY: Lima parser doesn't handle an incomplete final comment line
 errors {
-  message: "found 'ERROR unrecognized token' expected something else"
+  message: "found 'ERROR unrecognized token'"
 }

@@ -1,13 +1,13 @@
 # Note: no transaction is produced.
 
 errors {
-  message: "found 'ERROR unrecognized token' expected something else"
+  message: "found 'ERROR unrecognized token'"
 }
 errors {
-  message: "found 'ERROR unrecognized token' expected something else"
+  message: "found 'ERROR unrecognized token'"
 }
 errors {
-  message: "found 'ERROR unrecognized token' expected something else"
+  message: "found 'ERROR unrecognized token'"
 }
 errors {
   message: "found ')' expected something else"

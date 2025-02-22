@@ -79,14 +79,16 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
                     .zip(expected_errors.into_iter())
                     .enumerate()
                 {
-                    if Some(actual.message()) != expected.message.as_deref() {
-                        let actual_message = actual.message().to_string();
+                    // chumsky changed the format of its error messages in 1.0.0-alpha.7, so remove
+                    // single quotes before comparing, and just compare prefixes, since there's now
+                    // source location appended
+                    let expected_message = expected.message().replace("'", "");
+                    let actual_message = actual.message().replace("'", "");
+                    if !actual_message.starts_with(&expected_message) {
                         sources.write(stderr, vec![actual]).unwrap();
                         panic!(
                             "expected '{}' found '{}' at errors[{}]",
-                            expected.message.as_deref().unwrap_or(""),
-                            actual_message,
-                            i,
+                            expected_message, actual_message, i,
                         );
                     }
                 }
