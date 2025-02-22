@@ -169,7 +169,7 @@ pub enum Token<'a> {
     Error(LexerError),
 }
 
-impl<'a> Token<'a> {
+impl Token<'_> {
     fn is_eol(&self) -> bool {
         use Token::*;
 
@@ -177,7 +177,7 @@ impl<'a> Token<'a> {
     }
 }
 
-impl<'a> Display for Token<'a> {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Token::*;
         const INDENT: &str = "    ";
@@ -277,7 +277,7 @@ enum RecoveryToken {
     Number(Decimal),
 }
 
-impl<'a> From<RecoveryToken> for Token<'a> {
+impl From<RecoveryToken> for Token<'_> {
     fn from(value: RecoveryToken) -> Self {
         use RecoveryToken::*;
 
@@ -412,7 +412,7 @@ struct KeywordThenColonToKey<'a, I> {
     pending_tok: Option<(RangedToken<'a>, Option<&'static str>)>,
 }
 
-impl<'a, I> KeywordThenColonToKey<'a, I> {
+impl<I> KeywordThenColonToKey<'_, I> {
     fn new(iter: I) -> Self {
         KeywordThenColonToKey {
             iter,

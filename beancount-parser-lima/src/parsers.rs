@@ -199,18 +199,15 @@ where
     )
 }
 
+type TransactionHeaderLine<'s> = (
+    Spanned<Date>,
+    Spanned<Flag>,
+    (Option<Spanned<&'s str>>, Option<Spanned<&'s str>>),
+    (HashSet<Spanned<Tag<'s>>>, HashSet<Spanned<Link<'s>>>),
+);
+
 /// Matches the first line of a transaction.
-fn transaction_header_line<'s, I>() -> impl Parser<
-    's,
-    I,
-    (
-        Spanned<Date>,
-        Spanned<Flag>,
-        (Option<Spanned<&'s str>>, Option<Spanned<&'s str>>),
-        (HashSet<Spanned<Tag<'s>>>, HashSet<Spanned<Link<'s>>>),
-    ),
-    Extra<'s>,
->
+fn transaction_header_line<'s, I>() -> impl Parser<'s, I, TransactionHeaderLine<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
@@ -313,19 +310,16 @@ where
     )
 }
 
+type OpenHeaderLine<'s> = (
+    Spanned<Date>,
+    Spanned<Account<'s>>,
+    HashSet<Spanned<Currency<'s>>>,
+    Option<Spanned<Booking>>,
+    (HashSet<Spanned<Tag<'s>>>, HashSet<Spanned<Link<'s>>>),
+);
+
 /// Matches the first line of a open.
-fn open_header_line<'s, I>() -> impl Parser<
-    's,
-    I,
-    (
-        Spanned<Date>,
-        Spanned<Account<'s>>,
-        HashSet<Spanned<Currency<'s>>>,
-        Option<Spanned<Booking>>,
-        (HashSet<Spanned<Tag<'s>>>, HashSet<Spanned<Link<'s>>>),
-    ),
-    Extra<'s>,
->
+fn open_header_line<'s, I>() -> impl Parser<'s, I, OpenHeaderLine<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
@@ -372,10 +366,7 @@ where
             })
     })
     .or_not()
-    .map(|currencies| match currencies {
-        Some(currencies) => currencies,
-        None => HashSet::new(),
-    })
+    .map(|currencies| currencies.unwrap_or_default())
 }
 
 /// Matches a [Account].
@@ -1283,7 +1274,7 @@ impl<'a> Metadata<'a> {
 
 type ParserError<'a> = Rich<'a, Token<'a>, Span>;
 
-impl<'a> From<ParserError<'a>> for Error {
+impl From<ParserError<'_>> for Error {
     fn from(error: ParserError) -> Self {
         let error = error.map_token(|tok| tok.to_string());
 

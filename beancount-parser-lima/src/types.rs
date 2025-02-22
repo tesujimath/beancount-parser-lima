@@ -538,7 +538,7 @@ pub struct Directive<'a> {
     pub(crate) variant: DirectiveVariant<'a>,
 }
 
-impl<'a> Directive<'a> {
+impl Directive<'_> {
     /// Field accessor.
     pub fn date(&self) -> &Spanned<Date> {
         &self.date
@@ -555,7 +555,7 @@ impl<'a> Directive<'a> {
     }
 }
 
-impl<'a> ElementType for Directive<'a> {
+impl ElementType for Directive<'_> {
     fn element_type(&self) -> &'static str {
         use DirectiveVariant::*;
 
@@ -575,7 +575,7 @@ impl<'a> ElementType for Directive<'a> {
     }
 }
 
-impl<'a> Display for Directive<'a> {
+impl Display for Directive<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use DirectiveVariant::*;
 
@@ -634,7 +634,7 @@ pub struct Transaction<'a> {
     pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
 
-impl<'a> Transaction<'a> {
+impl Transaction<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} {}", date, self.flag)?;
 
@@ -680,7 +680,7 @@ pub struct Price<'a> {
     pub(crate) amount: Spanned<Amount<'a>>,
 }
 
-impl<'a> Price<'a> {
+impl Price<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} price {} {}", date, &self.currency, &self.amount)?;
 
@@ -702,7 +702,7 @@ impl<'a> Price<'a> {
     }
 }
 
-impl<'a> ElementType for Price<'a> {
+impl ElementType for Price<'_> {
     fn element_type(&self) -> &'static str {
         "price"
     }
@@ -715,7 +715,7 @@ pub struct Balance<'a> {
     pub(crate) atol: Spanned<AmountWithTolerance<'a>>,
 }
 
-impl<'a> Balance<'a> {
+impl Balance<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} balance {} {}", date, &self.account, &self.atol)?;
 
@@ -737,7 +737,7 @@ impl<'a> Balance<'a> {
     }
 }
 
-impl<'a> ElementType for Balance<'a> {
+impl ElementType for Balance<'_> {
     fn element_type(&self) -> &'static str {
         "balance"
     }
@@ -751,7 +751,7 @@ pub struct Open<'a> {
     pub(crate) booking: Option<Spanned<Booking>>,
 }
 
-impl<'a> Open<'a> {
+impl Open<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} open {}", date, self.account)?;
         format(f, &self.currencies, plain, ",", Some(" "))?;
@@ -783,7 +783,7 @@ pub struct Close<'a> {
     pub(crate) account: Spanned<Account<'a>>,
 }
 
-impl<'a> Close<'a> {
+impl Close<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} close {}", date, self.account)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -803,7 +803,7 @@ pub struct Commodity<'a> {
     pub(crate) currency: Spanned<Currency<'a>>,
 }
 
-impl<'a> Commodity<'a> {
+impl Commodity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} commodity {}", date, self.currency)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -824,7 +824,7 @@ pub struct Pad<'a> {
     pub(crate) source: Spanned<Account<'a>>,
 }
 
-impl<'a> Pad<'a> {
+impl Pad<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} pad {} {}", date, self.account, self.source)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -850,7 +850,7 @@ pub struct Document<'a> {
     pub(crate) path: Spanned<&'a str>,
 }
 
-impl<'a> Document<'a> {
+impl Document<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} document {} \"{}\"", date, self.account, self.path)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -877,7 +877,7 @@ pub struct Note<'a> {
     pub(crate) comment: Spanned<&'a str>,
 }
 
-impl<'a> Note<'a> {
+impl Note<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} note {} \"{}\"", date, self.account, self.comment)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -903,7 +903,7 @@ pub struct Event<'a> {
     pub(crate) description: Spanned<&'a str>,
 }
 
-impl<'a> Event<'a> {
+impl Event<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(
             f,
@@ -933,7 +933,7 @@ pub struct Query<'a> {
     pub(crate) content: Spanned<&'a str>,
 }
 
-impl<'a> Query<'a> {
+impl Query<'_> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} query \"{}\" \"{}\"", date, self.name, self.content)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -959,7 +959,7 @@ pub struct Plugin<'a> {
     pub(crate) config: Option<Spanned<&'a str>>,
 }
 
-impl<'a> Plugin<'a> {
+impl Plugin<'_> {
     /// Field accessor.
     pub fn module_name(&self) -> &Spanned<&str> {
         &self.module_name
@@ -971,7 +971,7 @@ impl<'a> Plugin<'a> {
     }
 }
 
-impl<'a> Display for Plugin<'a> {
+impl Display for Plugin<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "plugin \"{}\"", self.module_name)?;
         if let Some(config) = &self.config {
@@ -988,7 +988,7 @@ pub struct Account<'a> {
     pub(crate) subaccount: Subaccount<'a>,
 }
 
-impl<'a> Account<'a> {
+impl Account<'_> {
     ///constructor
     pub fn new(account_type: AccountType, subaccount: Subaccount) -> Account {
         Account {
@@ -1008,13 +1008,13 @@ impl<'a> Account<'a> {
     }
 }
 
-impl<'a> ElementType for Account<'a> {
+impl ElementType for Account<'_> {
     fn element_type(&self) -> &'static str {
         "account"
     }
 }
 
-impl<'a> Display for Account<'a> {
+impl Display for Account<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.account_type.as_ref())?;
         format(f, self.names(), plain, ":", Some(":"))
@@ -1029,7 +1029,7 @@ pub type Subaccount<'a> = SmallVec<AccountName<'a>, 4>;
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct AccountTypeName<'a>(&'a str);
 
-impl<'a> AccountTypeName<'a> {
+impl AccountTypeName<'_> {
     pub(crate) fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase()
     }
@@ -1065,25 +1065,25 @@ impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
     }
 }
 
-impl<'a> ElementType for AccountTypeName<'a> {
+impl ElementType for AccountTypeName<'_> {
     fn element_type(&self) -> &'static str {
         "account type name"
     }
 }
 
-impl<'a> AsRef<str> for AccountTypeName<'a> {
+impl AsRef<str> for AccountTypeName<'_> {
     fn as_ref(&self) -> &str {
         self.0
     }
 }
 
-impl<'a> PartialEq<&str> for AccountTypeName<'a> {
+impl PartialEq<&str> for AccountTypeName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for AccountTypeName<'a> {
+impl Display for AccountTypeName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -1130,7 +1130,7 @@ impl std::error::Error for AccountTypeNameError {}
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct AccountName<'a>(&'a str);
 
-impl<'a> AccountName<'a> {
+impl AccountName<'_> {
     pub(crate) fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || c.is_ascii_digit()
     }
@@ -1140,25 +1140,25 @@ impl<'a> AccountName<'a> {
     }
 }
 
-impl<'a> ElementType for AccountName<'a> {
+impl ElementType for AccountName<'_> {
     fn element_type(&self) -> &'static str {
         "account name"
     }
 }
 
-impl<'a> AsRef<str> for AccountName<'a> {
+impl AsRef<str> for AccountName<'_> {
     fn as_ref(&self) -> &str {
         self.0
     }
 }
 
-impl<'a> PartialEq<&str> for AccountName<'a> {
+impl PartialEq<&str> for AccountName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for AccountName<'a> {
+impl Display for AccountName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -1228,7 +1228,7 @@ pub struct Currency<'a>(&'a str);
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
 const CURRENCY_INTERMEDIATE_EXTRA_CHARS: [char; 4] = ['\'', '.', '_', '-'];
 
-impl<'a> Currency<'a> {
+impl Currency<'_> {
     fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_uppercase() || *c == '/'
     }
@@ -1244,25 +1244,25 @@ impl<'a> Currency<'a> {
     }
 }
 
-impl<'a> ElementType for Currency<'a> {
+impl ElementType for Currency<'_> {
     fn element_type(&self) -> &'static str {
         "currency"
     }
 }
 
-impl<'a> AsRef<str> for Currency<'a> {
+impl AsRef<str> for Currency<'_> {
     fn as_ref(&self) -> &str {
         self.0
     }
 }
 
-impl<'a> PartialEq<&str> for Currency<'a> {
+impl PartialEq<&str> for Currency<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for Currency<'a> {
+impl Display for Currency<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -1399,13 +1399,13 @@ impl<'a> Posting<'a> {
     }
 }
 
-impl<'a> ElementType for Posting<'a> {
+impl ElementType for Posting<'_> {
     fn element_type(&self) -> &'static str {
         "posting"
     }
 }
 
-impl<'a> Display for Posting<'a> {
+impl Display for Posting<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         simple_format(f, self.flag, None)?;
 
@@ -1436,7 +1436,7 @@ pub struct Metadata<'a> {
     pub(crate) links: HashSet<Spanned<Link<'a>>>,
 }
 
-impl<'a> Metadata<'a> {
+impl Metadata<'_> {
     /// is the metadata empty?
     pub fn is_empty(&self) -> bool {
         self.key_values().len() == 0 && self.tags().len() == 0 && self.links().len() == 0
@@ -1475,7 +1475,7 @@ impl<'a> Metadata<'a> {
     }
 }
 
-impl<'a> Display for Metadata<'a> {
+impl Display for Metadata<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_keys_values(f)?;
         format(f, &self.tags, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
@@ -1489,7 +1489,7 @@ pub(crate) struct MetaKeyValue<'a> {
     pub(crate) value: Spanned<MetaValue<'a>>,
 }
 
-impl<'a> Display for MetaKeyValue<'a> {
+impl Display for MetaKeyValue<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: \"{}\"", &self.key, &self.value)
     }
@@ -1502,7 +1502,7 @@ pub enum MetaValue<'a> {
     Amount(Amount<'a>),
 }
 
-impl<'a> Display for MetaValue<'a> {
+impl Display for MetaValue<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use MetaValue::*;
 
@@ -1527,13 +1527,13 @@ pub enum SimpleValue<'a> {
     Expr(ExprValue),
 }
 
-impl<'a> ElementType for SimpleValue<'a> {
+impl ElementType for SimpleValue<'_> {
     fn element_type(&self) -> &'static str {
         "simple value"
     }
 }
 
-impl<'a> Display for SimpleValue<'a> {
+impl Display for SimpleValue<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use SimpleValue::*;
 
@@ -1569,25 +1569,25 @@ impl<'a> TryFrom<&'a str> for Tag<'a> {
     }
 }
 
-impl<'a> ElementType for Tag<'a> {
+impl ElementType for Tag<'_> {
     fn element_type(&self) -> &'static str {
         "tag"
     }
 }
 
-impl<'a> AsRef<str> for Tag<'a> {
+impl AsRef<str> for Tag<'_> {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
     }
 }
 
-impl<'a> PartialEq<&str> for Tag<'a> {
+impl PartialEq<&str> for Tag<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for Tag<'a> {
+impl Display for Tag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "#{}", self.0 .0)
     }
@@ -1611,25 +1611,25 @@ impl<'a> TryFrom<&'a str> for Link<'a> {
     }
 }
 
-impl<'a> ElementType for Link<'a> {
+impl ElementType for Link<'_> {
     fn element_type(&self) -> &'static str {
         "link"
     }
 }
 
-impl<'a> PartialEq<&str> for Link<'a> {
+impl PartialEq<&str> for Link<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for Link<'a> {
+impl Display for Link<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "^{}", self.0 .0)
     }
 }
 
-impl<'a> AsRef<str> for Link<'a> {
+impl AsRef<str> for Link<'_> {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
     }
@@ -1642,7 +1642,7 @@ pub struct TagOrLinkIdentifier<'a>(&'a str);
 /// The valid characters for tags and links besides alphanumeric.
 const TAG_OR_LINK_EXTRA_CHARS: [char; 4] = ['-', '_', '/', '.'];
 
-impl<'a> TagOrLinkIdentifier<'a> {
+impl TagOrLinkIdentifier<'_> {
     pub(crate) fn is_valid_char(c: &char) -> bool {
         c.is_alphanumeric() || TAG_OR_LINK_EXTRA_CHARS.contains(c)
     }
@@ -1683,13 +1683,13 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
     }
 }
 
-impl<'a> AsRef<str> for TagOrLinkIdentifier<'a> {
+impl AsRef<str> for TagOrLinkIdentifier<'_> {
     fn as_ref(&self) -> &str {
         self.0
     }
 }
 
-impl<'a> PartialEq<&str> for TagOrLinkIdentifier<'a> {
+impl PartialEq<&str> for TagOrLinkIdentifier<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
@@ -1699,7 +1699,7 @@ impl<'a> PartialEq<&str> for TagOrLinkIdentifier<'a> {
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Key<'a>(&'a str);
 
-impl<'a> Key<'a> {
+impl Key<'_> {
     pub(crate) fn is_valid_initial(c: &char) -> bool {
         c.is_ascii_lowercase()
     }
@@ -1709,25 +1709,25 @@ impl<'a> Key<'a> {
     }
 }
 
-impl<'a> AsRef<str> for Key<'a> {
+impl AsRef<str> for Key<'_> {
     fn as_ref(&self) -> &str {
         self.0
     }
 }
 
-impl<'a> ElementType for Key<'a> {
+impl ElementType for Key<'_> {
     fn element_type(&self) -> &'static str {
         "key"
     }
 }
 
-impl<'a> PartialEq<&str> for Key<'a> {
+impl PartialEq<&str> for Key<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
     }
 }
 
-impl<'a> Display for Key<'a> {
+impl Display for Key<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
     }
@@ -1987,7 +1987,7 @@ impl<'a> Amount<'a> {
     }
 }
 
-impl<'a> Display for Amount<'a> {
+impl Display for Amount<'_> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         write!(format, "{} {}", &self.number, &self.currency)
     }
@@ -2019,7 +2019,7 @@ impl<'a> AmountWithTolerance<'a> {
     }
 }
 
-impl<'a> Display for AmountWithTolerance<'a> {
+impl Display for AmountWithTolerance<'_> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         if let Some(tolerance) = self.tolerance {
             write!(format, "{} ~ {}", &self.amount, tolerance)
@@ -2063,7 +2063,7 @@ pub enum CompoundAmount<'a> {
     CurrencyAmount(CompoundExprValue, Currency<'a>),
 }
 
-impl<'a> Display for CompoundAmount<'a> {
+impl Display for CompoundAmount<'_> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::CompoundAmount::*;
         match self {
@@ -2085,7 +2085,7 @@ pub struct CostSpec<'a> {
     merge: bool,
 }
 
-impl<'a> CostSpec<'a> {
+impl CostSpec<'_> {
     /// Field accessor.
     pub fn per_unit(&self) -> Option<&Spanned<ExprValue>> {
         self.per_unit.as_ref()
@@ -2117,13 +2117,13 @@ impl<'a> CostSpec<'a> {
     }
 }
 
-impl<'a> ElementType for CostSpec<'a> {
+impl ElementType for CostSpec<'_> {
     fn element_type(&self) -> &'static str {
         "cost specification"
     }
 }
 
-impl<'a> Display for CostSpec<'a> {
+impl Display for CostSpec<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut prefix = "";
         let space = " ";
@@ -2344,7 +2344,7 @@ pub enum PriceSpec<'a> {
     CurrencyAmount(ScopedExprValue, Currency<'a>),
 }
 
-impl<'a> Display for PriceSpec<'a> {
+impl Display for PriceSpec<'_> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::PriceSpec::*;
         match self {

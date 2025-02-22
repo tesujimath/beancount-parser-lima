@@ -192,7 +192,7 @@ where
     fn expect_eq(&self, expected: &Rhs, ctx: Context);
 }
 
-impl<'a, Rhs, T> ExpectEq<Rhs> for &'a T
+impl<Rhs, T> ExpectEq<Rhs> for &T
 where
     T: ExpectEq<Rhs>,
 {
@@ -201,7 +201,7 @@ where
     }
 }
 
-impl<'r, 't, Rhs, T> ExpectEq<Option<&'r Rhs>> for Option<&'t T>
+impl<Rhs, T> ExpectEq<Option<&Rhs>> for Option<&T>
 where
     T: ExpectEq<Rhs>,
 {
@@ -231,7 +231,7 @@ where
     }
 }
 
-impl<'a> ExpectEq<Directive> for lima::Directive<'a> {
+impl ExpectEq<Directive> for lima::Directive<'_> {
     fn expect_eq(&self, expected: &Directive, ctx: Context) {
         self.date()
             .expect_eq_unwrapped(expected.date.as_ref(), ctx.with("date"));
@@ -304,7 +304,7 @@ impl ExpectEq<Error> for lima::Error {
     }
 }
 
-impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
+impl ExpectEq<Transaction> for lima::Transaction<'_> {
     fn expect_eq(&self, expected: &Transaction, ctx: Context) {
         self.flag()
             .item()
@@ -322,7 +322,7 @@ impl<'a> ExpectEq<Transaction> for lima::Transaction<'a> {
     }
 }
 
-impl<'a> ExpectEq<Price> for lima::Price<'a> {
+impl ExpectEq<Price> for lima::Price<'_> {
     fn expect_eq(&self, expected: &Price, ctx: Context) {
         self.currency()
             .item()
@@ -334,7 +334,7 @@ impl<'a> ExpectEq<Price> for lima::Price<'a> {
     }
 }
 
-impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
+impl ExpectEq<Balance> for lima::Balance<'_> {
     fn expect_eq(&self, expected: &Balance, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -348,7 +348,7 @@ impl<'a> ExpectEq<Balance> for lima::Balance<'a> {
     }
 }
 
-impl<'a> ExpectEq<Open> for lima::Open<'a> {
+impl ExpectEq<Open> for lima::Open<'_> {
     fn expect_eq(&self, expected: &Open, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -365,14 +365,14 @@ impl<'a> ExpectEq<Open> for lima::Open<'a> {
     }
 }
 
-impl<'a> ExpectEq<Close> for lima::Close<'a> {
+impl ExpectEq<Close> for lima::Close<'_> {
     fn expect_eq(&self, expected: &Close, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
     }
 }
 
-impl<'a> ExpectEq<Commodity> for lima::Commodity<'a> {
+impl ExpectEq<Commodity> for lima::Commodity<'_> {
     fn expect_eq(&self, expected: &Commodity, ctx: Context) {
         self.currency()
             .item()
@@ -381,7 +381,7 @@ impl<'a> ExpectEq<Commodity> for lima::Commodity<'a> {
     }
 }
 
-impl<'a> ExpectEq<Pad> for lima::Pad<'a> {
+impl ExpectEq<Pad> for lima::Pad<'_> {
     fn expect_eq(&self, expected: &Pad, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -390,7 +390,7 @@ impl<'a> ExpectEq<Pad> for lima::Pad<'a> {
     }
 }
 
-impl<'a> ExpectEq<Document> for lima::Document<'a> {
+impl ExpectEq<Document> for lima::Document<'_> {
     fn expect_eq(&self, expected: &Document, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -399,7 +399,7 @@ impl<'a> ExpectEq<Document> for lima::Document<'a> {
     }
 }
 
-impl<'a> ExpectEq<Note> for lima::Note<'a> {
+impl ExpectEq<Note> for lima::Note<'_> {
     fn expect_eq(&self, expected: &Note, ctx: Context) {
         self.account()
             .expect_eq_unwrapped(expected.account.as_ref(), ctx.with("account"));
@@ -408,7 +408,7 @@ impl<'a> ExpectEq<Note> for lima::Note<'a> {
     }
 }
 
-impl<'a> ExpectEq<Event> for lima::Event<'a> {
+impl ExpectEq<Event> for lima::Event<'_> {
     fn expect_eq(&self, expected: &Event, ctx: Context) {
         self.event_type()
             .expect_eq_unwrapped(expected.type_.as_ref(), ctx.with("event_type"));
@@ -417,7 +417,7 @@ impl<'a> ExpectEq<Event> for lima::Event<'a> {
     }
 }
 
-impl<'a> ExpectEq<Query> for lima::Query<'a> {
+impl ExpectEq<Query> for lima::Query<'_> {
     fn expect_eq(&self, expected: &Query, ctx: Context) {
         self.name()
             .expect_eq_unwrapped(expected.name.as_ref(), ctx.with("name"));
@@ -426,7 +426,7 @@ impl<'a> ExpectEq<Query> for lima::Query<'a> {
     }
 }
 
-impl<'a> ExpectEq<Posting> for lima::Posting<'a> {
+impl ExpectEq<Posting> for lima::Posting<'_> {
     fn expect_eq(&self, expected: &Posting, ctx: Context) {
         self.flag()
             .item()
@@ -475,7 +475,7 @@ struct Metadata<'a> {
     kv: Option<&'a [KV]>,
 }
 
-impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
+impl ExpectEq<Metadata<'_>> for lima::Metadata<'_> {
     fn expect_eq(&self, expected: &Metadata, ctx: Context) {
         // tags and links on subsequent lines show up in kv as values without keys
 
@@ -577,7 +577,7 @@ impl<'a, 'e> ExpectEq<Metadata<'e>> for lima::Metadata<'a> {
     }
 }
 
-impl<'a, 'e> ExpectEq<HashMap<&'e str, &'e MetaValue>> for HashMap<&str, &lima::MetaValue<'a>> {
+impl<'e> ExpectEq<HashMap<&'e str, &'e MetaValue>> for HashMap<&str, &lima::MetaValue<'_>> {
     fn expect_eq(&self, expected: &HashMap<&str, &MetaValue>, ctx: Context) {
         assert_eq!(self.len(), expected.len(), "length at {}", &ctx);
 
@@ -590,7 +590,7 @@ impl<'a, 'e> ExpectEq<HashMap<&'e str, &'e MetaValue>> for HashMap<&str, &lima::
     }
 }
 
-impl<'a> ExpectEq<MetaValue> for lima::MetaValue<'a> {
+impl ExpectEq<MetaValue> for lima::MetaValue<'_> {
     fn expect_eq(&self, expected: &MetaValue, ctx: Context) {
         use lima::MetaValue::*;
         use lima::SimpleValue;
@@ -642,7 +642,7 @@ impl<'a> ExpectEq<MetaValue> for lima::MetaValue<'a> {
     }
 }
 
-impl<'a> ExpectEq<Options> for lima::Options<'a> {
+impl ExpectEq<Options> for lima::Options<'_> {
     fn expect_eq(&self, expected: &Options, ctx: Context) {
         // Since the default values are returned from out parser, we have to supply the same defaults here.
         // The defaults come from:
@@ -821,7 +821,7 @@ impl<'a> ExpectEq<Options> for lima::Options<'a> {
     }
 }
 
-impl<'a> ExpectEq<Vec<Plugin>> for Vec<lima::Plugin<'a>> {
+impl ExpectEq<Vec<Plugin>> for Vec<lima::Plugin<'_>> {
     fn expect_eq(&self, expected: &Vec<Plugin>, ctx: Context) {
         assert_eq!(self.len(), expected.len(), "postings.len");
         for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
@@ -830,7 +830,7 @@ impl<'a> ExpectEq<Vec<Plugin>> for Vec<lima::Plugin<'a>> {
     }
 }
 
-impl<'a> ExpectEq<Plugin> for lima::Plugin<'a> {
+impl ExpectEq<Plugin> for lima::Plugin<'_> {
     fn expect_eq(&self, expected: &Plugin, ctx: Context) {
         self.module_name()
             .expect_eq_unwrapped(expected.name.as_ref(), ctx.with("name"));
@@ -841,7 +841,7 @@ impl<'a> ExpectEq<Plugin> for lima::Plugin<'a> {
     }
 }
 
-impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
+impl ExpectEq<CostSpec> for lima::CostSpec<'_> {
     fn expect_eq(&self, expected: &CostSpec, ctx: Context) {
         self.per_unit()
             .item()
@@ -870,7 +870,7 @@ impl<'a> ExpectEq<CostSpec> for lima::CostSpec<'a> {
     }
 }
 
-impl<'a> ExpectEq<PriceSpec> for lima::PriceSpec<'a> {
+impl ExpectEq<PriceSpec> for lima::PriceSpec<'_> {
     fn expect_eq(&self, expected: &PriceSpec, ctx: Context) {
         use lima::PriceSpec::*;
         use lima::ScopedExprValue::*;
@@ -897,7 +897,7 @@ impl<'a> ExpectEq<PriceSpec> for lima::PriceSpec<'a> {
     }
 }
 
-impl<'a, S> ExpectEq<S> for lima::Account<'a>
+impl<S> ExpectEq<S> for lima::Account<'_>
 where
     S: AsRef<str> + ?Sized,
 {
@@ -920,7 +920,7 @@ fn account(s: &str) -> lima::Account {
     )
 }
 
-impl<'a, S> ExpectEq<S> for lima::Subaccount<'a>
+impl<S> ExpectEq<S> for lima::Subaccount<'_>
 where
     S: AsRef<str> + ?Sized,
 {
@@ -936,7 +936,7 @@ fn subaccount(s: &str) -> lima::Subaccount {
         .unwrap()
 }
 
-impl<'a> ExpectEq<Amount> for lima::Amount<'a> {
+impl ExpectEq<Amount> for lima::Amount<'_> {
     fn expect_eq(&self, expected: &Amount, ctx: Context) {
         self.number()
             .value()
@@ -947,7 +947,7 @@ impl<'a> ExpectEq<Amount> for lima::Amount<'a> {
     }
 }
 
-impl<'a, S> ExpectEq<S> for lima::Currency<'a>
+impl<S> ExpectEq<S> for lima::Currency<'_>
 where
     S: AsRef<str> + ?Sized,
 {
@@ -956,7 +956,7 @@ where
     }
 }
 
-impl<'a> ExpectEq<HashMap<String, String>> for Vec<(Option<lima::Currency<'a>>, Decimal)> {
+impl ExpectEq<HashMap<String, String>> for Vec<(Option<lima::Currency<'_>>, Decimal)> {
     fn expect_eq(&self, expected: &HashMap<String, String>, ctx: Context) {
         let actual = self
             .iter()
@@ -979,7 +979,7 @@ impl<'a> ExpectEq<HashMap<String, String>> for Vec<(Option<lima::Currency<'a>>, 
     }
 }
 
-impl<'a> ExpectEq<Vec<String>> for Vec<&lima::Currency<'a>> {
+impl ExpectEq<Vec<String>> for Vec<&lima::Currency<'_>> {
     fn expect_eq(&self, expected: &Vec<String>, ctx: Context) {
         let actual = expected.iter().map(|p| p.as_str()).collect::<HashSet<_>>();
         let expected = expected.iter().map(|s| s.as_str()).collect::<HashSet<_>>();

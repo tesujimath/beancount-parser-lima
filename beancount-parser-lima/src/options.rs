@@ -311,7 +311,7 @@ pub(crate) struct ParserOptions<'a> {
     pub(crate) long_string_maxlines: OptionallySourced<usize>,
 }
 
-impl<'a> Default for ParserOptions<'a> {
+impl Default for ParserOptions<'_> {
     fn default() -> Self {
         ParserOptions {
             account_type_names: AccountTypeNames::default(),
@@ -824,7 +824,7 @@ impl<'a> Default for AccountTypeNames<'a> {
     }
 }
 
-impl<'a> Display for AccountTypeNames<'a> {
+impl Display for AccountTypeNames<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format(f, &self.name_by_type, plain, ", ", None)
     }
