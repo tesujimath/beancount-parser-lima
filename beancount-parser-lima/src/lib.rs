@@ -249,34 +249,40 @@ impl BeancountSources {
             let color = error_or_warning.color();
             let report_kind = error_or_warning.report_kind();
 
-            Report::build(report_kind, src_id.to_string(), error_or_warning.span.start)
-                .with_message(error_or_warning.message)
-                .with_labels(Some(
-                    Label::new((
-                        src_id.to_string(),
-                        error_or_warning.span.start()..error_or_warning.span.end(),
-                    ))
-                    .with_message(error_or_warning.reason)
-                    .with_color(color),
+            Report::build(
+                report_kind,
+                (
+                    src_id.to_string(),
+                    error_or_warning.span.start..error_or_warning.span.end,
+                ),
+            )
+            .with_message(error_or_warning.message)
+            .with_labels(Some(
+                Label::new((
+                    src_id.to_string(),
+                    error_or_warning.span.start()..error_or_warning.span.end(),
                 ))
-                .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
-                    Label::new((
-                        self.span_source_id_string(&span).to_string(),
-                        span.start()..span.end(),
-                    ))
-                    .with_message(lazy_format!("in this {}", label))
-                    .with_color(Color::Yellow)
-                }))
-                .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
-                    Label::new((
-                        self.span_source_id_string(&span).to_string(),
-                        span.start()..span.end(),
-                    ))
-                    .with_message(lazy_format!("{}", label))
-                    .with_color(Color::Yellow)
-                }))
-                .finish()
-                .write(ariadne::sources(self.sources()), w)?;
+                .with_message(error_or_warning.reason)
+                .with_color(color),
+            ))
+            .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
+                Label::new((
+                    self.span_source_id_string(&span).to_string(),
+                    span.start()..span.end(),
+                ))
+                .with_message(lazy_format!("in this {}", label))
+                .with_color(Color::Yellow)
+            }))
+            .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
+                Label::new((
+                    self.span_source_id_string(&span).to_string(),
+                    span.start()..span.end(),
+                ))
+                .with_message(lazy_format!("{}", label))
+                .with_color(Color::Yellow)
+            }))
+            .finish()
+            .write(ariadne::sources(self.sources()), w)?;
         }
         Ok(())
     }
