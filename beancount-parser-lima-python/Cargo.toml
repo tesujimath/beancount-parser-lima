@@ -14,7 +14,11 @@ doc = false
 
 [dependencies]
 beancount-parser-lima = { version = "0.6.0", path = "../beancount-parser-lima" }
-pyo3 = { version = "0.21.2", features = ["extension-module", "rust_decimal"] }
+pyo3 = { version = "0.22.6", features = [
+  "extension-module",
+  "rust_decimal",
+  "py-clone",
+] }
 string-interner = "0.19.0"
 lazy_format = { workspace = true }
 rust_decimal = { workspace = true }
