@@ -467,14 +467,6 @@ pub struct BeancountParser<'s> {
     tokenized_sources: Vec<Vec<SpannedToken<'s>>>,
 }
 
-// We seem to need to actual input type in places, ugh!
-// It makes me sad that I had to do this.  Perhaps when the
-// dust has settled I'll find a way to get rid of it.
-type ConcreteInput<'t> = chumsky::input::WithContext<
-    Span,
-    chumsky::input::SpannedInput<Token<'t>, Span, &'t [(Token<'t>, Span)]>,
->;
-
 /// A successful parsing all the files, containing date-ordered `Directive`s, `Options`, `Plugin`s, and any `Warning`s.
 #[derive(Debug)]
 pub struct ParseSuccess<'t> {
@@ -555,7 +547,7 @@ impl<'s> BeancountParser<'s> {
             let tokens = &self.tokenized_sources[i_source];
 
             // type assertion here is to ensure we keep these in step
-            let spanned_tokens: ConcreteInput = tokens
+            let spanned_tokens = tokens
                 .spanned(end_of_input(source_id, content))
                 .with_context(source_id);
 

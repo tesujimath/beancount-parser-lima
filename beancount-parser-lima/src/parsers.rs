@@ -2,7 +2,6 @@ use crate::{
     lexer::Token,
     options::{BeancountOption, BeancountOptionError, ParserOptions},
     types::*,
-    ConcreteInput,
 };
 use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
 use either::Either;
@@ -1214,7 +1213,13 @@ impl<'a> Metadata<'a> {
                 Some(existing_tag) => {
                     let mut error =
                         Rich::custom(existing_tag.span, format!("duplicate tag {}", tag));
-                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "tag", tag.span);
+                    LabelError::<
+                        chumsky::input::WithContext<
+                            Span,
+                            chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
+                        >,
+                        &str,
+                    >::in_context(&mut error, "tag", tag.span);
                     emitter.emit(error);
                 }
             }
@@ -1244,7 +1249,13 @@ impl<'a> Metadata<'a> {
                 Some(existing_link) => {
                     let mut error =
                         Rich::custom(existing_link.span, format!("duplicate link {}", link));
-                    LabelError::<ConcreteInput, &str>::in_context(&mut error, "link", link.span);
+                    LabelError::<
+                        chumsky::input::WithContext<
+                            Span,
+                            chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
+                        >,
+                        &str,
+                    >::in_context(&mut error, "link", link.span);
                     emitter.emit(error);
                 }
             }
