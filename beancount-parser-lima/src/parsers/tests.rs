@@ -25,10 +25,13 @@ fn test_transaction(
 ) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
-    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+    let spanned_tokens = tokens.map(end_of_input(source_id, s), |(t, s)| (t, s));
     let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
-    let result = transaction().parse(spanned_tokens).into_result();
+    let result = transaction()
+        .parse_with_state(spanned_tokens, &mut parser_state)
+        .into_result();
 
     let expected_date = spanned(
         Date::from_calendar_date(expected_date.0 .0, expected_date.0 .1, expected_date.0 .2)
@@ -75,9 +78,12 @@ fn test_transaction(
 fn test_price_annotation(s: &str, expected: Option<PriceSpec>) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
-    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+    let spanned_tokens = tokens.map(end_of_input(source_id, s), |(t, s)| (t, s));
 
-    let result = price_annotation().parse(spanned_tokens).into_result();
+    let result = price_annotation()
+        .parse_with_state(spanned_tokens, &mut parser_state)
+        .into_result();
 
     assert_eq!(result, Ok(expected));
 }
@@ -91,9 +97,12 @@ fn test_price_annotation(s: &str, expected: Option<PriceSpec>) {
 fn test_compound_amount(s: &str, expected: CompoundAmount) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
-    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+    let spanned_tokens = tokens.map(end_of_input(source_id, s), |(t, s)| (t, s));
 
-    let result = compound_amount().parse(spanned_tokens).into_result();
+    let result = compound_amount()
+        .parse_with_state(spanned_tokens, &mut parser_state)
+        .into_result();
 
     assert_eq!(result, Ok(expected));
 }
@@ -104,9 +113,12 @@ fn test_compound_amount(s: &str, expected: CompoundAmount) {
 fn test_compound_expr(s: &str, expected: CompoundExprValue) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
-    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+    let spanned_tokens = tokens.map(end_of_input(source_id, s), |(t, s)| (t, s));
 
-    let result = compound_expr().parse(spanned_tokens).into_result();
+    let result = compound_expr()
+        .parse_with_state(spanned_tokens, &mut parser_state)
+        .into_result();
 
     assert_eq!(result, Ok(expected));
 }
@@ -119,7 +131,8 @@ fn test_tags_links(
 ) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
-    let spanned_tokens = tokens.spanned(end_of_input(source_id, s));
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+    let spanned_tokens = tokens.map(end_of_input(source_id, s), |(t, s)| (t, s));
     let sourced_span = |range| chumsky::span::Span::new(source_id, range);
 
     let expected_tags = expected_tags
@@ -132,7 +145,9 @@ fn test_tags_links(
         .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
         .collect::<HashSet<_>>();
 
-    let result = tags_links().parse(spanned_tokens).into_result();
+    let result = tags_links()
+        .parse_with_state(spanned_tokens, &mut parser_state)
+        .into_result();
 
     assert_eq!(result, Ok((expected_tags, expected_links)));
 }
@@ -152,14 +167,15 @@ fn test_tags_links(
 fn expr_test(s: &str, expected: &str) {
     let source_id = SourceId::default();
     let tokens = bare_lex_with_source(source_id, s);
+    let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
     let spanned_tokens = tokens
-        .spanned(end_of_input(source_id, s))
+        .map(end_of_input(source_id, s), |(t, s)| (t, s))
         .with_context(source_id);
 
     let result = expr()
         .map(|x| format!("{:?}", x))
         .then_ignore(any().repeated().collect::<Vec<Token>>())
-        .parse(spanned_tokens)
+        .parse_with_state(spanned_tokens, &mut parser_state)
         .into_result();
 
     assert_eq!(result, Ok(expected.to_owned()))

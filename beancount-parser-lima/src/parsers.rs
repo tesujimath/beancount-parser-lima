@@ -3,7 +3,7 @@ use crate::{
     options::{BeancountOption, BeancountOptionError, ParserOptions},
     types::*,
 };
-use chumsky::{input::BorrowInput, label::LabelError, prelude::*};
+use chumsky::{input::BorrowInput, prelude::*};
 use either::Either;
 use rust_decimal::Decimal;
 use std::{
@@ -138,7 +138,7 @@ where
             });
 
             if let Ok(opt) = opt {
-                let parser_state: &mut ParserState = e.state();
+                let parser_state: &mut extra::SimpleState<ParserState> = e.state();
                 parser_state
                     .options
                     .assimilate(opt)
@@ -386,7 +386,7 @@ where
             .map_err(|e| Rich::custom(span, e.to_string()))?;
 
         // look up the account type name to see which account type it is currently mapped to
-        let parser_state: &ParserState = e.state();
+        let parser_state: &mut extra::SimpleState<ParserState> = e.state();
         let account_type_names = &parser_state.options.account_type_names;
         account_type_names
             .get(&account_type_name)
@@ -1173,7 +1173,8 @@ where
 
     string.map_with(|s, e| {
         let span = e.span();
-        let parser_state: &mut ParserState = e.state();
+        let simple_state: &mut extra::SimpleState<ParserState> = e.state();
+        let parser_state: &mut ParserState = simple_state;
         let ParserState { warnings, options } = parser_state;
         let line_count = s.chars().filter(|c| *c == '\n').count() + 1;
         if line_count > options.long_string_maxlines.item {
@@ -1211,15 +1212,15 @@ impl<'a> Metadata<'a> {
                     self.tags.insert(*tag);
                 }
                 Some(existing_tag) => {
-                    let mut error =
-                        Rich::custom(existing_tag.span, format!("duplicate tag {}", tag));
-                    LabelError::<
-                        chumsky::input::WithContext<
-                            Span,
-                            chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
-                        >,
-                        &str,
-                    >::in_context(&mut error, "tag", tag.span);
+                    let error = Rich::custom(existing_tag.span, format!("duplicate tag {}", tag));
+                    // TODO: label the error in context, type annotations need fixing for chumsky 1.0.0-alpha7 to alpha8 transition
+                    // LabelError::<
+                    //     chumsky::input::WithContext<
+                    //         Span,
+                    //         chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
+                    //     >,
+                    //     &str,
+                    // >::in_context(&mut error, "tag", tag.span);
                     emitter.emit(error);
                 }
             }
@@ -1247,15 +1248,16 @@ impl<'a> Metadata<'a> {
                     self.links.insert(*link);
                 }
                 Some(existing_link) => {
-                    let mut error =
+                    let error =
                         Rich::custom(existing_link.span, format!("duplicate link {}", link));
-                    LabelError::<
-                        chumsky::input::WithContext<
-                            Span,
-                            chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
-                        >,
-                        &str,
-                    >::in_context(&mut error, "link", link.span);
+                    // TODO: label the error in context, type annotations need fixing for chumsky 1.0.0-alpha7 to alpha8 transition
+                    // LabelError::<
+                    //     chumsky::input::WithContext<
+                    //         Span,
+                    //         chumsky::input::SpannedInput<Token<'_>, Span, &[(Token<'_>, Span)]>,
+                    //     >,
+                    //     &str,
+                    // >::in_context(&mut error, "link", link.span);
                     emitter.emit(error);
                 }
             }
@@ -1309,7 +1311,7 @@ pub(crate) struct ParserState<'a> {
 }
 
 // our ParserExtra with our error and state types
-pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, ParserState<'a>, ()>;
+pub(crate) type Extra<'a> = extra::Full<ParserError<'a>, extra::SimpleState<ParserState<'a>>, ()>;
 
 /// Enable use of own functions which emit errors
 pub(crate) trait Emit<E> {

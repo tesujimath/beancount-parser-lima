@@ -1,4 +1,4 @@
 errors {
-  message: "found 'urant' expected something else"
+  message: "found 'urant'"
   location { lineno: 4 }
 }

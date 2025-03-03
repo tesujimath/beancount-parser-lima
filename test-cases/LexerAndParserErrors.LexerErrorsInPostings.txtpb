@@ -10,11 +10,11 @@ errors {
   message: "found 'ERROR unrecognized token'"
 }
 errors {
-  message: "found ')' expected something else"
+  message: "found ')'"
 }
 errors {
-  message: "found ')' expected something else"
+  message: "found ')'"
 }
 errors {
-  message: "found ')' expected something else"
+  message: "found ')'"
 }

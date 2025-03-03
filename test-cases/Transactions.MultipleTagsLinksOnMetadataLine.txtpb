@@ -1,3 +1,3 @@
 errors {
-  message: "found 'tag1' expected '\\n'"
+  message: "found 'tag2'"
 }

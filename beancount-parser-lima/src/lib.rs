@@ -135,11 +135,15 @@ fn get_includes(content: &str, source_id: SourceId) -> Vec<String> {
         source_id: SourceId,
         end_of_input: Span,
     ) -> Vec<String> {
-        let spanned_tokens = tokens.spanned(end_of_input).with_context(source_id);
+        let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
+
+        let spanned_tokens = tokens
+            .map(end_of_input, |(t, s)| (t, s))
+            .with_context(source_id);
 
         // ignore any errors in parsing, we'll pick them up in the next pass
         includes()
-            .parse(spanned_tokens)
+            .parse_with_state(spanned_tokens, &mut parser_state)
             .into_output()
             .unwrap_or_default()
     }
@@ -540,15 +544,14 @@ impl<'s> BeancountParser<'s> {
     fn parse_declarations(&self) -> ParseDeclarationsResult {
         let mut all_outputs = HashMap::new();
         let mut all_errors = Vec::new();
-        let mut parser_state = ParserState::default();
+        let mut parser_state = chumsky::extra::SimpleState(ParserState::default());
 
         for (source_id, source_path, content) in self.sources.content_iter() {
             let i_source: usize = source_id.into();
             let tokens = &self.tokenized_sources[i_source];
 
-            // type assertion here is to ensure we keep these in step
             let spanned_tokens = tokens
-                .spanned(end_of_input(source_id, content))
+                .map(end_of_input(source_id, content), |(t, s)| (t, s))
                 .with_context(source_id);
 
             let (output, errors) = file(source_path)
@@ -559,7 +562,7 @@ impl<'s> BeancountParser<'s> {
             all_errors.extend(errors);
         }
 
-        let ParserState { options, warnings } = parser_state;
+        let ParserState { options, warnings } = parser_state.0;
 
         (
             all_outputs,
