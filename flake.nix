@@ -27,6 +27,7 @@
           devShells.default = mkShell {
             nativeBuildInputs = [
               beancount
+              just
 
               # build dependencies
               cargo-flamegraph
@@ -46,7 +47,7 @@
 
               # for Python bindings
               maturin
-              python3
+              (python3.withPackages (ps: with ps; [ pip ]))
               zig
               twine
 
