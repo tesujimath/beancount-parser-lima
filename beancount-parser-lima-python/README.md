@@ -2,8 +2,6 @@
 
 The Python bindings are a simplification of the Rust interface, mainly because zero-copy is not possible, and all directives are returned by value.
 
-*Python bindings are a work-in-progress*
-
 ## Installation and Usage
 
 A binary wheel is available on PyPI, so no local Rust development environment is required.

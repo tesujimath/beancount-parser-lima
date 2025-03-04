@@ -4,8 +4,6 @@ A zero-copy parser for Beancount in Rust.
 
 It is intended to be a complete implementation of the Beancount file format, except for those parts which are deprecated and other features as documented here (in a list which may not be comprehensive).
 
-Currently under active development.  APIs are subject to change, but I hope not majorly.
-
 The slightly strange name is because of a somewhat careless failure on my part to notice the existing [beancount-parser](https://github.com/jcornaz/beancount-parser) when starting this project, for which apologies.
 
 ## Features
@@ -18,19 +16,13 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 - focus on conceptual clarity of application domain objects mapped to Rust types
 
-- [Python bindings](/beancount-parser-lima-python/README.md) (work-in-progress)
+- [Python bindings](/beancount-parser-lima-python/README.md)
 
 <img src="https://raw.githubusercontent.com/tesujimath/beancount-parser-lima/main/beancount-parser-lima/examples/images/beancount-parser-balancing-errors.png" alt="Example application error messages"/>
 
-## Roadmap and Status
+## Status
 
-- create Python bindings, so that this could be a drop-in replacement for the existing Beancount parser (which is not to say it will necessarily become that!)
-
-- improve API in the light of experience, i.e. when it gets some use 😅
-
-- address mistakes, misunderstandings, and edge-cases in the initial implementation as they are discovered
-
-`beancount-parser-lima v0.2.1` is able to parse the [example.beancount](https://github.com/beancount/beancount/blob/master/examples/example.beancount) file from the official [Beancount repo](https://github.com/beancount/beancount).
+- comprehensive test-suite from main Beancount repo is [incorporated](test-cases), modulo a few [unsupported cases](test-cases-unsupported).
 
 ## Examples
 
@@ -40,7 +32,7 @@ This simply parses a Beancount file and outputs the results of parsing, using th
 The special filename `STDIN` causes it to read instead from standard input and parse the resulting inline string.
 
 ```Shell
-cargo run --example dump -- ./examples/data/full.beancount
+cargo run --example dump -- ./beancount-parser-lima/examples/data/full.beancount
 ```
 
 ### check
@@ -49,7 +41,7 @@ This is an example of reporting errors against source locations by the applicati
 This is important as semantic errors are not the business of the core parser to detect and report.
 
 ```Shell
-cargo run --example check -- ./examples/data/full.beancount
+cargo run --example check -- ./beancount-parser-lima/examples/data/full.beancount
 ```
 
 ## Uncertainties / TODOs
@@ -80,13 +72,13 @@ Also, unary options are not supported.
 ## Parser Tests
 
 The [parser test cases](test-cases) are based on the
-[parser tests from Beancount itself](https://github.com/beancount/beancount/blob/master/beancount/cparser/parser_test.cc),
+[parser tests from Beancount itself](https://github.com/beancount/beancount/blob/cpp/beancount/cparser/parser_test.cc),
 extracted into a language independent format.
 That is, all the original tests have been replicated here, with some additions.
 
 Each test comprises a Beancount file and expected parse output formatted as
 [Protobuf Text Format Language](https://protobuf.dev/reference/protobuf/textformat-spec/),
-using the [Beancount Protobuf schema](https://github.com/beancount/beancount/blob/master/beancount/cparser/ledger.proto)
+using the [Beancount Protobuf schema](https://github.com/beancount/beancount/blob/cpp/beancount/cparser/ledger.proto)
 from the Beancount repo.
 
 Error cases in this repo have been converted to match the expected error message output of this parser.
