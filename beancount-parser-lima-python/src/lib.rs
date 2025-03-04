@@ -112,14 +112,14 @@ fn parse(py: Python<'_>, parser: &lima::BeancountParser) -> PyResult<Py<PyAny>> 
                     ParseResult {},
                 ),
             )?
-            .into_py(py))
+            .into_any())
         }
 
         Err(lima::ParseError { errors, warnings }) => {
             let errors = errors.into_iter().map(Error::new).collect::<Vec<_>>();
             let warnings = warnings.into_iter().map(Warning::new).collect::<Vec<_>>();
 
-            Ok(Py::new(py, (ParseError { errors, warnings }, ParseResult {}))?.into_py(py))
+            Ok(Py::new(py, (ParseError { errors, warnings }, ParseResult {}))?.into_any())
         }
     }
 }

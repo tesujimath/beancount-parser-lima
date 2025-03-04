@@ -80,14 +80,14 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn posting(&mut self, py: Python<'_>, x: &lima::Posting<'_>) -> PyResult<Posting> {
         let flag = x.flag().map(|flag| self.flag(py, flag.item()));
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
         let amount = x.amount().map(|amount| amount.value());
         let currency = x
             .currency()
@@ -130,7 +130,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn balance(
@@ -142,7 +142,7 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
         let atol = self.amount_with_tolerance(py, x.atol());
 
         Ok(Py::new(
@@ -152,7 +152,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn open(
@@ -164,13 +164,13 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
 
-        let currencies = PyList::new_bound(
+        let currencies = PyList::new(
             py,
             x.currencies()
                 .map(|currency| self.string.create_or_reuse(py, currency.item().as_ref())),
-        )
+        )?
         .into();
 
         let booking = x
@@ -188,7 +188,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn close(
@@ -200,9 +200,9 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
 
-        Ok(Py::new(py, (Close { account }, self.directive(py, date, metadata)?))?.into_py(py))
+        Ok(Py::new(py, (Close { account }, self.directive(py, date, metadata)?))?.into_any())
     }
 
     pub(crate) fn commodity(
@@ -220,7 +220,7 @@ impl Converter {
             py,
             (Commodity { currency }, self.directive(py, date, metadata)?),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn pad(
@@ -232,16 +232,16 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
         let source = self
             .account
-            .create_or_reuse(py, x.source(), &mut self.string);
+            .create_or_reuse(py, x.source(), &mut self.string)?;
 
         Ok(Py::new(
             py,
             (Pad { account, source }, self.directive(py, date, metadata)?),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn document(
@@ -253,7 +253,7 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
         let path = self.string.create_or_reuse(py, x.path().item().as_ref());
 
         Ok(Py::new(
@@ -263,7 +263,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn note(
@@ -275,7 +275,7 @@ impl Converter {
     ) -> PyResult<Py<PyAny>> {
         let account = self
             .account
-            .create_or_reuse(py, x.account(), &mut self.string);
+            .create_or_reuse(py, x.account(), &mut self.string)?;
         let comment = self.string.create_or_reuse(py, x.comment().item().as_ref());
 
         Ok(Py::new(
@@ -285,7 +285,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn event(
@@ -312,7 +312,7 @@ impl Converter {
                 self.directive(py, date, metadata)?,
             ),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn query(
@@ -329,7 +329,7 @@ impl Converter {
             py,
             (Query { name, content }, self.directive(py, date, metadata)?),
         )?
-        .into_py(py))
+        .into_any())
     }
 
     pub(crate) fn metadata(
@@ -347,7 +347,7 @@ impl Converter {
             let key_values = if key_values.len() == 0 {
                 None
             } else {
-                let key_value_dict = PyDict::new_bound(py);
+                let key_value_dict = PyDict::new(py);
                 for (k, v) in key_values {
                     key_value_dict.set_item(
                         self.string.create_or_reuse(py, k.item().as_ref()),
@@ -361,10 +361,10 @@ impl Converter {
                 None
             } else {
                 Some(
-                    PyList::new_bound(
+                    PyList::new(
                         py,
                         tags.map(|tag| self.string.create_or_reuse(py, tag.item().as_ref())),
-                    )
+                    )?
                     .into(),
                 )
             };
@@ -373,10 +373,10 @@ impl Converter {
                 None
             } else {
                 Some(
-                    PyList::new_bound(
+                    PyList::new(
                         py,
                         links.map(|link| self.string.create_or_reuse(py, link.item().as_ref())),
-                    )
+                    )?
                     .into(),
                 )
             };
@@ -402,49 +402,49 @@ impl Converter {
         match x {
             Simple(String(x)) => {
                 let value = self.string.create_or_reuse(py, x);
-                Ok(Py::new(py, (MetaValueString { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueString { value }, meta_value))?.into_any())
             }
 
             Simple(Currency(x)) => {
                 let value = self.string.create_or_reuse(py, x.as_ref());
-                Ok(Py::new(py, (MetaValueCurrency { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueCurrency { value }, meta_value))?.into_any())
             }
 
             Simple(Account(x)) => {
-                let value = self.account.create_or_reuse(py, x, &mut self.string);
-                Ok(Py::new(py, (MetaValueAccount { value }, meta_value))?.into_py(py))
+                let value = self.account.create_or_reuse(py, x, &mut self.string)?;
+                Ok(Py::new(py, (MetaValueAccount { value }, meta_value))?.into_any())
             }
 
             Simple(Tag(x)) => {
                 let value = self.string.create_or_reuse(py, x.as_ref());
-                Ok(Py::new(py, (MetaValueTag { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueTag { value }, meta_value))?.into_any())
             }
 
             Simple(Link(x)) => {
                 let value = self.string.create_or_reuse(py, x.as_ref());
-                Ok(Py::new(py, (MetaValueLink { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueLink { value }, meta_value))?.into_any())
             }
 
             Simple(Date(x)) => {
                 let value = self.date.create_or_reuse(py, x);
-                Ok(Py::new(py, (MetaValueDate { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueDate { value }, meta_value))?.into_any())
             }
 
             Simple(Bool(x)) => {
                 let value = *x;
-                Ok(Py::new(py, (MetaValueBool { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueBool { value }, meta_value))?.into_any())
             }
 
-            Simple(None) => Ok(Py::new(py, (MetaValueNone, meta_value))?.into_py(py)),
+            Simple(None) => Ok(Py::new(py, (MetaValueNone, meta_value))?.into_any()),
 
             Simple(Expr(x)) => {
                 let value = x.value();
-                Ok(Py::new(py, (MetaValueExpr { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueExpr { value }, meta_value))?.into_any())
             }
 
             Amount(x) => {
                 let value = self.amount(py, x);
-                Ok(Py::new(py, (MetaValueAmount { value }, meta_value))?.into_py(py))
+                Ok(Py::new(py, (MetaValueAmount { value }, meta_value))?.into_any())
             }
         }
     }
@@ -546,41 +546,42 @@ impl Converter {
             py,
             x.account_previous_balances(),
             &mut self.string,
-        );
+        )?;
         let account_previous_earnings = self.account.create_or_reuse_subaccount(
             py,
             x.account_previous_earnings(),
             &mut self.string,
-        );
+        )?;
         let account_previous_conversions = self.account.create_or_reuse_subaccount(
             py,
             x.account_previous_conversions(),
             &mut self.string,
-        );
+        )?;
         let account_current_earnings = self.account.create_or_reuse_subaccount(
             py,
             x.account_current_earnings(),
             &mut self.string,
-        );
+        )?;
         let account_current_conversions = self.account.create_or_reuse_subaccount(
             py,
             x.account_current_conversions(),
             &mut self.string,
-        );
+        )?;
         let account_unrealized_gains = self.account.create_or_reuse_subaccount(
             py,
             x.account_unrealized_gains(),
             &mut self.string,
-        );
-        let account_rounding = x.account_rounding().map(|account_rounding| {
+        )?;
+        let account_rounding = x.account_rounding().map_or(Ok(None), |account_rounding| {
             self.account
                 .create_or_reuse_subaccount(py, account_rounding, &mut self.string)
-        });
+                .map(Some)
+        })?;
         let conversion_currency = self
             .string
             .create_or_reuse(py, x.conversion_currency().as_ref());
 
-        let inferred_tolerance_default = PyDict::new_bound(py);
+        let inferred_tolerance_default = PyDict::new(py);
         for (c, d) in x.inferred_tolerance_defaults() {
             // let c = match c {
             //     Some(c) => (Some(self.string.create_or_reuse(py, c.as_ref())), d),
@@ -595,7 +596,7 @@ impl Converter {
         let inferred_tolerance_multiplier = x.inferred_tolerance_multiplier();
         let infer_tolerance_from_cost = x.infer_tolerance_from_cost();
 
-        let documents = PySet::new_bound(
+        let documents = PySet::new(
             py,
             x.documents()
                 .map(|p| {
@@ -608,7 +609,7 @@ impl Converter {
         .unwrap()
         .into();
 
-        let operating_currency = PySet::new_bound(
+        let operating_currency = PySet::new(
             py,
             x.operating_currency()
                 .map(|c| self.string.create_or_reuse(py, c.as_ref()))
@@ -627,8 +628,8 @@ impl Converter {
             .map(|t| (t, x.account_type_name(t)))
             .collect::<HashMap<lima::AccountType, &lima::AccountTypeName>>();
 
-        let account_name_by_type = PyDict::new_bound(py);
-        let account_type_by_name = PyDict::new_bound(py);
+        let account_name_by_type = PyDict::new(py);
+        let account_type_by_name = PyDict::new(py);
         for (t, n) in account_type_name {
             account_name_by_type.set_item(
                 self.string.create_or_reuse(py, t.as_ref()),
@@ -716,7 +717,7 @@ impl StringFactory {
         match i_sym.cmp(&self.py_strings.len()) {
             Less => (),
             Equal => {
-                self.py_strings.push(PyString::new_bound(py, x).into());
+                self.py_strings.push(PyString::new(py, x).into());
             }
             Greater => {
                 // impossible
@@ -769,7 +770,7 @@ impl AccountFactory {
         account_type_sym: SymbolU32,
         subaccount_names: &[lima::AccountName<'s>],
         string: &mut StringFactory,
-    ) -> Py<PyList>
+    ) -> PyResult<Py<PyList>>
     where
         's: 'a,
     {
@@ -778,7 +779,7 @@ impl AccountFactory {
         let key = self.composite_account_key(py, account_type_sym, subaccount_names, string);
         // if we've got this account, then just clone a new ref, otherwise create a PyList
         match self.accounts.entry(key) {
-            Occupied(account) => account.get().clone_ref(py),
+            Occupied(account) => Ok(account.get().clone_ref(py)),
             Vacant(entry) => {
                 let string = RefCell::new(string);
                 let subaccount = subaccount_names.iter().map(|name| {
@@ -787,18 +788,15 @@ impl AccountFactory {
                         .create_or_lookup_symbol(py, name.as_ref())
                 });
 
-                entry
-                    .insert(
-                        PyList::new_bound(
-                            py,
-                            once(account_type_sym)
-                                .chain(subaccount)
-                                .map(|sym| string.borrow_mut().reuse(py, sym))
-                                .collect::<Vec<_>>(),
-                        )
-                        .into(),
-                    )
-                    .clone_ref(py)
+                let account = PyList::new(
+                    py,
+                    once(account_type_sym)
+                        .chain(subaccount)
+                        .map(|sym| string.borrow_mut().reuse(py, sym))
+                        .collect::<Vec<_>>(),
+                )?
+                .into();
+                Ok(entry.insert(account).clone_ref(py))
             }
         }
     }
@@ -808,7 +806,7 @@ impl AccountFactory {
         py: Python<'_>,
         x: &lima::Account,
         string: &mut StringFactory,
-    ) -> Py<PyList> {
+    ) -> PyResult<Py<PyList>> {
         let account_type = string.create_or_lookup_symbol(py, x.account_type().as_ref());
         self.composite_create_or_reuse(py, account_type, x.names(), string)
     }
@@ -818,7 +816,7 @@ impl AccountFactory {
         py: Python<'_>,
         x: &lima::Subaccount,
         string: &mut StringFactory,
-    ) -> Py<PyList> {
+    ) -> PyResult<Py<PyList>> {
         // treat subaccounts just like accounts, but with a type named after the first component
         let pseudo_account_type = string.create_or_lookup_symbol(py, x[0].as_ref());
         self.composite_create_or_reuse(py, pseudo_account_type, &x[1..], string)
@@ -883,7 +881,7 @@ impl DateFactory {
 }
 
 fn create_date(py: Python<'_>, x: &Date) -> Py<PyDate> {
-    PyDate::new_bound(py, x.year(), x.month() as u8, x.day())
+    PyDate::new(py, x.year(), x.month() as u8, x.day())
         .unwrap()
         .into()
 }
