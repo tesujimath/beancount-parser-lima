@@ -109,6 +109,8 @@ Licensed under either of
 
 at your option.
 
+The [Beancount protobuf files](beancount-parser-lima/protobuf), which were extracted from the original Beancount repo and are used here only for testing, are licensed under GPLv2.
+
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted

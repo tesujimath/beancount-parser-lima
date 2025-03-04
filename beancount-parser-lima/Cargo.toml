@@ -7,7 +7,7 @@ description = "A zero-copy parser for Beancount"
 homepage = "https://github.com/tesujimath/beancount-parser-lima"
 repository = "https://github.com/tesujimath/beancount-parser-lima"
 readme = "README.md"
-exclude = ["examples/images/*"]
+exclude = ["/examples/images/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
