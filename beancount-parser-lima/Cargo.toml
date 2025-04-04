@@ -9,7 +9,13 @@ repository = "https://github.com/tesujimath/beancount-parser-lima"
 readme = "README.md"
 exclude = ["/examples/images/*"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "beancount_parser_lima"
+path = "src/lib.rs"
+
+[[bin]]
+name = "beancount2proto"
+path = "src/beancount2proto/main.rs"
 
 [dependencies]
 lazy_format = { workspace = true }
@@ -31,6 +37,7 @@ logos = "0.15.0"
 protobuf = "3.7.1"
 rust_decimal_macros = "1.36.0"
 unescaper = "0.1.5"
+xflags = "0.3.2"
 
 [dev-dependencies]
 derive_more = { version = "2.0.1", features = ["display"] }
@@ -40,7 +47,6 @@ rstest = "0.24.0"
 stats_alloc = "0.1.10"
 test-case = "3.3.1"
 time = { version = "0.3.37", features = ["parsing"] }
-xflags = "0.3.2"
 
 [build-dependencies]
 protobuf-codegen = "3.7.1"

@@ -1,4 +1,5 @@
-use self::beancount::{
+use ::beancount_parser_lima as lima;
+use ::beancount_parser_lima::proto::{
     data::{
         meta::KV, meta_value, Amount, Balance, Close, Commodity, Directive, Document, Error, Event,
         MetaValue, Note, Open, Pad, Posting, Price, Query, Transaction,
@@ -9,7 +10,6 @@ use self::beancount::{
     number::Number,
     options::{options::ProcessingMode, processing_info::Plugin, AccountTypes, Booking, Options},
 };
-use ::beancount_parser_lima as lima;
 use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
@@ -1132,5 +1132,3 @@ impl ExpectEq<bool> for bool {
         assert_eq!(*self, *expected, "{}", &ctx);
     }
 }
-
-mod beancount;

@@ -841,5 +841,6 @@ mod lexer;
 pub use options::Options;
 mod options;
 mod parsers;
+pub mod proto;
 mod sort;
 pub mod types;
