@@ -5,7 +5,7 @@ fn autogen_beancount_proto() {
     let proto_dir = cargo_manifest_dir.join("protobuf");
 
     protobuf_codegen::Codegen::new()
-        .protoc()
+        .pure()
         .include(proto_dir.as_path())
         .inputs(
             [
