@@ -4,13 +4,10 @@ build:
 test:
     cargo test
 
-build-image := "maturin-protoc:1"
-[working-directory: 'beancount-parser-lima-python/docker']
-build-container:
-    docker build . -t {{build-image}}
+build-image := "ghcr.io/pyo3/maturin"
 
 [working-directory: 'beancount-parser-lima-python']
-build-python-wheel: build-container
+build-python-wheel:
     docker run --rm -v $(pwd)/..:/io -w /io/beancount-parser-lima-python {{build-image}} build --release
 
 upload-testpypi:
