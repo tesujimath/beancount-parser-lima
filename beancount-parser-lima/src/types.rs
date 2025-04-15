@@ -379,7 +379,7 @@ impl<T> Deref for Spanned<T> {
     }
 }
 
-pub(crate) fn spanned<T>(item: T, span: Span) -> Spanned<T> {
+pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
     Spanned { item, span }
 }
 
