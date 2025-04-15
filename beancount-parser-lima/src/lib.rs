@@ -114,6 +114,7 @@ pub use types::*;
 ///
 /// let result = beancount_parser.parse();
 /// ```
+#[derive(Clone)]
 pub struct BeancountSources {
     root_path: Option<PathBuf>,
     root_source_id: SourceId,
@@ -122,9 +123,10 @@ pub struct BeancountSources {
     source_id_strings: Vec<String>, // indexed by SourceId
 }
 
+#[derive(Clone, Debug)]
 enum IncludedSource {
     Content(SourceId, String),
-    IoError(io::Error),
+    IoError(String),
     Duplicate,
 }
 
@@ -211,9 +213,10 @@ impl BeancountSources {
                 let source_id = SourceId::from(source_id_strings.len());
                 source_id_strings.push(path.to_string_lossy().into());
 
-                let included_source = read(&path).map_or_else(IncludedSource::IoError, |c| {
-                    IncludedSource::Content(source_id, c)
-                });
+                let included_source = read(&path).map_or_else(
+                    |e| IncludedSource::IoError(e.to_string()),
+                    |c| IncludedSource::Content(source_id, c),
+                );
 
                 // stabilisation of VacantEntry::insert_entry() would enable us to avoid cloning the path here
                 // and doing an immediate lookup
@@ -364,12 +367,12 @@ impl BeancountSources {
         )
     }
 
-    fn error_path_iter(&self) -> impl Iterator<Item = (Option<&Path>, &io::Error)> {
+    fn error_path_iter(&self) -> impl Iterator<Item = (Option<&Path>, String)> {
         self.included_content
             .iter()
             .filter_map(|(pathbuf, included_source)| {
                 if let IncludedSource::IoError(e) = included_source {
-                    Some((Some(pathbuf.as_path()), e))
+                    Some((Some(pathbuf.as_path()), e.clone()))
                 } else {
                     None
                 }
@@ -604,7 +607,7 @@ struct PragmaProcessor<'s> {
     current_declarations: VecDeque<Spanned<Declaration<'s>>>,
     stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>)>,
     remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>>,
-    error_paths: HashMap<Option<PathBuf>, &'s io::Error>,
+    error_paths: HashMap<Option<PathBuf>, String>,
     include_span_by_canonical_path: HashMap<PathBuf, Span>,
     // tags and meta key/values for pragma push/pop
     tags: HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
@@ -619,7 +622,7 @@ impl<'s> PragmaProcessor<'s> {
     fn new(
         root_path: Option<&Path>,
         parsed_sources: HashMap<Option<&Path>, Vec<Spanned<Declaration<'s>>>>,
-        error_paths: HashMap<Option<&Path>, &'s io::Error>,
+        error_paths: HashMap<Option<&Path>, String>,
         options: Options<'s>,
     ) -> Self {
         let mut remaining = parsed_sources

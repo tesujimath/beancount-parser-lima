@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "beancount-parser-lima"
-version = "0.7.1"
+version = "0.8.0-alpha.1"
 description = "Python bindings for beancount-parser-lima"
 readme = "README.md"
 requires-python = ">=3.7"
