@@ -5,7 +5,6 @@ use chumsky::{
 };
 use rust_decimal::Decimal;
 use smallvec::SmallVec;
-use std::marker::PhantomData;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -15,6 +14,7 @@ use std::{
     mem::swap,
     ops::Deref,
 };
+use std::{marker::PhantomData, ops::DerefMut};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 use time::Date;
 
@@ -379,6 +379,13 @@ impl<T> Deref for Spanned<T> {
     }
 }
 
+/// Spanned item may deref mut as simple item for convenience.
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.item
+    }
+}
+
 pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
     Spanned { item, span }
 }
@@ -547,7 +554,7 @@ pub(crate) enum Declaration<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Directive<'a> {
     pub(crate) date: Spanned<Date>,
-    pub(crate) metadata: Metadata<'a>,
+    pub(crate) metadata: Spanned<Metadata<'a>>,
     pub(crate) variant: DirectiveVariant<'a>,
 }
 
@@ -1372,7 +1379,7 @@ pub struct Posting<'a> {
     pub(crate) currency: Option<Spanned<Currency<'a>>>,
     pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
-    pub(crate) metadata: Metadata<'a>,
+    pub(crate) metadata: Spanned<Metadata<'a>>,
 }
 
 impl<'a> Posting<'a> {

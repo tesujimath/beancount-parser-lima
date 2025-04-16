@@ -171,11 +171,8 @@ where
 {
     group((
         transaction_header_line(),
-        metadata(),
-        posting()
-            .map_with(spanned_extra)
-            .repeated()
-            .collect::<Vec<_>>(),
+        metadata().map_with(spanned_extra),
+        posting().repeated().collect::<Vec<_>>(),
     ))
     .validate(
         |((date, flag, (payee, narration), (tags, links)), mut metadata, postings),
@@ -241,7 +238,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, currency, amount, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -270,7 +267,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, atol, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -291,7 +288,7 @@ pub(crate) fn open<'s, I>() -> impl Parser<'s, I, Directive<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
-    group((open_header_line(), metadata())).validate(
+    group((open_header_line(), metadata().map_with(spanned_extra))).validate(
         |((date, account, currencies, booking, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
             metadata.merge_links(&links, emitter);
@@ -424,7 +421,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -451,7 +448,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, currency, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -479,7 +476,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, source, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -507,7 +504,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, path, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -535,7 +532,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, comment, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -563,7 +560,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, event_type, description, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -594,7 +591,7 @@ where
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
-    .then(metadata())
+    .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, name, content, (tags, links)), mut metadata), _span, emitter| {
             metadata.merge_tags(&tags, emitter);
@@ -632,7 +629,7 @@ where
 }
 
 /// Matches a [Posting] complete with [Metadata] over several lines.
-fn posting<'s, I>() -> impl Parser<'s, I, Posting<'s>, Extra<'s>>
+fn posting<'s, I>() -> impl Parser<'s, I, Spanned<Posting<'s>>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
@@ -654,19 +651,29 @@ where
                         .map(|price_spec| spanned(price_spec, e.span()))
                 }),
             ))
+            .map_with(spanned_extra)
             .then_ignore(just(Token::Eol))
-            .then(metadata())
+            .then(metadata().map_with(spanned_extra))
             .map(
-                |((flag, account, amount, currency, cost_spec, price_annotation), metadata)| {
-                    Posting {
-                        flag,
-                        account,
-                        amount,
-                        currency,
-                        cost_spec,
-                        price_annotation,
-                        metadata,
-                    }
+                |(
+                    Spanned {
+                        item: (flag, account, amount, currency, cost_spec, price_annotation),
+                        span: posting_span_without_metadata,
+                    },
+                    metadata,
+                )| {
+                    spanned(
+                        Posting {
+                            flag,
+                            account,
+                            amount,
+                            currency,
+                            cost_spec,
+                            price_annotation,
+                            metadata,
+                        },
+                        posting_span_without_metadata,
+                    )
                 },
             ),
         )
