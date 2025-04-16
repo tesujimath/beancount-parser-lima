@@ -439,6 +439,19 @@ where
         )
     }
 
+    pub fn error_with_contexts<S: Into<String>>(
+        &self,
+        reason: S,
+        contexts: Vec<(String, Span)>,
+    ) -> Error {
+        Error::with_contexts(
+            format!("invalid {}", self.element_type()),
+            reason,
+            self.span,
+            contexts,
+        )
+    }
+
     /// Create a new `Warning` referring to the spanned element.
     pub fn warning<S: Into<String>>(&self, reason: S) -> Warning {
         Warning::new(
