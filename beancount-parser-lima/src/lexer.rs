@@ -585,7 +585,7 @@ where
 
         match first_tok {
             Some((Token::EolThenIndent, span)) => {
-                self.pending = [Some((Token::Indent, span.clone())), second_tok];
+                self.pending = [Some((Token::Indent, span.end - 1..span.end)), second_tok];
                 Some((Token::Eol, span))
             }
             Some(tok) => {

@@ -248,53 +248,75 @@ impl BeancountSources {
     {
         for error_or_warning in errors_or_warnings.into_iter() {
             use chumsky::span::Span;
-
-            let src_id = self.span_source_id_string(&error_or_warning.span);
+            let (src_id, span) = self.source_id_string_and_adjusted_span(&error_or_warning.span);
             let color = error_or_warning.color();
             let report_kind = error_or_warning.report_kind();
 
-            Report::build(
-                report_kind,
-                (
-                    src_id.to_string(),
-                    error_or_warning.span.start..error_or_warning.span.end,
-                ),
-            )
-            .with_message(error_or_warning.message)
-            .with_labels(Some(
-                Label::new((
-                    src_id.to_string(),
-                    error_or_warning.span.start()..error_or_warning.span.end(),
+            Report::build(report_kind, (src_id.clone(), (span.start()..span.end())))
+                .with_message(error_or_warning.message)
+                .with_labels(Some(
+                    Label::new((src_id, (span.start()..span.end())))
+                        .with_message(error_or_warning.reason)
+                        .with_color(color),
                 ))
-                .with_message(error_or_warning.reason)
-                .with_color(color),
-            ))
-            .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
-                Label::new((
-                    self.span_source_id_string(&span).to_string(),
-                    span.start()..span.end(),
-                ))
-                .with_message(lazy_format!("in this {}", label))
-                .with_color(Color::Yellow)
-            }))
-            .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
-                Label::new((
-                    self.span_source_id_string(&span).to_string(),
-                    span.start()..span.end(),
-                ))
-                .with_message(lazy_format!("{}", label))
-                .with_color(Color::Yellow)
-            }))
-            .finish()
-            .write(ariadne::sources(self.sources()), w)?;
+                .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
+                    let (src_id, span) = self.source_id_string_and_adjusted_span(&span);
+                    Label::new((src_id, (span.start()..span.end())))
+                        .with_message(lazy_format!("in this {}", label))
+                        .with_color(Color::Yellow)
+                }))
+                .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
+                    let (src_id, span) = self.source_id_string_and_adjusted_span(&span);
+                    Label::new((src_id, (span.start()..span.end())))
+                        .with_message(lazy_format!("{}", label))
+                        .with_color(Color::Yellow)
+                }))
+                .finish()
+                .write(ariadne::sources(self.sources()), w)?;
         }
         Ok(())
     }
 
-    fn span_source_id_string(&self, span: &Span) -> &str {
+    fn source_id_string_and_adjusted_span(&self, span: &Span) -> (String, Span) {
         use chumsky::span::Span;
+        let source_id = span.context();
+        let source_id_str = self.source_id_string(source_id);
+        let source_content = if source_id == self.root_source_id {
+            self.root_content.as_str()
+        } else if let IncludedSource::Content(_, content) =
+            self.included_content.get(Path::new(source_id_str)).unwrap()
+        {
+            content.as_str()
+        } else {
+            ""
+        };
 
-        self.source_id_string(span.context())
+        (
+            source_id_str.to_string(),
+            self.adjusted_span(source_content, span),
+        )
+    }
+
+    // adjust the span to exclude trailing whitespace
+    fn adjusted_span(&self, content: &str, span: &Span) -> Span {
+        let mut chars = content.chars();
+        let content = chars.by_ref();
+        let mut i = span.start;
+        let mut final_non_whitespace = i;
+        for c in content.skip(span.start) {
+            if i >= span.end {
+                break;
+            }
+
+            if !c.is_whitespace() {
+                final_non_whitespace = i;
+            }
+
+            i += 1;
+        }
+        let mut adjusted_span = *span;
+        adjusted_span.end = final_non_whitespace + 1;
+        adjusted_span
     }
 
     fn source_id_string(&self, source_id: SourceId) -> &str {
