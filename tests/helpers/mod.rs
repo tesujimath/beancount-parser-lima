@@ -119,7 +119,7 @@ where
 {
     let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
     // unwrap here is safe because we know the repo structure, so there definitely is a parent
-    let testcase_dir = cargo_manifest_dir.parent().unwrap().join("test-cases");
+    let testcase_dir = cargo_manifest_dir.join("test-cases");
     let input_file: PathBuf = Into::<PathBuf>::into(format!("{}.beancount", test_name.as_ref()));
     let input_path = testcase_dir.join(input_file);
     let expected_output_file: PathBuf =
