@@ -21,7 +21,6 @@ use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
     rc::Rc,
-    str::FromStr,
 };
 
 fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: Ledger) {
@@ -902,22 +901,8 @@ where
     S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
-        assert_eq!(self, &account(expected.as_ref()), "{}", &ctx);
+        assert_eq!(self.as_ref(), expected.as_ref(), "{}", &ctx);
     }
-}
-
-fn account(s: &str) -> lima::Account {
-    let mut account = s.split(':');
-    let account_type_name = account.by_ref().next().unwrap();
-    let subaccount = account
-        .map(lima::AccountName::try_from)
-        .collect::<Result<lima::Subaccount, _>>()
-        .unwrap();
-
-    lima::Account::new(
-        lima::AccountType::from_str(account_type_name).unwrap(),
-        subaccount,
-    )
 }
 
 impl<S> ExpectEq<S> for lima::Subaccount<'_>
@@ -925,15 +910,8 @@ where
     S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
-        assert_eq!(self, &subaccount(expected.as_ref()), "{}", &ctx);
+        assert_eq!(self.as_ref(), expected.as_ref(), "{}", &ctx);
     }
-}
-
-fn subaccount(s: &str) -> lima::Subaccount {
-    s.split(':')
-        .map(lima::AccountName::try_from)
-        .collect::<Result<lima::Subaccount, _>>()
-        .unwrap()
 }
 
 impl ExpectEq<Amount> for lima::Amount<'_> {

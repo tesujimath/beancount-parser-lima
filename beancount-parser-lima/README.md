@@ -91,8 +91,6 @@ Tests for features unsupported in the Lima parser are left in test-cases-unsuppo
 
 - Chumsky `1.0.0.alpha.*` releases are required for zero-copy support
 
-- smallvec `2.0.0-alpha.*` releases are required for correct lifetime inference
-
 ## Alternatives
 
 [beancount-parser](https://github.com/jcornaz/beancount-parser) is another parser for Beancount which predates this one,

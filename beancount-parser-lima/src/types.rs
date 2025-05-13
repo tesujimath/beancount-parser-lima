@@ -4,10 +4,9 @@ use chumsky::{
     input::{Input, MapExtra},
 };
 use rust_decimal::Decimal;
-use smallvec::SmallVec;
 use std::{
     cmp::max,
-    collections::{HashMap, HashSet},
+    collections::{hash_map, HashMap, HashSet},
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     iter::empty,
@@ -1001,32 +1000,77 @@ impl Display for Plugin<'_> {
     }
 }
 
-/// A Beancount account with account type and subaccount names.
+/// A Beancount account, simply a string after account type validation.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Account<'a> {
-    pub(crate) account_type: AccountType,
-    pub(crate) subaccount: Subaccount<'a>,
+pub struct Account<'a>(&'a str);
+
+impl<'a> Account<'a> {
+    ///constructor
+    pub(crate) fn new(
+        s: &'a str,
+        account_type_names: &AccountTypeNames,
+    ) -> Result<Self, AccountError> {
+        let mut account = s.split(':');
+        let account_type_name = AccountTypeName::try_from(
+            account
+                .by_ref()
+                .next()
+                .ok_or(AccountError(AccountErrorKind::MissingColon))?,
+        )
+        .map_err(|e| AccountError(AccountErrorKind::TypeName(e)))?;
+        for subaccount in account {
+            let _ = AccountName::try_from(subaccount)
+                .map_err(|e| AccountError(AccountErrorKind::AccountName(e)))?;
+        }
+
+        if account_type_names.get(&account_type_name).is_none() {
+            Err(AccountError(AccountErrorKind::UnknownAccountType(format!(
+                "unknown account type {}, must be one of {}",
+                &account_type_name, account_type_names
+            ))))?;
+        }
+
+        Ok(Account(s))
+    }
 }
 
-impl Account<'_> {
-    ///constructor
-    pub fn new(account_type: AccountType, subaccount: Subaccount) -> Account {
-        Account {
-            account_type,
-            subaccount,
+impl Display for Account<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+impl AsRef<str> for Account<'_> {
+    fn as_ref(&self) -> &str {
+        self.0
+    }
+}
+
+/// Error type for [AccountTypeName] creation.
+#[derive(PartialEq, Eq, Debug)]
+pub struct AccountError(AccountErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum AccountErrorKind {
+    MissingColon,
+    TypeName(AccountTypeNameError),
+    AccountName(AccountNameError),
+    UnknownAccountType(String),
+}
+
+impl Display for AccountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use AccountErrorKind::*;
+        match &self.0 {
+            MissingColon => f.write_str("missing colon"),
+            TypeName(e) => write!(f, "{}", e),
+            AccountName(e) => write!(f, "{}", e),
+            UnknownAccountType(e) => write!(f, "{}", e),
         }
     }
-
-    /// Field accessor.
-    pub fn account_type(&self) -> AccountType {
-        self.account_type
-    }
-
-    /// Field accessor.
-    pub fn names(&self) -> &Subaccount {
-        &self.subaccount
-    }
 }
+
+impl std::error::Error for AccountError {}
 
 impl ElementType for Account<'_> {
     fn element_type(&self) -> &'static str {
@@ -1034,16 +1078,39 @@ impl ElementType for Account<'_> {
     }
 }
 
-impl Display for Account<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.account_type.as_ref())?;
-        format(f, self.names(), plain, ":", Some(":"))
+/// an account without the account type prefix
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct Subaccount<'a>(&'a str);
+
+impl AsRef<str> for Subaccount<'_> {
+    fn as_ref(&self) -> &str {
+        self.0
     }
 }
 
-/// The individual colon-separated components of an account, without the [AccountType] prefix.
-/// `SmallVec` stores a small number of these inline, before making use of the heap.
-pub type Subaccount<'a> = SmallVec<AccountName<'a>, 4>;
+impl Display for Subaccount<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Subaccount<'a> {
+    type Error = AccountNameError;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        let mut empty = true;
+        for account_name in s.split(':') {
+            _ = AccountName::try_from(account_name)?;
+            empty = false;
+        }
+
+        if empty {
+            Err(AccountNameError(AccountNameErrorKind::Empty))
+        } else {
+            Ok(Subaccount(s))
+        }
+    }
+}
 
 /// A validated name for an account type.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
@@ -2390,5 +2457,112 @@ impl Display for PriceSpec<'_> {
         }
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct AccountTypeNames<'a> {
+    // relies on AccountType discriminants being contiguous and from zero, which they are
+    pub(crate) name_by_type: Vec<AccountTypeName<'a>>,
+    pub(crate) type_by_name: HashMap<AccountTypeName<'a>, AccountType>,
+}
+
+impl<'a> AccountTypeNames<'a> {
+    pub(crate) fn name(&self, account_type: AccountType) -> AccountTypeName<'a> {
+        self.name_by_type[account_type as usize]
+    }
+
+    pub(crate) fn get(&self, name: &AccountTypeName) -> Option<AccountType> {
+        self.type_by_name.get(name).copied()
+    }
+
+    pub(crate) fn update(
+        &mut self,
+        account_type: AccountType,
+        name: AccountTypeName<'a>,
+    ) -> Result<(), AccountTypeNamesError> {
+        use hash_map::Entry::*;
+
+        match self.type_by_name.entry(name) {
+            Vacant(e) => {
+                e.insert(account_type);
+                let old_name = self.name_by_type[account_type as usize];
+                self.name_by_type[account_type as usize] = name;
+                self.type_by_name.remove(&old_name);
+                Ok(())
+            }
+            Occupied(o) => {
+                let existing_account_type = *o.get();
+                if existing_account_type == account_type {
+                    // updating as same, harmless
+                    Ok(())
+                } else {
+                    Err(AccountTypeNamesError(AccountTypeNamesErrorKind::NameInUse(
+                        existing_account_type,
+                    )))
+                }
+            }
+        }
+    }
+}
+
+impl<'a> Default for AccountTypeNames<'a> {
+    fn default() -> Self {
+        use AccountType::*;
+
+        let names_types = vec![
+            ("Assets", Assets),
+            ("Liabilities", Liabilities),
+            ("Equity", Equity),
+            ("Income", Income),
+            ("Expenses", Expenses),
+        ];
+
+        let mut names_type_indices = names_types
+            .iter()
+            .map(|(n, t)| (*n, *t as usize))
+            .collect::<Vec<_>>();
+        names_type_indices.sort_by_key(|(_n, t)| *t);
+
+        let name_by_type = names_type_indices
+            .into_iter()
+            .map(|(n, _t)| AccountTypeName::try_from(n).unwrap())
+            .collect::<Vec<_>>();
+
+        let type_by_name: HashMap<AccountTypeName<'a>, AccountType> = HashMap::from_iter(
+            names_types
+                .into_iter()
+                .map(|(n, t)| (AccountTypeName::try_from(n).unwrap(), t)),
+        );
+
+        AccountTypeNames {
+            name_by_type,
+            type_by_name,
+        }
+    }
+}
+
+impl Display for AccountTypeNames<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        format(f, &self.name_by_type, plain, ", ", None)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) struct AccountTypeNamesError(AccountTypeNamesErrorKind);
+
+#[derive(PartialEq, Eq, Debug)]
+enum AccountTypeNamesErrorKind {
+    NameInUse(AccountType),
+}
+
+impl Display for AccountTypeNamesError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use AccountTypeNamesErrorKind::*;
+        match &self.0 {
+            NameInUse(t) => write!(f, "account type name in use for {}", t.as_ref()),
+        }
+    }
+}
+
+impl std::error::Error for AccountTypeNamesError {}
 
 mod tests;

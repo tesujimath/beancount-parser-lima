@@ -38,7 +38,7 @@ pub(crate) struct Posting {
     #[pyo3(get)]
     pub(crate) flag: Option<Py<PyString>>,
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
     pub(crate) amount: Option<Decimal>,
     #[pyo3(get)]
@@ -66,7 +66,7 @@ pub(crate) struct Price {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Balance {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
     pub(crate) atol: AmountWithTolerance,
 }
@@ -76,7 +76,7 @@ pub(crate) struct Balance {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Open {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
     pub(crate) currencies: Py<PyList>,
     #[pyo3(get)]
@@ -88,7 +88,7 @@ pub(crate) struct Open {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Close {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
 }
 
 /// Beancount commodity directive.
@@ -104,9 +104,9 @@ pub(crate) struct Commodity {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Pad {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) source: Py<PyList>,
+    pub(crate) source: Py<PyString>,
 }
 
 /// Beancount document directive.
@@ -114,7 +114,7 @@ pub(crate) struct Pad {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Document {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
     pub(crate) path: Py<PyString>,
 }
@@ -124,7 +124,7 @@ pub(crate) struct Document {
 #[pyclass(frozen, extends=Directive)]
 pub(crate) struct Note {
     #[pyo3(get)]
-    pub(crate) account: Py<PyList>,
+    pub(crate) account: Py<PyString>,
     #[pyo3(get)]
     pub(crate) comment: Py<PyString>,
 }
@@ -243,7 +243,7 @@ pub struct MetaValueCurrency {
 #[pyclass(frozen, extends=MetaValue)]
 pub struct MetaValueAccount {
     #[pyo3(get)]
-    pub(crate) value: Py<PyList>,
+    pub(crate) value: Py<PyString>,
 }
 
 #[derive(Clone, Debug)]
@@ -292,19 +292,19 @@ pub(crate) struct Options {
     #[pyo3(get)]
     pub(crate) title: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_previous_balances: Py<PyList>,
+    pub(crate) account_previous_balances: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_previous_earnings: Py<PyList>,
+    pub(crate) account_previous_earnings: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_previous_conversions: Py<PyList>,
+    pub(crate) account_previous_conversions: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_current_earnings: Py<PyList>,
+    pub(crate) account_current_earnings: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_current_conversions: Py<PyList>,
+    pub(crate) account_current_conversions: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_unrealized_gains: Py<PyList>,
+    pub(crate) account_unrealized_gains: Py<PyString>,
     #[pyo3(get)]
-    pub(crate) account_rounding: Option<Py<PyList>>,
+    pub(crate) account_rounding: Option<Py<PyString>>,
     #[pyo3(get)]
     pub(crate) conversion_currency: Py<PyString>,
     #[pyo3(get)]

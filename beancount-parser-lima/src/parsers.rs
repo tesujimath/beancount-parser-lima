@@ -374,30 +374,12 @@ where
 
     s.try_map_with(|s, e| {
         let span = e.span();
-        let mut account = s.split(':');
-        let account_type_name = AccountTypeName::try_from(account.by_ref().next().unwrap())
-            .map_err(|e| Rich::custom(span, e.to_string()))?;
-        let subaccount = account
-            .map(AccountName::try_from)
-            .collect::<Result<Subaccount, _>>()
-            .map_err(|e| Rich::custom(span, e.to_string()))?;
-
+        //
         // look up the account type name to see which account type it is currently mapped to
         let parser_state: &mut extra::SimpleState<ParserState> = e.state();
         let account_type_names = &parser_state.options.account_type_names;
-        account_type_names
-            .get(&account_type_name)
-            .map(|account_type| Account {
-                account_type,
-                subaccount,
-            })
-            .ok_or(Rich::custom(
-                span,
-                format!(
-                    "unknown account type {}, must be one of {}",
-                    &account_type_name, account_type_names
-                ),
-            ))
+
+        Account::new(s, account_type_names).map_err(|e| Rich::custom(span, e.to_string()))
     })
 }
 

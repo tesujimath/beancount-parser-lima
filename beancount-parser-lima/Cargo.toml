@@ -14,7 +14,6 @@ exclude = ["/examples/images/*"]
 [dependencies]
 lazy_format = { workspace = true }
 rust_decimal = { workspace = true }
-smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 time = { workspace = true }

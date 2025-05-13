@@ -47,15 +47,7 @@ impl Posting {
 
 fn fmt_posting(x: &Posting, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
     simple_format(f, x.flag.as_ref(), None)?;
-
-    format(
-        f,
-        x.account.bind(py),
-        plain,
-        ":",
-        x.flag.as_ref().and(Some(" ")),
-    )?;
-
+    simple_format(f, x.amount.as_ref(), x.flag.as_ref().and(Some(" ")))?;
     simple_format(f, x.amount.as_ref(), Some(" "))?;
     simple_format(f, x.currency.as_ref(), Some(" "))?;
 
@@ -110,9 +102,7 @@ fn fmt_balance(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} balance ", date,)?;
-    fmt_account(&x.account, py, f)?;
-    write!(f, " {}", x.atol)?;
+    write!(f, "{} balance {} {}", date, &x.account, x.atol)?;
 
     fmt_optional_metadata_inline(metadata, py, f)
 }
@@ -136,8 +126,7 @@ fn fmt_open(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} open ", date)?;
-    fmt_account(&x.account, py, f)?;
+    write!(f, "{} open {} ", date, &x.account)?;
     format(f, x.currencies.bind(py), plain, ",", Some(" "))?;
     format(f, &x.booking, double_quoted, " ", Some(" "))?;
 
@@ -163,8 +152,7 @@ fn fmt_close(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} close ", date)?;
-    fmt_account(&x.account, py, f)?;
+    write!(f, "{} close {}", date, &x.account)?;
 
     fmt_optional_metadata_inline(metadata, py, f)
 }
@@ -212,10 +200,7 @@ fn fmt_pad(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} pad ", date)?;
-    fmt_account(&x.account, py, f)?;
-    f.write_str(" ")?;
-    fmt_account(&x.source, py, f)?;
+    write!(f, "{} pad {} {}", date, &x.account, &x.source)?;
 
     fmt_optional_metadata_inline(metadata, py, f)
 }
@@ -239,9 +224,7 @@ fn fmt_document(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} document ", date)?;
-    fmt_account(&x.account, py, f)?;
-    write!(f, " \"{}\"", x.path)?;
+    write!(f, "{} document {} \"{}\"", date, &x.account, x.path)?;
 
     fmt_optional_metadata_inline(metadata, py, f)
 }
@@ -265,9 +248,7 @@ fn fmt_note(
     metadata: &Option<Metadata>,
     f: &mut Formatter<'_>,
 ) -> fmt::Result {
-    write!(f, "{} note ", date)?;
-    fmt_account(&x.account, py, f)?;
-    write!(f, " \"{}\"", x.comment)?;
+    write!(f, "{} note {} \"{}\"", date, &x.account, x.comment)?;
 
     fmt_optional_metadata_inline(metadata, py, f)
 }
@@ -440,17 +421,13 @@ impl Display for MetaValueCurrency {
 
 #[pymethods]
 impl MetaValueAccount {
-    fn __str__(&self, py: Python<'_>) -> String {
-        format!("{}", Fmt(|f| fmt_meta_value_account(self, py, f)))
+    fn __str__(&self) -> String {
+        format!("{}", Fmt(|f| fmt_meta_value_account(self, f)))
     }
 }
 
-fn fmt_meta_value_account(
-    x: &MetaValueAccount,
-    py: Python<'_>,
-    f: &mut Formatter<'_>,
-) -> fmt::Result {
-    fmt_account(&x.value, py, f)
+fn fmt_meta_value_account(x: &MetaValueAccount, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", &x.value)
 }
 
 #[pymethods]
@@ -648,50 +625,28 @@ impl Options {
 fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
     write!(f, "title: {}", x.title)?;
 
-    fmt_account_option(
-        "account_previous_balances",
-        &x.account_previous_balances,
-        py,
-        f,
-    )?;
+    fmt_account_option("account_previous_balances", &x.account_previous_balances, f)?;
 
-    fmt_account_option(
-        "account_previous_earnings",
-        &x.account_previous_earnings,
-        py,
-        f,
-    )?;
+    fmt_account_option("account_previous_earnings", &x.account_previous_earnings, f)?;
 
     fmt_account_option(
         "account_previous_conversions",
         &x.account_previous_conversions,
-        py,
         f,
     )?;
 
-    fmt_account_option(
-        "account_current_earnings",
-        &x.account_current_earnings,
-        py,
-        f,
-    )?;
+    fmt_account_option("account_current_earnings", &x.account_current_earnings, f)?;
 
     fmt_account_option(
         "account_current_conversions",
         &x.account_current_conversions,
-        py,
         f,
     )?;
 
-    fmt_account_option(
-        "account_unrealized_gains",
-        &x.account_unrealized_gains,
-        py,
-        f,
-    )?;
+    fmt_account_option("account_unrealized_gains", &x.account_unrealized_gains, f)?;
 
     if let Some(account_rounding) = x.account_rounding.as_ref() {
-        fmt_account_option("account_rounding", account_rounding, py, f)?;
+        fmt_account_option("account_rounding", account_rounding, f)?;
     }
 
     write!(f, "\nconversion_currency: {}", x.conversion_currency)?;
@@ -757,18 +712,12 @@ fn fmt_options(x: &Options, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Resul
     Ok(())
 }
 
-fn fmt_account_option(
-    option_name: &str,
-    x: &Py<PyList>,
-    py: Python<'_>,
-    f: &mut Formatter<'_>,
-) -> fmt::Result {
-    write!(f, "\n{}: ", option_name)?;
-    fmt_account(x, py, f)
+fn fmt_account_option(option_name: &str, x: &Py<PyString>, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "\n{}: {}", option_name, x)
 }
 
-fn fmt_account(x: &Py<PyList>, py: Python<'_>, f: &mut Formatter<'_>) -> fmt::Result {
-    format(f, x.bind(py).iter(), plain, ":", None)
+fn fmt_account(x: &Py<PyString>, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", x)
 }
 
 struct Fmt<F>(pub F)
