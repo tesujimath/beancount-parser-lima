@@ -1470,6 +1470,22 @@ impl Metadata<'_> {
     }
 
     /// Field accessor.
+    pub fn key_value<'s, 'k>(&'s self, key: Key<'k>) -> Option<&'s Spanned<MetaValue<'s>>>
+    where
+        'k: 's,
+    {
+        // this is a bit gross because we don't have a span,
+        // so we cheat and use any span we know, which is OK because it doesn't matter
+        match self.key_values.keys().next() {
+            None => None,
+            Some(arbitrary_spanned_key) => {
+                let key = spanned(key, *arbitrary_spanned_key.span());
+                self.key_values.get(&key)
+            }
+        }
+    }
+
+    /// Field accessor.
     pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<Tag>> {
         self.tags.iter()
     }
