@@ -1002,7 +1002,10 @@ impl Display for Plugin<'_> {
 
 /// A Beancount account, simply a string after account type validation.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Account<'a>(&'a str);
+pub struct Account<'a> {
+    account_type: AccountType,
+    name: &'a str,
+}
 
 impl<'a> Account<'a> {
     ///constructor
@@ -1023,26 +1026,32 @@ impl<'a> Account<'a> {
                 .map_err(|e| AccountError(AccountErrorKind::AccountName(e)))?;
         }
 
-        if account_type_names.get(&account_type_name).is_none() {
-            Err(AccountError(AccountErrorKind::UnknownAccountType(format!(
+        match account_type_names.get(&account_type_name) {
+            Some(account_type) => Ok(Account {
+                account_type,
+                name: s,
+            }),
+            None => Err(AccountError(AccountErrorKind::UnknownAccountType(format!(
                 "unknown account type {}, must be one of {}",
                 &account_type_name, account_type_names
-            ))))?;
+            )))),
         }
+    }
 
-        Ok(Account(s))
+    pub fn account_type(&self) -> AccountType {
+        self.account_type
     }
 }
 
 impl Display for Account<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", &self.name)
     }
 }
 
 impl AsRef<str> for Account<'_> {
     fn as_ref(&self) -> &str {
-        self.0
+        self.name
     }
 }
 
