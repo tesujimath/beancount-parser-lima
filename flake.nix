@@ -27,7 +27,6 @@
           devShells.default = mkShell {
             nativeBuildInputs = [
               beancount
-              just
 
               # build dependencies
               cargo-flamegraph
@@ -41,15 +40,6 @@
               rust-analyzer
               rust-bin.stable.latest.default
               rustfmt
-
-              # for Python bindings
-              maturin
-              (python3.withPackages (ps: with ps; [ pip ]))
-              zig
-              twine
-
-              # Python devtools
-              pyright
             ];
           };
         }
