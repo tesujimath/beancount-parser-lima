@@ -150,6 +150,16 @@ where
     pub(crate) fn report_kind(&self) -> ariadne::ReportKind<'static> {
         K::report_kind()
     }
+
+    pub fn with_annotation<S>(self, annotation: S) -> AnnotatedErrorOrWarning<K>
+    where
+        S: Into<String>,
+    {
+        AnnotatedErrorOrWarning {
+            error_or_warning: self,
+            annotation: Some(annotation.into()),
+        }
+    }
 }
 
 impl Display for Error {
@@ -199,6 +209,31 @@ impl ErrorOrWarningKind for WarningKind {
         ariadne::Color::Yellow
     }
 }
+
+/// Annotated error or warning
+#[derive(Clone, Debug)]
+pub struct AnnotatedErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
+    pub error_or_warning: ErrorOrWarning<K>,
+    pub annotation: Option<String>,
+}
+
+impl<K> From<ErrorOrWarning<K>> for AnnotatedErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
+    fn from(error_or_warning: ErrorOrWarning<K>) -> Self {
+        Self {
+            error_or_warning,
+            annotation: None,
+        }
+    }
+}
+
+pub type AnnotatedError = AnnotatedErrorOrWarning<ErrorKind>;
+pub type AnnotatedWarning = AnnotatedErrorOrWarning<WarningKind>;
 
 /// Top-level account type, the prefix of any fully-qualified [Account].
 #[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, IntoStaticStr, Debug)]

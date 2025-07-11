@@ -244,13 +244,18 @@ impl BeancountSources {
         }
     }
 
-    pub fn write<W, K>(&self, w: W, errors_or_warnings: Vec<ErrorOrWarning<K>>) -> io::Result<()>
+    pub fn write<W, E, K>(&self, mut w: W, errors_or_warnings: Vec<E>) -> io::Result<()>
     where
         W: Write + Copy,
+        E: Into<AnnotatedErrorOrWarning<K>>,
         K: ErrorOrWarningKind,
     {
         for error_or_warning in errors_or_warnings.into_iter() {
             use chumsky::span::Span;
+            let AnnotatedErrorOrWarning {
+                error_or_warning,
+                annotation,
+            } = error_or_warning.into();
             let (src_id, span) = self.source_id_string_and_adjusted_span(&error_or_warning.span);
             let color = error_or_warning.color();
             let report_kind = error_or_warning.report_kind();
@@ -276,6 +281,11 @@ impl BeancountSources {
                 }))
                 .finish()
                 .write(ariadne::sources(self.sources()), w)?;
+
+            if let Some(annotation) = annotation {
+                // clippy thinks this is better than write! 🤷
+                w.write_fmt(core::format_args!("{}\n", &annotation))?;
+            }
         }
         Ok(())
     }
