@@ -29,6 +29,7 @@ either = "1.15.0"
 logos = "0.15.0"
 protobuf = "3.7.2"
 rust_decimal_macros = "1.37.1"
+tracing = "0.1.41"
 unescaper = "0.1.6"
 
 [dev-dependencies]

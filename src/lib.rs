@@ -120,13 +120,14 @@ pub struct BeancountSources {
     root_path: Option<PathBuf>,
     root_source_id: SourceId,
     root_content: String,
+    root_content_char_indices: Vec<usize>,
     included_content: HashMap<PathBuf, IncludedSource>,
     source_id_strings: Vec<String>, // indexed by SourceId
 }
 
 #[derive(Clone, Debug)]
 enum IncludedSource {
-    Content(SourceId, String),
+    Content(SourceId, String, Vec<usize>), // the content and its char indices
     IoError(String),
     Duplicate,
 }
@@ -216,7 +217,18 @@ impl BeancountSources {
 
                 let included_source = read(&path).map_or_else(
                     |e| IncludedSource::IoError(e.to_string()),
-                    |c| IncludedSource::Content(source_id, c),
+                    |c| {
+                        // find the char indices for the content
+                        // needed for mapping byte indices to char indices, to convert Chumsky spans to Ariadne spans
+                        // see https://github.com/zesterer/chumsky/issues/65#issuecomment-1689216633
+                        let char_indices = c.char_indices().map(|(i, _)| i).collect::<Vec<_>>();
+                        tracing::debug!(
+                            "content byte len {} char len {}",
+                            c.len(),
+                            char_indices.len()
+                        );
+                        IncludedSource::Content(source_id, c, char_indices)
+                    },
                 );
 
                 // stabilisation of VacantEntry::insert_entry() would enable us to avoid cloning the path here
@@ -224,7 +236,7 @@ impl BeancountSources {
                 included_content.insert(path.clone(), included_source);
                 let included_source = included_content.get(&path).unwrap();
 
-                if let IncludedSource::Content(_, content) = included_source {
+                if let IncludedSource::Content(_, content, _) = included_source {
                     let mut includes = get_includes(content, source_id)
                         .into_iter()
                         .map(|included_path| {
@@ -236,10 +248,16 @@ impl BeancountSources {
             }
         }
 
+        let root_content_char_indices = root_content
+            .char_indices()
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>();
+
         Self {
             root_path,
             root_source_id,
             root_content,
+            root_content_char_indices,
             included_content,
             source_id_strings,
         }
@@ -291,24 +309,64 @@ impl BeancountSources {
         Ok(())
     }
 
+    fn byte_to_rune(&self, char_indices: &[usize], byte_span: Span) -> Span {
+        let mut rune_span = byte_span;
+
+        rune_span.start = char_indices.partition_point(|&i| i < byte_span.start);
+        rune_span.end = char_indices.partition_point(|&i| i < byte_span.end);
+        tracing::debug!(
+            "byte_to_rune({:?}) chars in source = {}, ruined span {:?}",
+            &byte_span,
+            char_indices.len(),
+            &rune_span
+        );
+        rune_span
+    }
+
     fn source_id_string_and_adjusted_span(&self, span: &Span) -> (String, Span) {
         use chumsky::span::Span;
         let source_id = span.context();
         let source_id_str = self.source_id_string(source_id);
-        let source_content = if source_id == self.root_source_id {
-            self.root_content.as_str()
-        } else if let IncludedSource::Content(_, content) =
+        let empty_char_indices = Vec::default();
+        let (source_content, source_content_char_indices) = if source_id == self.root_source_id {
+            (self.root_content.as_str(), &self.root_content_char_indices)
+        } else if let IncludedSource::Content(_, content, content_char_indices) =
             self.included_content.get(Path::new(source_id_str)).unwrap()
         {
-            content.as_str()
+            (content.as_str(), content_char_indices)
         } else {
-            ""
+            ("", &empty_char_indices)
         };
 
-        (
-            source_id_str.to_string(),
-            trimmed_span(source_content, span),
-        )
+        let trimmed = trimmed_span(source_content, span);
+        let rune_span = self.byte_to_rune(source_content_char_indices, trimmed);
+
+        tracing::debug!(
+            "original span {:?} `{:?}`, trimmed {:?} `{:?}`, ruined {:?} `{:?}`",
+            &span,
+            &source_content[span.start..span.end],
+            trimmed,
+            &source_content[trimmed.start..trimmed.end],
+            rune_span,
+            &source_content[rune_span.start..rune_span.end]
+        );
+        tracing::debug!(
+            "original span {:?} `{:?}`",
+            &span,
+            &source_content[span.start..span.end],
+        );
+        tracing::debug!(
+            "trimmed span {:?} `{:?}`",
+            trimmed,
+            &source_content[trimmed.start..trimmed.end],
+        );
+        tracing::debug!(
+            "ruined span {:?} `{:?}`",
+            rune_span,
+            &source_content[rune_span.start..rune_span.end]
+        );
+
+        (source_id_str.to_string(), rune_span)
     }
 
     fn source_id_string(&self, source_id: SourceId) -> &str {
@@ -324,7 +382,7 @@ impl BeancountSources {
             self.included_content
                 .iter()
                 .filter_map(|(_, included_source)| {
-                    if let IncludedSource::Content(source_id, content) = included_source {
+                    if let IncludedSource::Content(source_id, content, _) = included_source {
                         Some((
                             self.source_id_string(*source_id).to_string(),
                             content.as_str(),
@@ -347,7 +405,7 @@ impl BeancountSources {
             self.included_content
                 .iter()
                 .filter_map(|(pathbuf, included_source)| {
-                    if let IncludedSource::Content(source_id, content) = included_source {
+                    if let IncludedSource::Content(source_id, content, _) = included_source {
                         Some((*source_id, Some(pathbuf.as_path()), content.as_str()))
                     } else {
                         None
@@ -403,7 +461,7 @@ impl std::fmt::Debug for BeancountSources {
 
         for (path, included_source) in &self.included_content {
             match included_source {
-                IncludedSource::Content(source_id, content) => writeln!(
+                IncludedSource::Content(source_id, content, _) => writeln!(
                     f,
                     "    {} ok len {},",
                     self.source_id_string(*source_id),
