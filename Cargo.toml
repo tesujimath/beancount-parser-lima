@@ -13,33 +13,33 @@ exclude = ["/examples/images/*"]
 
 [dependencies]
 lazy_format = "2.0.3"
-rust_decimal = "1.36.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
-time = "0.3.37"
-anyhow = "1.0.96"
-ariadne = "0.5.0"
+rust_decimal = "1.37.2"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+time = "0.3.41"
+anyhow = "1.0.98"
+ariadne = "0.5.1"
 # for bleeding edge ariadne
 # ariadne= { path = "../../../../third-party/rust/ariadne" }
 chumsky = { version = "1.0.0-alpha.8", features = ["regex"] }
 # for bleeding edge chumsky:
 # chumsky = { git = "https://github.com/tesujimath/chumsky", branch = "one_of_ref-not_ref", features = ["label", "regex"] }
 # chumsky = { path = "../../../../third-party/rust/chumsky", features = ["label", "regex"] }
-either = "1.13.0"
+either = "1.15.0"
 logos = "0.15.0"
-protobuf = "3.7.1"
-rust_decimal_macros = "1.36.0"
-unescaper = "0.1.5"
+protobuf = "3.7.2"
+rust_decimal_macros = "1.37.1"
+unescaper = "0.1.6"
 
 [dev-dependencies]
 derive_more = { version = "2.0.1", features = ["display"] }
 itertools = "0.14.0"
-proptest = "1.6.0"
-rstest = "0.24.0"
+proptest = "1.7.0"
+rstest = "0.26.1"
 stats_alloc = "0.1.10"
 test-case = "3.3.1"
-time = { version = "0.3.37", features = ["parsing"] }
+time = { version = "0.3.41", features = ["parsing"] }
 xflags = "0.3.2"
 
 [build-dependencies]
-protobuf-codegen = "3.7.1"
+protobuf-codegen = "3.7.2"
