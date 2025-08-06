@@ -222,11 +222,6 @@ impl BeancountSources {
                         // needed for mapping byte indices to char indices, to convert Chumsky spans to Ariadne spans
                         // see https://github.com/zesterer/chumsky/issues/65#issuecomment-1689216633
                         let char_indices = c.char_indices().map(|(i, _)| i).collect::<Vec<_>>();
-                        tracing::debug!(
-                            "content byte len {} char len {}",
-                            c.len(),
-                            char_indices.len()
-                        );
                         IncludedSource::Content(source_id, c, char_indices)
                     },
                 );
@@ -311,15 +306,8 @@ impl BeancountSources {
 
     fn byte_to_rune(&self, char_indices: &[usize], byte_span: Span) -> Span {
         let mut rune_span = byte_span;
-
         rune_span.start = char_indices.partition_point(|&i| i < byte_span.start);
         rune_span.end = char_indices.partition_point(|&i| i < byte_span.end);
-        tracing::debug!(
-            "byte_to_rune({:?}) chars in source = {}, ruined span {:?}",
-            &byte_span,
-            char_indices.len(),
-            &rune_span
-        );
         rune_span
     }
 
@@ -340,31 +328,6 @@ impl BeancountSources {
 
         let trimmed = trimmed_span(source_content, span);
         let rune_span = self.byte_to_rune(source_content_char_indices, trimmed);
-
-        tracing::debug!(
-            "original span {:?} `{:?}`, trimmed {:?} `{:?}`, ruined {:?} `{:?}`",
-            &span,
-            &source_content[span.start..span.end],
-            trimmed,
-            &source_content[trimmed.start..trimmed.end],
-            rune_span,
-            &source_content[rune_span.start..rune_span.end]
-        );
-        tracing::debug!(
-            "original span {:?} `{:?}`",
-            &span,
-            &source_content[span.start..span.end],
-        );
-        tracing::debug!(
-            "trimmed span {:?} `{:?}`",
-            trimmed,
-            &source_content[trimmed.start..trimmed.end],
-        );
-        tracing::debug!(
-            "ruined span {:?} `{:?}`",
-            rune_span,
-            &source_content[rune_span.start..rune_span.end]
-        );
 
         (source_id_str.to_string(), rune_span)
     }
