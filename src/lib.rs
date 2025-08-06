@@ -97,7 +97,8 @@ use std::{
     iter::once,
     path::{Path, PathBuf},
 };
-pub use types::*;
+
+pub use crate::{trim::trim_trailing_whitespace, types::*};
 
 /// Contains the content of the Beancount source file, and the content of
 /// the transitive closure of all the include'd source files.
@@ -306,30 +307,8 @@ impl BeancountSources {
 
         (
             source_id_str.to_string(),
-            self.adjusted_span(source_content, span),
+            trimmed_span(source_content, span),
         )
-    }
-
-    // adjust the span to exclude trailing whitespace
-    fn adjusted_span(&self, content: &str, span: &Span) -> Span {
-        let mut chars = content.chars();
-        let content = chars.by_ref();
-        let mut i = span.start;
-        let mut final_non_whitespace = i;
-        for c in content.skip(span.start) {
-            if i >= span.end {
-                break;
-            }
-
-            if !c.is_whitespace() {
-                final_non_whitespace = i;
-            }
-
-            i += 1;
-        }
-        let mut adjusted_span = *span;
-        adjusted_span.end = final_non_whitespace + 1;
-        adjusted_span
     }
 
     fn source_id_string(&self, source_id: SourceId) -> &str {
@@ -869,6 +848,12 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span {
     chumsky::span::Span::new(source_id, s.len()..s.len())
 }
 
+fn trimmed_span(source: &str, span: &Span) -> Span {
+    let mut trimmed = *span;
+    trimmed.end = trim_trailing_whitespace(source, span.start, span.end);
+    trimmed
+}
+
 #[cfg(test)]
 pub use lexer::bare_lex;
 mod format;
@@ -877,4 +862,5 @@ pub use options::Options;
 mod options;
 mod parsers;
 mod sort;
+mod trim;
 pub mod types;
