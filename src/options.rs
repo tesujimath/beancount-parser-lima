@@ -611,6 +611,7 @@ impl<'a> Options<'a> {
         &self.conversion_currency.item
     }
 
+    /// return the tolerance default for one particular currency
     pub fn inferred_tolerance_default(&self, currency: &Currency) -> Option<Decimal> {
         self.inferred_tolerance_default
             .get(&CurrencyOrAny::Currency(*currency))
@@ -619,6 +620,13 @@ impl<'a> Options<'a> {
                 .inferred_tolerance_default
                 .get(&CurrencyOrAny::Any)
                 .map(|d| d.0))
+    }
+
+    /// return the tolerance default fallback in case not defined for a particular currency
+    pub fn inferred_tolerance_default_fallback(&self) -> Option<Decimal> {
+        self.inferred_tolerance_default
+            .get(&CurrencyOrAny::Any)
+            .map(|d| d.0)
     }
 
     /// return the tolerance defaults for all currencies, with None as the 'any' currency
