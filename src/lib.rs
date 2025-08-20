@@ -551,9 +551,17 @@ impl<'s> BeancountParser<'s> {
         let error_paths = self.sources.error_path_iter().collect::<HashMap<_, _>>();
         let mut p = PragmaProcessor::new(self.root_path(), parsed_sources, error_paths, options);
 
+        // directives are stable-sorted by date, where balance directives sort ahead of the other directives for that day
+        // as per https://beancount.github.io/docs/beancount_design_doc.html#stream-invariants
         let directives = p
             .by_ref()
-            .sort(|d| *d.item().date().item())
+            .sort(|d| {
+                (
+                    *d.item().date().item(),
+                    // secondary sort of Balance ahead of others
+                    !matches!(d.variant(), DirectiveVariant::Balance(_)),
+                )
+            })
             .collect::<Vec<_>>();
         let (options, plugins, mut pragma_errors) = p.result();
         errors.append(&mut pragma_errors);
