@@ -2,8 +2,6 @@ directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
     flag: "*"
-    # ANOMALY: Lima distinguishes empty string from no string
-    narration: ""
     postings {
       account: "Assets:Investments:MSFT"
       spec {
