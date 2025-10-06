@@ -2,7 +2,6 @@ directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
     flag: "*"
-    narration: ""
     postings {
       account: "Assets:Investments:MSFT"
       spec {
@@ -20,7 +19,6 @@ directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
     flag: "*"
-    narration: ""
     postings {
       account: "Assets:Investments:MSFT"
       spec {
@@ -43,7 +41,6 @@ directives {
   date { year: 2013 month: 6 day: 1 }
   transaction {
     flag: "*"
-    narration: ""
     postings {
       account: "Assets:Investments:MSFT"
       spec {

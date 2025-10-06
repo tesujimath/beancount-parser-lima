@@ -4,8 +4,6 @@ directives {
     kv { key: "test" value { text: "Something" } }
   }
   transaction {
-    # ANOMALY: Lima distinguishes empty string from no string
-    narration: ""
     flag: "*"
     postings {
       account: "Assets:Investments:MSFT"

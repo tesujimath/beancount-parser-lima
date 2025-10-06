@@ -219,10 +219,29 @@ where
             // a single string is narration
             (Some(s1), None) => (None, Some(s1)),
             (s1, s2) => (s1, s2),
+        })
+        .map(|(payee, narration)| {
+            (
+                replace_some_empty_with_none(payee),
+                replace_some_empty_with_none(narration),
+            )
         }),
         tags_links(),
     ))
     .then_ignore(just(Token::Eol))
+}
+
+fn replace_some_empty_with_none(s: Option<Spanned<&str>>) -> Option<Spanned<&str>> {
+    match s {
+        Some(maybe_empty) => {
+            if maybe_empty.is_empty() {
+                None
+            } else {
+                s
+            }
+        }
+        None => None,
+    }
 }
 
 /// Matches a price directive, including metadata, over several lines.
