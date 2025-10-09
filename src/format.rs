@@ -76,14 +76,6 @@ where
     lazy_format!("{}: {}", kv.0, kv.1)
 }
 
-fn pad_if(condition: bool) -> &'static str {
-    if condition {
-        " "
-    } else {
-        ""
-    }
-}
-
 pub const SPACE: &str = " ";
 pub const NEWLINE: &str = "\n";
 pub const INDENT: &str = "  ";
