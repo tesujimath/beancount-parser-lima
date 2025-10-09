@@ -77,6 +77,4 @@ where
 }
 
 pub const SPACE: &str = " ";
-pub const NEWLINE: &str = "\n";
-pub const INDENT: &str = "  ";
 pub const NEWLINE_INDENT: &str = "\n  ";
