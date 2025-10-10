@@ -102,16 +102,16 @@ where
                 }
             }
 
-            sources.write(error_w, warnings).unwrap();
+            sources.write_errors_or_warnings(error_w, warnings).unwrap();
 
             if !errors.is_empty() {
-                sources.write(error_w, errors).unwrap();
+                sources.write_errors_or_warnings(error_w, errors).unwrap();
             }
         }
 
         Err(ParseError { errors, warnings }) => {
-            sources.write(error_w, errors).unwrap();
-            sources.write(error_w, warnings).unwrap();
+            sources.write_errors_or_warnings(error_w, errors).unwrap();
+            sources.write_errors_or_warnings(error_w, warnings).unwrap();
         }
     }
 }

@@ -84,7 +84,7 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
                     let expected_message = expected.message().replace("'", "");
                     let actual_message = actual.message().replace("'", "");
                     if !actual_message.starts_with(&expected_message) {
-                        sources.write(stderr, vec![actual]).unwrap();
+                        sources.write_errors_or_warnings(stderr, vec![actual]).unwrap();
                         panic!(
                             "expected '{}' found '{}' at errors[{}]",
                             expected_message, actual_message, i,
@@ -92,7 +92,7 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
                     }
                 }
             } else {
-                sources.write(stderr, errors).unwrap();
+                sources.write_errors_or_warnings(stderr, errors).unwrap();
                 panic!(
                     "parse failed with {} errors, expected {}",
                     n_errors,

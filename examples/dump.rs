@@ -92,11 +92,11 @@ fn parse<W>(
                 eprintln!("Allocations after printing directives: {:#?}", reg.change());
             }
 
-            sources.write(error_w, warnings).unwrap();
+            sources.write_errors_or_warnings(error_w, warnings).unwrap();
         }
         Err(ParseError { errors, warnings }) => {
-            sources.write(error_w, errors).unwrap();
-            sources.write(error_w, warnings).unwrap();
+            sources.write_errors_or_warnings(error_w, errors).unwrap();
+            sources.write_errors_or_warnings(error_w, warnings).unwrap();
         }
     }
 }

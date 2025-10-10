@@ -70,13 +70,13 @@
 //!                }
 //!            }
 //!
-//!            sources.write(error_w, errors).unwrap();
-//!            sources.write(error_w, warnings).unwrap();
+//!            sources.write_errors_or_warnings(error_w, errors).unwrap();
+//!            sources.write_errors_or_warnings(error_w, warnings).unwrap();
 //!        }
 //!
 //!        Err(ParseError { errors, warnings }) => {
-//!            sources.write(error_w, errors).unwrap();
-//!            sources.write(error_w, warnings).unwrap();
+//!            sources.write_errors_or_warnings(error_w, errors).unwrap();
+//!            sources.write_errors_or_warnings(error_w, warnings).unwrap();
 //!        }
 //!    }
 //!}
@@ -258,7 +258,22 @@ impl BeancountSources {
         }
     }
 
-    pub fn write<W, E, K>(&self, mut w: W, errors_or_warnings: Vec<E>) -> io::Result<()>
+    #[deprecated(since = "0.12.0", note = "Use `write_errors_or_warnings` instead")]
+    pub fn write<W, E, K>(&self, w: W, errors_or_warnings: Vec<E>) -> io::Result<()>
+    where
+        W: Write + Copy,
+        E: Into<AnnotatedErrorOrWarning<K>>,
+        K: ErrorOrWarningKind,
+    {
+        self.write_errors_or_warnings(w, errors_or_warnings)
+    }
+
+    /// Write human-readable error reports.
+    pub fn write_errors_or_warnings<W, E, K>(
+        &self,
+        mut w: W,
+        errors_or_warnings: Vec<E>,
+    ) -> io::Result<()>
     where
         W: Write + Copy,
         E: Into<AnnotatedErrorOrWarning<K>>,
@@ -491,11 +506,11 @@ type SpannedToken<'t> = (Token<'t>, Span);
 ///                 println!("{}\n", &directive);
 ///             }
 ///    
-///             sources.write(error_w, warnings).unwrap();
+///             sources.write_errors_or_warnings(error_w, warnings).unwrap();
 ///         }
 ///         Err(ParseError { errors, warnings }) => {
-///             sources.write(error_w, errors).unwrap();
-///             sources.write(error_w, warnings).unwrap();
+///             sources.write_errors_or_warnings(error_w, errors).unwrap();
+///             sources.write_errors_or_warnings(error_w, warnings).unwrap();
 ///         }
 ///     }
 /// }
