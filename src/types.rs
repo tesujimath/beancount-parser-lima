@@ -162,26 +162,39 @@ where
     }
 }
 
+fn fmt_error_or_warning<K>(value: &ErrorOrWarning<K>, f: &mut Formatter<'_>) -> fmt::Result
+where
+    K: ErrorOrWarningKind,
+{
+    use chumsky::span::Span;
+
+    write!(f, "{} ({}) ", value.message, value.reason)?;
+    write!(
+        f,
+        "at {}..{} of source {}",
+        value.span.start(),
+        value.span.end(),
+        value.span.context()
+    )?;
+    for context in value.contexts.iter() {
+        write!(f, " while parsing {} at {}", context.0, context.1)?;
+    }
+    Ok(())
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use chumsky::span::Span;
-
-        write!(f, "{} ({}) ", self.message, self.reason)?;
-        write!(
-            f,
-            "at {}..{} of source {}",
-            self.span.start(),
-            self.span.end(),
-            self.span.context()
-        )?;
-        for context in self.contexts.iter() {
-            write!(f, " while parsing {} at {}", context.0, context.1)?;
-        }
-        Ok(())
+        fmt_error_or_warning(self, f)
     }
 }
 
 impl std::error::Error for Error {}
+
+impl Display for Warning {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        fmt_error_or_warning(self, f)
+    }
+}
 
 /// Trait for formatting of [Error] separately from [Warning].
 pub trait ErrorOrWarningKind {
