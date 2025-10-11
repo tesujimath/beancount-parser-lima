@@ -6,7 +6,7 @@ directives {
       account: "Assets:Account1"
       spec {
         units { number { exact: "2" } currency: "HOOL" }
-        # ANOMALY: Lima parser doesn't include empty cost spec in result
+        cost {}
       }
     }
     postings {

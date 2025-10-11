@@ -2421,16 +2421,6 @@ impl<'a> CostSpecBuilder<'a> {
             let mut errors = Vec::new();
             swap(&mut self.errors, &mut errors);
             Err(CostSpecErrors(errors))
-        } else if per_unit.is_none()
-            && total.is_none()
-            && currency.is_none()
-            && date.is_none()
-            && label.is_none()
-            && !merge
-        {
-            Err(CostSpecErrors(vec![CostSpecError(
-                CostSpecErrorKind::Empty,
-            )]))
         } else {
             Ok(CostSpec {
                 per_unit,
@@ -2458,7 +2448,6 @@ enum CostSpecErrorKind {
     Date,
     Label,
     MergeCost,
-    Empty,
 }
 
 impl CostSpecErrorKind {
@@ -2473,11 +2462,7 @@ impl CostSpecErrorKind {
 
 impl Display for CostSpecError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.0 == CostSpecErrorKind::Empty {
-            write!(f, "empty cost specification")
-        } else {
-            write!(f, "duplicate {} field in cost specification", self.0)
-        }
+        write!(f, "duplicate {} field in cost specification", self.0)
     }
 }
 

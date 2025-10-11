@@ -642,9 +642,7 @@ where
                 expr_value().map_with(spanned_extra).or_not(),
                 currency().map_with(spanned_extra).or_not(),
                 cost_spec().or_not().map_with(|cost_spec, e| {
-                    cost_spec
-                        .flatten()
-                        .map(|cost_spec| spanned(cost_spec, e.span()))
+                    cost_spec.map(|cost_spec| spanned(cost_spec, e.span()))
                 }),
                 price_annotation().or_not().map_with(|price_spec, e| {
                     price_spec.map(|price_spec| spanned(price_spec, e.span()))
@@ -927,7 +925,7 @@ where
 
 /// Matches a [CostSpec].
 /// For now we only match the new syntax of single braces.
-fn cost_spec<'s, I>() -> impl Parser<'s, I, Option<CostSpec<'s>>, Extra<'s>>
+fn cost_spec<'s, I>() -> impl Parser<'s, I, CostSpec<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
@@ -945,11 +943,10 @@ where
             .or_not(), // allow for empty cost spec
         )
         .then_ignore(just(Token::Rcurl))
-        .try_map(move |cost_spec, span| match cost_spec {
-            Some((head, tail)) => {
-                once(head)
-                    .chain(tail)
-                    .fold(
+        .try_map(move |cost_spec, span| {
+            let mut builder = match cost_spec {
+                Some((head, tail)) => {
+                    once(head).chain(tail).fold(
                         // accumulate the `CostComp`s in a `CostSpecBuilder`
                         CostSpecBuilder::default(),
                         |builder, cost_comp| match cost_comp.item {
@@ -965,11 +962,12 @@ where
                             Merge => builder.merge(cost_comp.span),
                         },
                     )
-                    .build()
-                    .map(Some)
-                    .map_err(|e| Rich::custom(span, e.to_string()))
-            }
-            None => Ok(None),
+                }
+                None => CostSpecBuilder::default(),
+            };
+            builder
+                .build()
+                .map_err(|e| Rich::custom(span, e.to_string()))
         })
 }
 
