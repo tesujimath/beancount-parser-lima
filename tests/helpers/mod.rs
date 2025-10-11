@@ -876,6 +876,7 @@ impl ExpectEq<PriceSpec> for lima::PriceSpec<'_> {
 
         // it seems that expected proto defaults to false for is_total
         let (currency, amount, is_total) = match self {
+            Unspecified => (None, None, false),
             BareCurrency(currency) => (Some(currency), None, false),
             BareAmount(PerUnit(expr)) => (None, Some(expr.value()), false),
             BareAmount(Total(expr)) => (None, Some(expr.value()), true),

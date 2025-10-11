@@ -2499,6 +2499,7 @@ impl std::error::Error for CostSpecErrors {}
 /// Unlike a `CompoundAmount` it is forbidden to have both total and per-unit.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PriceSpec<'a> {
+    Unspecified,
     BareCurrency(Currency<'a>),
     BareAmount(ScopedExprValue),
     CurrencyAmount(ScopedExprValue, Currency<'a>),
@@ -2508,6 +2509,7 @@ impl Display for PriceSpec<'_> {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use self::PriceSpec::*;
         match self {
+            Unspecified => Ok(()),
             BareCurrency(cur) => write!(format, "{}", cur),
             BareAmount(ce) => write!(format, "{}", ce),
             CurrencyAmount(ce, cur) => write!(format, "{} {}", ce, cur),
