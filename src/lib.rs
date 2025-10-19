@@ -285,6 +285,7 @@ impl BeancountSources {
                 error_or_warning,
                 annotation,
             } = error_or_warning.into();
+            let error_or_warning = *(error_or_warning.0);
             let (src_id, span) =
                 self.source_id_string_and_adjusted_rune_span(&error_or_warning.span);
             let color = error_or_warning.color();
@@ -332,7 +333,7 @@ impl BeancountSources {
         K: ErrorOrWarningKind,
     {
         let (source_content, _, byte_span, _rune_span) =
-            self.get_adjusted_source(&error_or_warning.span);
+            self.get_adjusted_source(&error_or_warning.0.span);
         &source_content[byte_span.start..byte_span.end]
     }
 

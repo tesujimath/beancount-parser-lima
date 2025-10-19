@@ -19,10 +19,17 @@ use time::Date;
 
 /// Error or warning, according to the marker type with which it is instantiated.
 #[derive(Clone, Debug)]
-pub struct ErrorOrWarning<K>
-where
-    K: ErrorOrWarningKind,
-{
+pub struct ErrorOrWarning<K>(pub(crate) Box<ErrorOrWarningImpl<K>>);
+
+impl<K> From<ErrorOrWarningImpl<K>> for ErrorOrWarning<K> {
+    fn from(value: ErrorOrWarningImpl<K>) -> Self {
+        Self(Box::new(value))
+    }
+}
+
+/// Error or warning, according to the marker type with which it is instantiated.
+#[derive(Clone, Debug)]
+pub(crate) struct ErrorOrWarningImpl<K> {
     pub(crate) message: String,
     pub(crate) reason: String,
     pub(crate) span: Span,
@@ -49,7 +56,7 @@ pub type Warning = ErrorOrWarning<WarningKind>;
 
 impl Error {
     pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
-        ErrorOrWarning {
+        ErrorOrWarningImpl {
             message: message.into(),
             reason: reason.into(),
             span,
@@ -57,6 +64,7 @@ impl Error {
             related: Vec::new(),
             kind: PhantomData,
         }
+        .into()
     }
 
     pub(crate) fn with_contexts<M: Into<String>, R: Into<String>>(
@@ -65,7 +73,7 @@ impl Error {
         span: Span,
         contexts: Vec<(String, Span)>,
     ) -> Self {
-        ErrorOrWarning {
+        ErrorOrWarningImpl {
             message: message.into(),
             reason: reason.into(),
             span,
@@ -73,12 +81,13 @@ impl Error {
             related: Vec::new(),
             kind: PhantomData,
         }
+        .into()
     }
 }
 
 impl Warning {
     pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
-        ErrorOrWarning {
+        ErrorOrWarningImpl {
             message: message.into(),
             reason: reason.into(),
             span,
@@ -86,6 +95,7 @@ impl Warning {
             related: Vec::new(),
             kind: PhantomData,
         }
+        .into()
     }
 }
 
@@ -99,7 +109,7 @@ where
         T: ElementType + 'a,
     {
         let mut e = self;
-        e.related
+        e.0.related
             .push((element.element_type().to_string(), element.span));
         e
     }
@@ -114,12 +124,12 @@ where
             .into_iter()
             .map(|element| (element.element_type().to_string(), element.span))
             .collect::<Vec<_>>();
-        e.related.append(&mut new_related);
+        e.0.related.append(&mut new_related);
         e
     }
 
     pub fn message(&self) -> &str {
-        self.message.as_str()
+        self.0.message.as_str()
     }
 
     pub(crate) fn related_to_named_span<S>(self, name: S, span: Span) -> Self
@@ -127,7 +137,7 @@ where
         S: ToString,
     {
         let mut e = self;
-        e.related.push((name.to_string(), span));
+        e.0.related.push((name.to_string(), span));
         e
     }
 
@@ -138,17 +148,9 @@ where
         T: ElementType,
     {
         let mut e = self;
-        e.contexts
+        e.0.contexts
             .push((element.element_type().to_string(), element.span));
         e
-    }
-
-    pub(crate) fn color(&self) -> ariadne::Color {
-        K::color()
-    }
-
-    pub(crate) fn report_kind(&self) -> ariadne::ReportKind<'static> {
-        K::report_kind()
     }
 
     pub fn with_annotation<S>(self, annotation: S) -> AnnotatedErrorOrWarning<K>
@@ -162,21 +164,34 @@ where
     }
 }
 
+impl<K> ErrorOrWarningImpl<K>
+where
+    K: ErrorOrWarningKind,
+{
+    pub(crate) fn color(&self) -> ariadne::Color {
+        K::color()
+    }
+
+    pub(crate) fn report_kind(&self) -> ariadne::ReportKind<'static> {
+        K::report_kind()
+    }
+}
+
 fn fmt_error_or_warning<K>(value: &ErrorOrWarning<K>, f: &mut Formatter<'_>) -> fmt::Result
 where
     K: ErrorOrWarningKind,
 {
     use chumsky::span::Span;
 
-    write!(f, "{} ({}) ", value.message, value.reason)?;
+    write!(f, "{} ({}) ", value.0.message, value.0.reason)?;
     write!(
         f,
         "at {}..{} of source {}",
-        value.span.start(),
-        value.span.end(),
-        value.span.context()
+        value.0.span.start(),
+        value.0.span.end(),
+        value.0.span.context()
     )?;
-    for context in value.contexts.iter() {
+    for context in value.0.contexts.iter() {
         write!(f, " while parsing {} at {}", context.0, context.1)?;
     }
     Ok(())
