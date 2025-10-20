@@ -1151,7 +1151,7 @@ impl ElementType for Account<'_> {
 }
 
 /// an account without the account type prefix
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Subaccount<'a>(&'a str);
 
 impl AsRef<str> for Subaccount<'_> {
@@ -1185,7 +1185,7 @@ impl<'a> TryFrom<&'a str> for Subaccount<'a> {
 }
 
 /// A validated name for an account type.
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct AccountTypeName<'a>(&'a str);
 
 impl AccountTypeName<'_> {
@@ -1286,7 +1286,7 @@ impl Display for AccountTypeNameError {
 impl std::error::Error for AccountTypeNameError {}
 
 /// One component of a colon-separated account.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone, Debug)]
 pub struct AccountName<'a>(&'a str);
 
 impl AccountName<'_> {
@@ -1381,7 +1381,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
 }
 
 /// A Beancount currency.
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Currency<'a>(&'a str);
 
 /// The valid intermediate characters for currency, in addition to ASCII uppercase and digits
@@ -1811,7 +1811,7 @@ impl AsRef<str> for Link<'_> {
 }
 
 /// The validated identifier part of a `Tag` or `Link` without the `#` or `^` prefix.
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct TagOrLinkIdentifier<'a>(&'a str);
 
 /// The valid characters for tags and links besides alphanumeric.
@@ -1871,7 +1871,7 @@ impl PartialEq<&str> for TagOrLinkIdentifier<'_> {
 }
 
 /// A key for a [Metadata] [MetaValue].
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Key<'a>(&'a str);
 
 impl Key<'_> {
