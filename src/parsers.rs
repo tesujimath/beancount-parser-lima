@@ -1,6 +1,6 @@
 use crate::{
     lexer::Token,
-    options::{BeancountOption, BeancountOptionError, ParserOptions},
+    options::{BeancountOption, BeancountOptionError, ParserOptions, DEFAULT_LONG_STRING_MAXLINES},
     types::*,
 };
 use chumsky::{input::BorrowInput, prelude::*};
@@ -1181,15 +1181,16 @@ where
         let parser_state: &mut ParserState = simple_state;
         let ParserState { warnings, options } = parser_state;
         let line_count = s.chars().filter(|c| *c == '\n').count() + 1;
-        if line_count > options.long_string_maxlines.item {
-            let option_span = options.long_string_maxlines.source.map(|s| s.value);
+        let long_string_maxlines = options.long_string_maxlines.as_ref().map(|n| *n.item()).unwrap_or(DEFAULT_LONG_STRING_MAXLINES);
+        if line_count > long_string_maxlines {
+            let option_span = options.long_string_maxlines.as_ref().map(|s| s.source.value);
             let is_default = option_span.is_none();
             let warning = Warning::new(
                 "string too long",
                 format!(
                     "exceeds long_string_maxlines({}{}) - hint: would require option \"long_string_maxlines\" \"{}\"",
                     if is_default { "default " } else { "" },
-                    options.long_string_maxlines.item,
+                    long_string_maxlines,
                     line_count
                 ),
                 span,

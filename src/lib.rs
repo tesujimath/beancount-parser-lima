@@ -919,7 +919,7 @@ pub use lexer::bare_lex;
 mod format;
 mod lexer;
 pub use options::Options;
-mod options;
+pub(crate) mod options;
 mod parsers;
 mod sort;
 mod trim;

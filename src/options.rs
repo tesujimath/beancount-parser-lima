@@ -1,7 +1,6 @@
 use super::format::{format, plain};
 use super::types::*;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use std::path::{Path, PathBuf};
 use std::{
     collections::{hash_map, HashMap},
@@ -300,21 +299,14 @@ impl BadValueErrorKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 /// ParserOptions are only those which affect the core parsing.
 pub(crate) struct ParserOptions<'a> {
     pub(crate) account_type_names: AccountTypeNames<'a>,
-    pub(crate) long_string_maxlines: OptionallySourced<usize>,
+    pub(crate) long_string_maxlines: Option<Sourced<usize>>,
 }
 
-impl Default for ParserOptions<'_> {
-    fn default() -> Self {
-        ParserOptions {
-            account_type_names: AccountTypeNames::default(),
-            long_string_maxlines: unsourced(64),
-        }
-    }
-}
+pub(crate) const DEFAULT_LONG_STRING_MAXLINES: usize = 64;
 
 impl<'a> ParserOptions<'a> {
     pub(crate) fn assimilate(
@@ -333,7 +325,7 @@ impl<'a> ParserOptions<'a> {
                 .map(|_| Assimilated),
 
             LongStringMaxlines(n) => {
-                self.long_string_maxlines = optionally_sourced(n, source);
+                self.long_string_maxlines = Some(sourced(n, source));
                 Ok(Assimilated)
             }
 
@@ -347,7 +339,10 @@ impl<'a> ParserOptions<'a> {
     }
 
     pub(crate) fn long_string_maxlines(&self) -> usize {
-        self.long_string_maxlines.item
+        self.long_string_maxlines
+            .as_ref()
+            .map(|sourced| *sourced.item())
+            .unwrap_or(DEFAULT_LONG_STRING_MAXLINES)
     }
 }
 
@@ -365,50 +360,46 @@ impl std::error::Error for ParserOptionsError {}
 /// All options read in from `option` pragmas, excluding those for internal processing only.
 #[derive(Debug)]
 pub struct Options<'a> {
-    title: OptionallySourced<&'a str>,
-    account_previous_balances: OptionallySourced<Subaccount<'a>>,
-    account_previous_earnings: OptionallySourced<Subaccount<'a>>,
-    account_previous_conversions: OptionallySourced<Subaccount<'a>>,
-    account_current_earnings: OptionallySourced<Subaccount<'a>>,
-    account_current_conversions: OptionallySourced<Subaccount<'a>>,
-    account_unrealized_gains: OptionallySourced<Subaccount<'a>>,
+    title: Option<Sourced<&'a str>>,
+    account_previous_balances: Option<Sourced<Subaccount<'a>>>,
+    account_previous_earnings: Option<Sourced<Subaccount<'a>>>,
+    account_previous_conversions: Option<Sourced<Subaccount<'a>>>,
+    account_current_earnings: Option<Sourced<Subaccount<'a>>>,
+    account_current_conversions: Option<Sourced<Subaccount<'a>>>,
+    account_unrealized_gains: Option<Sourced<Subaccount<'a>>>,
     account_rounding: Option<Sourced<Subaccount<'a>>>,
-    conversion_currency: OptionallySourced<Currency<'a>>,
+    conversion_currency: Option<Sourced<Currency<'a>>>,
     inferred_tolerance_default: HashMap<CurrencyOrAny<'a>, (Decimal, Source)>,
-    inferred_tolerance_multiplier: OptionallySourced<Decimal>,
-    infer_tolerance_from_cost: OptionallySourced<bool>,
+    inferred_tolerance_multiplier: Option<Sourced<Decimal>>,
+    infer_tolerance_from_cost: Option<Sourced<bool>>,
     documents: HashMap<PathBuf, Source>,
     operating_currency: HashMap<Currency<'a>, Source>,
-    render_commas: OptionallySourced<bool>,
-    booking_method: OptionallySourced<Booking>,
-    plugin_processing_mode: OptionallySourced<PluginProcessingMode>,
+    render_commas: Option<Sourced<bool>>,
+    booking_method: Option<Sourced<Booking>>,
+    plugin_processing_mode: Option<Sourced<PluginProcessingMode>>,
     parser_options: ParserOptions<'a>,
 }
 
 impl<'a> Options<'a> {
     pub(crate) fn new(parser_options: ParserOptions<'a>) -> Self {
         Options {
-            title: unsourced("Beancount"),
-            account_previous_balances: unsourced(parse_subaccount("Opening-Balances").unwrap()),
-            account_previous_earnings: unsourced(parse_subaccount("Earnings:Previous").unwrap()),
-            account_previous_conversions: unsourced(
-                parse_subaccount("Conversions:Previous").unwrap(),
-            ),
-            account_current_earnings: unsourced(parse_subaccount("Earnings:Current").unwrap()),
-            account_current_conversions: unsourced(
-                parse_subaccount("Conversions:Current").unwrap(),
-            ),
-            account_unrealized_gains: unsourced(parse_subaccount("Earnings:Unrealized").unwrap()),
+            title: None,
+            account_previous_balances: None,
+            account_previous_earnings: None,
+            account_previous_conversions: None,
+            account_current_earnings: None,
+            account_current_conversions: None,
+            account_unrealized_gains: None,
             account_rounding: None,
-            conversion_currency: unsourced(Currency::try_from("NOTHING").unwrap()),
+            conversion_currency: None,
             inferred_tolerance_default: HashMap::new(),
-            inferred_tolerance_multiplier: unsourced(dec!(0.5)),
-            infer_tolerance_from_cost: unsourced(false),
+            inferred_tolerance_multiplier: None,
+            infer_tolerance_from_cost: None,
             documents: HashMap::new(),
             operating_currency: HashMap::new(),
-            render_commas: unsourced(false),
-            booking_method: unsourced(Booking::Strict),
-            plugin_processing_mode: unsourced(PluginProcessingMode::Default),
+            render_commas: None,
+            booking_method: None,
+            plugin_processing_mode: None,
             parser_options,
         }
     }
@@ -419,38 +410,40 @@ impl<'a> Options<'a> {
 
         let BeancountOption { source, variant } = opt;
         match variant {
-            Title(value) => Self::update(&mut self.title, value, source),
+            Title(value) => Self::update_optional(&mut self.title, value, source),
 
             // already assimilated into ParserOptions
             AccountTypeName(_, _) => Ok(()),
 
             AccountPreviousBalances(value) => {
-                Self::update(&mut self.account_previous_balances, value, source)
+                Self::update_optional(&mut self.account_previous_balances, value, source)
             }
             AccountPreviousEarnings(value) => {
-                Self::update(&mut self.account_previous_earnings, value, source)
+                Self::update_optional(&mut self.account_previous_earnings, value, source)
             }
             AccountPreviousConversions(value) => {
-                Self::update(&mut self.account_previous_conversions, value, source)
+                Self::update_optional(&mut self.account_previous_conversions, value, source)
             }
 
             AccountCurrentEarnings(value) => {
-                Self::update(&mut self.account_current_earnings, value, source)
+                Self::update_optional(&mut self.account_current_earnings, value, source)
             }
 
             AccountCurrentConversions(value) => {
-                Self::update(&mut self.account_current_conversions, value, source)
+                Self::update_optional(&mut self.account_current_conversions, value, source)
             }
 
             AccountUnrealizedGains(value) => {
-                Self::update(&mut self.account_unrealized_gains, value, source)
+                Self::update_optional(&mut self.account_unrealized_gains, value, source)
             }
 
             AccountRounding(value) => {
                 Self::update_optional(&mut self.account_rounding, value, source)
             }
 
-            ConversionCurrency(value) => Self::update(&mut self.conversion_currency, value, source),
+            ConversionCurrency(value) => {
+                Self::update_optional(&mut self.conversion_currency, value, source)
+            }
 
             InferredToleranceDefault(currency_or_any, tolerance) => Self::update_hashmap(
                 &mut self.inferred_tolerance_default,
@@ -460,11 +453,11 @@ impl<'a> Options<'a> {
             ),
 
             InferredToleranceMultiplier(value) => {
-                Self::update(&mut self.inferred_tolerance_multiplier, value, source)
+                Self::update_optional(&mut self.inferred_tolerance_multiplier, value, source)
             }
 
             InferToleranceFromCost(value) => {
-                Self::update(&mut self.infer_tolerance_from_cost, value, source)
+                Self::update_optional(&mut self.infer_tolerance_from_cost, value, source)
             }
 
             Documents(path) => Self::update_unit_hashmap(&mut self.documents, path, source),
@@ -473,15 +466,15 @@ impl<'a> Options<'a> {
                 Self::update_unit_hashmap(&mut self.operating_currency, value, source)
             }
 
-            RenderCommas(value) => Self::update(&mut self.render_commas, value, source),
+            RenderCommas(value) => Self::update_optional(&mut self.render_commas, value, source),
 
             // already assimilated into ParserOptions
             LongStringMaxlines(_) => Ok(()),
 
-            BookingMethod(value) => Self::update(&mut self.booking_method, value, source),
+            BookingMethod(value) => Self::update_optional(&mut self.booking_method, value, source),
 
             PluginProcessingMode(value) => {
-                Self::update(&mut self.plugin_processing_mode, value, source)
+                Self::update_optional(&mut self.plugin_processing_mode, value, source)
             }
 
             // this value contains nothing
@@ -493,22 +486,6 @@ impl<'a> Options<'a> {
             DuplicateValue(span) => Error::new("invalid option", "duplicate value", source.value)
                 .related_to_named_span("option value", *span),
         })
-    }
-
-    fn update<T>(
-        field: &mut OptionallySourced<T>,
-        value: T,
-        source: Source,
-    ) -> Result<(), OptionError> {
-        use OptionError::*;
-
-        match &field.source {
-            None => {
-                *field = optionally_sourced(value, source);
-                Ok(())
-            }
-            Some(source) => Err(DuplicateOption(source.name)),
-        }
     }
 
     fn update_optional<T>(
@@ -575,40 +552,44 @@ impl<'a> Options<'a> {
         self.parser_options.account_type_name(account_type)
     }
 
-    pub fn title(&self) -> &str {
-        self.title.item
+    pub fn title(&self) -> Option<&Spanned<&str>> {
+        self.title.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_balances(&self) -> &Subaccount {
-        &self.account_previous_balances.item
+    pub fn account_previous_balances(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_previous_balances.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_earnings(&self) -> &Subaccount {
-        &self.account_previous_earnings.item
+    pub fn account_previous_earnings(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_previous_earnings.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_conversions(&self) -> &Subaccount {
-        &self.account_previous_conversions.item
+    pub fn account_previous_conversions(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_previous_conversions
+            .as_ref()
+            .map(|x| &x.spanned)
     }
 
-    pub fn account_current_earnings(&self) -> &Subaccount {
-        &self.account_current_earnings.item
+    pub fn account_current_earnings(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_current_earnings.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_current_conversions(&self) -> &Subaccount {
-        &self.account_current_conversions.item
+    pub fn account_current_conversions(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_current_conversions
+            .as_ref()
+            .map(|x| &x.spanned)
     }
 
-    pub fn account_unrealized_gains(&self) -> &Subaccount {
-        &self.account_unrealized_gains.item
+    pub fn account_unrealized_gains(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_unrealized_gains.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_rounding(&self) -> Option<&Subaccount> {
-        self.account_rounding.as_ref().map(|x| &x.item)
+    pub fn account_rounding(&self) -> Option<&Spanned<Subaccount>> {
+        self.account_rounding.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn conversion_currency(&self) -> &Currency {
-        &self.conversion_currency.item
+    pub fn conversion_currency(&self) -> Option<&Spanned<Currency>> {
+        self.conversion_currency.as_ref().map(|x| &x.spanned)
     }
 
     /// return the tolerance default for one particular currency
@@ -639,12 +620,14 @@ impl<'a> Options<'a> {
             })
     }
 
-    pub fn inferred_tolerance_multiplier(&self) -> Decimal {
-        self.inferred_tolerance_multiplier.item
+    pub fn inferred_tolerance_multiplier(&self) -> Option<&Spanned<Decimal>> {
+        self.inferred_tolerance_multiplier
+            .as_ref()
+            .map(|x| &x.spanned)
     }
 
-    pub fn infer_tolerance_from_cost(&self) -> bool {
-        self.infer_tolerance_from_cost.item
+    pub fn infer_tolerance_from_cost(&self) -> Option<&Spanned<bool>> {
+        self.infer_tolerance_from_cost.as_ref().map(|x| &x.spanned)
     }
 
     pub fn documents(&self) -> impl Iterator<Item = &PathBuf> {
@@ -655,27 +638,30 @@ impl<'a> Options<'a> {
         self.operating_currency.iter().map(|document| document.0)
     }
 
-    pub fn render_commas(&self) -> bool {
-        self.render_commas.item
+    pub fn render_commas(&self) -> Option<&Spanned<bool>> {
+        self.render_commas.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn booking_method(&self) -> Booking {
-        self.booking_method.item
+    pub fn booking_method(&self) -> Option<&Spanned<Booking>> {
+        self.booking_method.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn plugin_processing_mode(&self) -> PluginProcessingMode {
-        self.plugin_processing_mode.item
+    pub fn plugin_processing_mode(&self) -> Option<&Spanned<PluginProcessingMode>> {
+        self.plugin_processing_mode.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn long_string_maxlines(&self) -> usize {
-        self.parser_options.long_string_maxlines.item
+    pub fn long_string_maxlines(&self) -> Option<&Spanned<usize>> {
+        self.parser_options
+            .long_string_maxlines
+            .as_ref()
+            .map(|x| &x.spanned)
     }
 }
 
 #[derive(Debug)]
-struct Sourced<T> {
-    item: T,
-    source: Source,
+pub(crate) struct Sourced<T> {
+    pub(crate) spanned: Spanned<T>,
+    pub(crate) source: Source,
 }
 
 impl<T> PartialEq for Sourced<T>
@@ -683,30 +669,22 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.item.eq(&other.item)
+        self.spanned.eq(&other.spanned)
     }
 }
 
 impl<T> Eq for Sourced<T> where T: Eq {}
 
 fn sourced<T>(item: T, source: Source) -> Sourced<T> {
-    Sourced { item, source }
+    Sourced {
+        spanned: spanned(item, source.value),
+        source,
+    }
 }
 
-#[derive(Debug)]
-pub(crate) struct OptionallySourced<T> {
-    pub(crate) item: T,
-    pub(crate) source: Option<Source>,
-}
-
-fn unsourced<T>(item: T) -> OptionallySourced<T> {
-    OptionallySourced { item, source: None }
-}
-
-fn optionally_sourced<T>(item: T, source: Source) -> OptionallySourced<T> {
-    OptionallySourced {
-        item,
-        source: Some(source),
+impl<T> Sourced<T> {
+    pub(crate) fn item(&self) -> &T {
+        &self.spanned.item
     }
 }
 

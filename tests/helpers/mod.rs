@@ -13,7 +13,6 @@ use ::beancount_parser_lima as lima;
 use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -84,7 +83,9 @@ fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: 
                     let expected_message = expected.message().replace("'", "");
                     let actual_message = actual.message().replace("'", "");
                     if !actual_message.starts_with(&expected_message) {
-                        sources.write_errors_or_warnings(stderr, vec![actual]).unwrap();
+                        sources
+                            .write_errors_or_warnings(stderr, vec![actual])
+                            .unwrap();
                         panic!(
                             "expected '{}' found '{}' at errors[{}]",
                             expected_message, actual_message, i,
@@ -647,66 +648,47 @@ impl ExpectEq<Options> for lima::Options<'_> {
         // The defaults come from:
         // https://github.com/beancount/beancount/blob/master/beancount/parser/options.py#L238
 
-        self.title().expect_eq(
-            expected.title.as_deref().unwrap_or("Beancount"),
-            ctx.with("title"),
-        );
+        self.title()
+            .item()
+            .expect_eq(&expected.title.as_ref(), ctx.with("title"));
 
-        self.account_previous_balances().expect_eq(
-            expected
-                .account_previous_balances
-                .as_deref()
-                .unwrap_or("Opening-Balances"),
+        self.account_previous_balances().item().expect_eq(
+            &expected.account_previous_balances.as_ref(),
             ctx.with("account_previous_balances"),
         );
 
-        self.account_previous_earnings().expect_eq(
-            expected
-                .account_previous_earnings
-                .as_deref()
-                .unwrap_or("Earnings:Previous"),
+        self.account_previous_earnings().item().expect_eq(
+            &expected.account_previous_earnings.as_ref(),
             ctx.with("account_previous_earnings"),
         );
 
-        self.account_previous_conversions().expect_eq(
-            expected
-                .account_previous_conversions
-                .as_deref()
-                .unwrap_or("Conversions:Previous"),
+        self.account_previous_conversions().item().expect_eq(
+            &expected.account_previous_conversions.as_ref(),
             ctx.with("account_previous_conversions"),
         );
 
-        self.account_current_earnings().expect_eq(
-            expected
-                .account_current_earnings
-                .as_deref()
-                .unwrap_or("Earnings:Current"),
+        self.account_current_earnings().item().expect_eq(
+            &expected.account_current_earnings.as_ref(),
             ctx.with("account_current_earnings"),
         );
 
-        self.account_current_conversions().expect_eq(
-            expected
-                .account_current_conversions
-                .as_deref()
-                .unwrap_or("Conversions:Current"),
+        self.account_current_conversions().item().expect_eq(
+            &expected.account_current_conversions.as_ref(),
             ctx.with("account_current_conversions"),
         );
 
-        self.account_unrealized_gains().expect_eq(
-            expected
-                .account_unrealized_gains
-                .as_deref()
-                .unwrap_or("Earnings:Unrealized"),
+        self.account_unrealized_gains().item().expect_eq(
+            &expected.account_unrealized_gains.as_ref(),
             ctx.with("account_unrealized_gains"),
         );
 
-        self.account_rounding().expect_eq(
+        self.account_rounding().item().expect_eq(
             &expected.account_rounding.as_ref(),
             ctx.with("account_rounding"),
         );
 
-        self.conversion_currency().expect_eq(
-            expected.conversion_currency.as_deref().unwrap_or("NOTHING"),
+        self.conversion_currency().item().as_ref().expect_eq(
+            &expected.conversion_currency.as_ref(),
             ctx.with("conversion_currency"),
         );
 
@@ -718,19 +700,18 @@ impl ExpectEq<Options> for lima::Options<'_> {
             );
 
         assert_eq!(
-            self.inferred_tolerance_multiplier(),
+            self.inferred_tolerance_multiplier().item().copied(),
             expected
                 .inferred_tolerance_multiplier
                 .as_ref()
-                .map(|s| Decimal::from_str_exact(s).unwrap())
-                .unwrap_or(dec!(0.5)),
+                .map(|s| Decimal::from_str_exact(s).unwrap()),
             "{}",
             ctx.with("inferred_tolerance_multiplier")
         );
 
         assert_eq!(
-            self.infer_tolerance_from_cost(),
-            expected.infer_tolerance_from_cost.unwrap_or(false),
+            self.infer_tolerance_from_cost().item().copied(),
+            expected.infer_tolerance_from_cost,
             "{}",
             ctx.with("infer_tolerance_from_cost")
         );
@@ -744,25 +725,33 @@ impl ExpectEq<Options> for lima::Options<'_> {
             .expect_eq(&expected.operating_currency, ctx.with("operating_currency"));
 
         assert_eq!(
-            self.render_commas(),
-            expected.render_commas.unwrap_or(false),
+            self.render_commas().item().copied(),
+            expected.render_commas,
             "{}",
             ctx.with("render_commas")
         );
 
-        self.booking_method().expect_eq(
-            &expected
-                .booking_method
-                .map(|b| b.enum_value().unwrap())
-                .unwrap_or(Booking::STRICT),
-            ctx.with("booking_method"),
-        );
+        let expected_booking_method = expected
+            .booking_method
+            .as_ref()
+            .map(|expected| expected.unwrap());
+        self.booking_method()
+            .map(|booking| booking.item())
+            .expect_eq(
+                &expected_booking_method.as_ref(),
+                ctx.with("booking_method"),
+            );
 
-        let expected_plugin_processing_mode = expected.plugin_processing_mode();
-        self.plugin_processing_mode().expect_eq(
-            &expected_plugin_processing_mode,
-            ctx.with("plugin_processing_mode"),
-        );
+        let expected_plugin_processing_mode = expected
+            .plugin_processing_mode
+            .as_ref()
+            .map(|expected| expected.unwrap());
+        self.plugin_processing_mode()
+            .map(|mode| mode.item())
+            .expect_eq(
+                &expected_plugin_processing_mode.as_ref(),
+                ctx.with("plugin_processing_mode"),
+            );
 
         // account type names must be checked individually
         fn expected_account_type<'a, F>(
