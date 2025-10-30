@@ -20,6 +20,8 @@ The slightly strange name is because of a somewhat careless failure on my part t
 
 ## Status
 
+This parser is used by [Lima](https://github.com/tesujimath/beancount-lima), a new Beancount implementation in Rust and Scheme, by the same author.
+
 - comprehensive test-suite from main Beancount repo is [incorporated](test-cases), modulo a few [unsupported cases](test-cases-unsupported).
 
 - the Python bindings have been removed to a [separate repo](https://github.com/tesujimath/beancount-parser-lima-python) and demoted in status to proof-of-concept
@@ -44,17 +46,9 @@ This is important as semantic errors are not the business of the core parser to 
 cargo run --example check -- ./examples/data/full.beancount
 ```
 
-## Uncertainties / TODOs
-
-Yeah, Beancount is complicated, and I may have made some mistakes here.  Current list of uncertainties, which is certainly not comprehensive.
-
-- metadata tags/links for a directive get folded in with those in the directive header line
-
 ## Unsupported
 
 This is an incomplete list of what is currently unsupported.
-
-- custom directive
 
 ### Unsupported Options
 
