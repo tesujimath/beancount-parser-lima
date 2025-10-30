@@ -493,6 +493,17 @@ impl<T> Spanned<T> {
             span: self.span,
         }
     }
+
+    /// Like map but moving self into a new mapped value, with the same span.
+    pub fn map_into<U, F>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned {
+            item: f(self.item),
+            span: self.span,
+        }
+    }
 }
 
 impl<T> Spanned<T>
@@ -653,6 +664,7 @@ impl ElementType for Directive<'_> {
             Note(_) => "note",
             Event(_) => "event",
             Query(_) => "query",
+            Custom(_) => "custom",
         }
     }
 }
@@ -673,6 +685,7 @@ impl Display for Directive<'_> {
             Note(x) => x.fmt(f, self.date.item, &self.metadata),
             Event(x) => x.fmt(f, self.date.item, &self.metadata),
             Query(x) => x.fmt(f, self.date.item, &self.metadata),
+            Custom(x) => x.fmt(f, self.date.item, &self.metadata),
         }
     }
 }
@@ -691,7 +704,7 @@ pub enum DirectiveVariant<'a> {
     Note(Note<'a>),
     Event(Event<'a>),
     Query(Query<'a>),
-    // TODO Custom
+    Custom(Custom<'a>),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -1031,6 +1044,33 @@ impl Query<'_> {
     /// Field accessor.
     pub fn content(&self) -> &Spanned<&str> {
         &self.content
+    }
+}
+
+/// A Beancount custom directive, without the common [Directive] fields.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Custom<'a> {
+    pub(crate) type_: Spanned<&'a str>,
+    pub(crate) values: Vec<Spanned<MetaValue<'a>>>,
+}
+
+impl Custom<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
+        write!(f, "{} custom \"{}\"", date, self.type_)?;
+        format(f, &self.values, plain, SPACE, Some(SPACE))?;
+        // show tags and links on separate lines rather than inline to avoid ambiguity with custom values
+        metadata.fmt_tags_links_on_separate_lines(f)?;
+        metadata.fmt_keys_values(f)
+    }
+
+    /// Field accessor.
+    pub fn type_(&self) -> &Spanned<&str> {
+        &self.type_
+    }
+
+    /// Field accessor.
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &Spanned<MetaValue>> {
+        self.values.iter()
     }
 }
 
@@ -1639,6 +1679,11 @@ impl Metadata<'_> {
         format(f, &self.links, plain, SPACE, Some(SPACE))
     }
 
+    pub(crate) fn fmt_tags_links_on_separate_lines(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        format(f, &self.tags, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))?;
+        format(f, &self.links, plain, NEWLINE_INDENT, Some(NEWLINE_INDENT))
+    }
+
     pub(crate) fn fmt_keys_values(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format(
             f,
@@ -1698,7 +1743,7 @@ pub enum SimpleValue<'a> {
     Link(Link<'a>),
     Date(Date),
     Bool(bool),
-    None,
+    Null,
     Expr(ExprValue),
 }
 
@@ -1720,7 +1765,7 @@ impl Display for SimpleValue<'_> {
             Link(x) => x.fmt(f),
             Date(x) => x.fmt(f),
             Bool(x) => f.write_str(if *x { "TRUE" } else { "FALSE" }),
-            None => Ok(()),
+            Null => f.write_str("NULL"),
             Expr(x) => x.fmt(f),
         }
     }

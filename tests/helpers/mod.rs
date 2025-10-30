@@ -1,7 +1,7 @@
 use self::beancount::{
     data::{
-        meta::KV, meta_value, Amount, Balance, Close, Commodity, Directive, Document, Error, Event,
-        MetaValue, Note, Open, Pad, Posting, Price, Query, Transaction,
+        meta::KV, meta_value, Amount, Balance, Close, Commodity, Custom, Directive, Document,
+        Error, Event, MetaValue, Note, Open, Pad, Posting, Price, Query, Transaction,
     },
     date::Date,
     inter::{CostSpec, PriceSpec},
@@ -289,6 +289,10 @@ impl ExpectEq<Directive> for lima::Directive<'_> {
                 variant.expect_eq(expected.query(), ctx.with("query"));
             }
 
+            lima::DirectiveVariant::Custom(variant) if expected.has_custom() => {
+                variant.expect_eq(expected.custom(), ctx.with("custom"));
+            }
+
             _ => panic!(
                 "mismatched directive variant: got {}, expected {:?} {}",
                 self, &expected, &ctx
@@ -423,6 +427,17 @@ impl ExpectEq<Query> for lima::Query<'_> {
             .expect_eq_unwrapped(expected.name.as_ref(), ctx.with("name"));
         self.content()
             .expect_eq_unwrapped(expected.query_string.as_ref(), ctx.with("content"));
+    }
+}
+
+impl ExpectEq<Custom> for lima::Custom<'_> {
+    fn expect_eq(&self, expected: &Custom, ctx: Context) {
+        self.type_()
+            .expect_eq_unwrapped(expected.type_.as_ref(), ctx.with("type"));
+        self.values()
+            .map(|value| value.item())
+            .collect::<Vec<_>>()
+            .expect_eq(&expected.values, ctx.clone());
     }
 }
 
@@ -627,7 +642,7 @@ impl ExpectEq<MetaValue> for lima::MetaValue<'_> {
                 actual.expect_eq(expected, ctx.with("boolean"))
             }
 
-            (Simple(SimpleValue::None), None) => (),
+            (Simple(SimpleValue::Null), None) => (),
 
             (Simple(Expr(actual)), Some(Value::Number(expected))) => {
                 actual.value().expect_eq(expected, ctx.with("number"))
@@ -638,6 +653,15 @@ impl ExpectEq<MetaValue> for lima::MetaValue<'_> {
             }
 
             _ => panic!("mismatched metavalue at {}", &ctx),
+        }
+    }
+}
+
+impl<'a> ExpectEq<Vec<MetaValue>> for Vec<&'a lima::MetaValue<'a>> {
+    fn expect_eq(&self, expected: &Vec<MetaValue>, ctx: Context) {
+        assert_eq!(self.len(), expected.len(), "meta_values.len");
+        for (i, (actual, expected)) in self.iter().zip(expected.iter()).enumerate() {
+            actual.expect_eq(expected, ctx.with(format!("meta_values[{}]", i)))
         }
     }
 }

@@ -11,11 +11,9 @@ directives {
     values {
       boolean: true
     }
+    # ANOMALY: Lima parses as amount rather than separate number and currency
     values {
-      number { exact: "43.03" }
-    }
-    values {
-      currency: "USD"
+      amount { number { exact: "43.03" } currency: "USD" }
     }
     values {
       number { exact: "23" }

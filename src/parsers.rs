@@ -73,7 +73,7 @@ where
             note(),
             event(),
             query(),
-            // TODO custom
+            custom(),
         ))
         .labelled("directive")
         .as_context(),
@@ -607,6 +607,29 @@ where
     )
 }
 
+/// Matches a custom, including metadata, over several lines.
+pub(crate) fn custom<'s, I>() -> impl Parser<'s, I, Directive<'s>, Extra<'s>>
+where
+    I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
+{
+    group((
+        date().map_with(spanned_extra),
+        just(Token::Custom),
+        string().map_with(spanned_extra),
+        meta_value()
+            .map_with(spanned_extra)
+            .repeated()
+            .collect::<Vec<_>>(),
+    ))
+    .then_ignore(just(Token::Eol))
+    .then(metadata().map_with(spanned_extra))
+    .map(|((date, _, type_, values), metadata)| Directive {
+        date,
+        metadata,
+        variant: DirectiveVariant::Custom(Custom { type_, values }),
+    })
+}
+
 /// Matches the `txn` keyword or a flag.
 pub(crate) fn txn<'s, I>() -> impl Parser<'s, I, Flag, Extra<'s>>
 where
@@ -748,8 +771,11 @@ where
 {
     key()
         .map_with(spanned_extra)
-        .then(just(Token::Colon).ignore_then(meta_value().map_with(spanned_extra)))
-        .map(|(key, value)| MetaKeyValue { key, value })
+        .then(just(Token::Colon).ignore_then(meta_value().or_not().map_with(spanned_extra)))
+        .map(|(key, value)| MetaKeyValue {
+            key,
+            value: value.map_into(|value| value.unwrap_or(MetaValue::Simple(SimpleValue::Null))),
+        })
 }
 
 /// Matches a single Metadatum on a single line.
@@ -772,7 +798,7 @@ where
         .as_context()
 }
 
-/// Matches a [MetaValue].
+/// Matches a non-empty [MetaValue].
 pub(crate) fn meta_value<'s, I>() -> impl Parser<'s, I, MetaValue<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
@@ -783,7 +809,7 @@ where
     choice((amount().map(Amount), simple_value().map(Simple)))
 }
 
-/// Matches a [SimpleValue].
+/// Matches a non-empty [SimpleValue].
 pub(crate) fn simple_value<'s, I>() -> impl Parser<'s, I, SimpleValue<'s>, Extra<'s>>
 where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
@@ -798,9 +824,8 @@ where
         link().map(Link),
         date().map(Date),
         bool().map(Bool),
-        just(Token::Null).to(None),
+        just(Token::Null).to(Null),
         expr_value().map(Expr),
-        empty().to(None),
     ))
 }
 
