@@ -295,21 +295,21 @@ impl From<RecoveryToken> for Token<'_> {
 /// and forcing a final `Eol` in case missing.
 ///
 /// Lexing errors are returned as `Error` tokens.
-pub fn lex(s: &str) -> impl Iterator<Item = RangedToken> {
+pub fn lex<'a>(s: &'a str) -> impl Iterator<Item = RangedToken<'a>> {
     let end_of_input = s.len()..s.len();
     lex_with_final_eol(s, Some(end_of_input))
 }
 
 /// Lex the input discarding empty lines.
 #[cfg(test)]
-pub fn bare_lex(s: &str) -> impl Iterator<Item = RangedToken> {
+pub fn bare_lex<'a>(s: &'a str) -> impl Iterator<Item = RangedToken<'a>> {
     lex_with_final_eol(s, None)
 }
 
-fn lex_with_final_eol(
-    s: &str,
+fn lex_with_final_eol<'a>(
+    s: &'a str,
     final_eol: Option<Range<usize>>,
-) -> impl Iterator<Item = RangedToken> {
+) -> impl Iterator<Item = RangedToken<'a>> {
     Token::lexer(s)
         .spanned()
         .attempt_recovery(s)
@@ -681,7 +681,7 @@ fn parse_time(s: &str) -> Result<Time, LexerError> {
 
 // Unescape string literal using the inverse of std::ascii::escape_default
 // https://doc.rust-lang.org/std/ascii/fn.escape_default.html
-fn unescape_string_literal(s: &str) -> Result<Cow<str>, LexerError> {
+fn unescape_string_literal<'a>(s: &'a str) -> Result<Cow<'a, str>, LexerError> {
     if s.contains('\\') {
         unescape(s)
             .map(Cow::Owned)

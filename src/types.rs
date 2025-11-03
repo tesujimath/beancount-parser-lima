@@ -618,6 +618,9 @@ where
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+// The Directive is much bigger than the pragma, but there are hardly any
+// pragmas expected, so boxing the directive would be worse than not boxing.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Declaration<'a> {
     Directive(Directive<'a>),
     Pragma(Pragma<'a>),
@@ -631,19 +634,19 @@ pub struct Directive<'a> {
     pub(crate) variant: DirectiveVariant<'a>,
 }
 
-impl Directive<'_> {
+impl<'a> Directive<'a> {
     /// Field accessor.
     pub fn date(&self) -> &Spanned<Date> {
         &self.date
     }
 
     /// Field accessor.
-    pub fn metadata(&self) -> &Metadata {
+    pub fn metadata(&self) -> &Metadata<'a> {
         &self.metadata
     }
 
     /// Field accessor.
-    pub fn variant(&self) -> &DirectiveVariant {
+    pub fn variant(&self) -> &DirectiveVariant<'a> {
         &self.variant
     }
 }
@@ -729,7 +732,7 @@ pub struct Transaction<'a> {
     pub(crate) postings: Vec<Spanned<Posting<'a>>>,
 }
 
-impl Transaction<'_> {
+impl<'a> Transaction<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} {}", date, self.flag)?;
 
@@ -763,7 +766,7 @@ impl Transaction<'_> {
     }
 
     /// Field accessor.
-    pub fn postings(&self) -> impl ExactSizeIterator<Item = &Spanned<Posting>> {
+    pub fn postings(&self) -> impl ExactSizeIterator<Item = &Spanned<Posting<'a>>> {
         self.postings.iter()
     }
 }
@@ -775,7 +778,7 @@ pub struct Price<'a> {
     pub(crate) amount: Spanned<Amount<'a>>,
 }
 
-impl Price<'_> {
+impl<'a> Price<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} price {} {}", date, &self.currency, &self.amount)?;
 
@@ -787,12 +790,12 @@ impl Price<'_> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<Currency> {
+    pub fn currency(&self) -> &Spanned<Currency<'a>> {
         &self.currency
     }
 
     /// Field accessor.
-    pub fn amount(&self) -> &Spanned<Amount> {
+    pub fn amount(&self) -> &Spanned<Amount<'a>> {
         &self.amount
     }
 }
@@ -810,7 +813,7 @@ pub struct Balance<'a> {
     pub(crate) atol: Spanned<AmountWithTolerance<'a>>,
 }
 
-impl Balance<'_> {
+impl<'a> Balance<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} balance {} {}", date, &self.account, &self.atol)?;
 
@@ -822,12 +825,12 @@ impl Balance<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
     /// Field accessor.
-    pub fn atol(&self) -> &Spanned<AmountWithTolerance> {
+    pub fn atol(&self) -> &Spanned<AmountWithTolerance<'a>> {
         &self.atol
     }
 }
@@ -846,7 +849,7 @@ pub struct Open<'a> {
     pub(crate) booking: Option<Spanned<Booking>>,
 }
 
-impl Open<'_> {
+impl<'a> Open<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} open {}", date, self.account)?;
         format(f, &self.currencies, plain, ",", Some(" "))?;
@@ -857,12 +860,12 @@ impl Open<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
     /// Field accessor.
-    pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<Currency>> {
+    pub fn currencies(&self) -> impl ExactSizeIterator<Item = &Spanned<Currency<'a>>> {
         self.currencies.iter()
     }
 
@@ -878,7 +881,7 @@ pub struct Close<'a> {
     pub(crate) account: Spanned<Account<'a>>,
 }
 
-impl Close<'_> {
+impl<'a> Close<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} close {}", date, self.account)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -887,7 +890,7 @@ impl Close<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 }
@@ -898,7 +901,7 @@ pub struct Commodity<'a> {
     pub(crate) currency: Spanned<Currency<'a>>,
 }
 
-impl Commodity<'_> {
+impl<'a> Commodity<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} commodity {}", date, self.currency)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -907,7 +910,7 @@ impl Commodity<'_> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<Currency> {
+    pub fn currency(&self) -> &Spanned<Currency<'a>> {
         &self.currency
     }
 }
@@ -919,7 +922,7 @@ pub struct Pad<'a> {
     pub(crate) source: Spanned<Account<'a>>,
 }
 
-impl Pad<'_> {
+impl<'a> Pad<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} pad {} {}", date, self.account, self.source)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -928,12 +931,12 @@ impl Pad<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
     /// Field accessor.
-    pub fn source(&self) -> &Spanned<Account> {
+    pub fn source(&self) -> &Spanned<Account<'a>> {
         &self.source
     }
 }
@@ -945,7 +948,7 @@ pub struct Document<'a> {
     pub(crate) path: Spanned<&'a str>,
 }
 
-impl Document<'_> {
+impl<'a> Document<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} document {} \"{}\"", date, self.account, self.path)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -954,7 +957,7 @@ impl Document<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
@@ -972,7 +975,7 @@ pub struct Note<'a> {
     pub(crate) comment: Spanned<&'a str>,
 }
 
-impl Note<'_> {
+impl<'a> Note<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} note {} \"{}\"", date, self.account, self.comment)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -981,7 +984,7 @@ impl Note<'_> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
@@ -1054,7 +1057,7 @@ pub struct Custom<'a> {
     pub(crate) values: Vec<Spanned<MetaValue<'a>>>,
 }
 
-impl Custom<'_> {
+impl<'a> Custom<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} custom \"{}\"", date, self.type_)?;
         format(f, &self.values, plain, SPACE, Some(SPACE))?;
@@ -1069,7 +1072,7 @@ impl Custom<'_> {
     }
 
     /// Field accessor.
-    pub fn values(&self) -> impl ExactSizeIterator<Item = &Spanned<MetaValue>> {
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &Spanned<MetaValue<'a>>> {
         self.values.iter()
     }
 }
@@ -1081,7 +1084,7 @@ pub struct Plugin<'a> {
     pub(crate) config: Option<Spanned<&'a str>>,
 }
 
-impl Plugin<'_> {
+impl<'a> Plugin<'a> {
     /// Field accessor.
     pub fn module_name(&self) -> &Spanned<&str> {
         &self.module_name
@@ -1252,7 +1255,7 @@ impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
                 Err(AccountTypeNameError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter(|c| (!AccountTypeName::is_valid_subsequent(c)))
+                    .filter(|c| !AccountTypeName::is_valid_subsequent(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
                     Ok(AccountTypeName(s))
@@ -1408,7 +1411,7 @@ impl<'a> TryFrom<&'a str> for AccountName<'a> {
                 Err(AccountNameError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter(|c| (!AccountName::is_valid_subsequent(c)))
+                    .filter(|c| !AccountName::is_valid_subsequent(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
                     Ok(AccountName(s))
@@ -1535,7 +1538,7 @@ impl<'a> TryFrom<&'a str> for Currency<'a> {
             } else {
                 let bad_intermediates = intermediate
                     .into_iter()
-                    .filter(|c| (!Currency::is_valid_intermediate(c)))
+                    .filter(|c| !Currency::is_valid_intermediate(c))
                     .collect::<Vec<char>>();
                 if !bad_intermediates.is_empty() {
                     Err(CurrencyError(Intermediate(bad_intermediates)))
@@ -1568,7 +1571,7 @@ impl<'a> Posting<'a> {
     }
 
     /// Field accessor.
-    pub fn account(&self) -> &Spanned<Account> {
+    pub fn account(&self) -> &Spanned<Account<'a>> {
         &self.account
     }
 
@@ -1578,17 +1581,17 @@ impl<'a> Posting<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<Currency>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency<'a>>> {
         self.currency.as_ref()
     }
 
     /// Field accessor.
-    pub fn cost_spec(&self) -> Option<&Spanned<CostSpec>> {
+    pub fn cost_spec(&self) -> Option<&Spanned<CostSpec<'a>>> {
         self.cost_spec.as_ref()
     }
 
     /// Field accessor.
-    pub fn price_annotation(&self) -> Option<&Spanned<PriceSpec>> {
+    pub fn price_annotation(&self) -> Option<&Spanned<PriceSpec<'a>>> {
         self.price_annotation.as_ref()
     }
 
@@ -1635,7 +1638,7 @@ pub struct Metadata<'a> {
     pub(crate) links: HashSet<Spanned<Link<'a>>>,
 }
 
-impl Metadata<'_> {
+impl<'a> Metadata<'a> {
     /// is the metadata empty?
     pub fn is_empty(&self) -> bool {
         self.key_values().len() == 0 && self.tags().len() == 0 && self.links().len() == 0
@@ -1644,7 +1647,7 @@ impl Metadata<'_> {
     /// Field accessor.
     pub fn key_values(
         &self,
-    ) -> impl ExactSizeIterator<Item = (&Spanned<Key>, &Spanned<MetaValue>)> {
+    ) -> impl ExactSizeIterator<Item = (&Spanned<Key<'a>>, &Spanned<MetaValue<'a>>)> {
         self.key_values.iter()
     }
 
@@ -1665,12 +1668,12 @@ impl Metadata<'_> {
     }
 
     /// Field accessor.
-    pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<Tag>> {
+    pub fn tags(&self) -> impl ExactSizeIterator<Item = &Spanned<Tag<'a>>> {
         self.tags.iter()
     }
 
     /// Field accessor.
-    pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<Link>> {
+    pub fn links(&self) -> impl ExactSizeIterator<Item = &Spanned<Link<'a>>> {
         self.links.iter()
     }
 
@@ -1893,7 +1896,7 @@ impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         let bad_chars = s
             .chars()
-            .filter(|c| (!TagOrLinkIdentifier::is_valid_char(c)))
+            .filter(|c| !TagOrLinkIdentifier::is_valid_char(c))
             .collect::<Vec<char>>();
         if bad_chars.is_empty() {
             Ok(TagOrLinkIdentifier(s))
@@ -2004,7 +2007,7 @@ impl<'a> TryFrom<&'a str> for Key<'a> {
                 Err(KeyError(Initial(initial)))
             } else {
                 let bad_chars = chars
-                    .filter(|c| (!Key::is_valid_subsequent(c)))
+                    .filter(|c| !Key::is_valid_subsequent(c))
                     .collect::<Vec<char>>();
                 if bad_chars.is_empty() {
                     Ok(Key(s))
@@ -2202,7 +2205,7 @@ impl<'a> Amount<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> &Spanned<Currency> {
+    pub fn currency(&self) -> &Spanned<Currency<'a>> {
         &self.currency
     }
 }
@@ -2229,7 +2232,7 @@ impl<'a> AmountWithTolerance<'a> {
     }
 
     /// Field accessor.
-    pub fn amount(&self) -> &Spanned<Amount> {
+    pub fn amount(&self) -> &Spanned<Amount<'a>> {
         &self.amount
     }
 
@@ -2270,7 +2273,7 @@ impl<'a> LooseAmount<'a> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<Currency>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency<'a>>> {
         self.currency.as_ref()
     }
 }

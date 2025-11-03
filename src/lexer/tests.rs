@@ -13,15 +13,15 @@ macro_rules! number {
     };
 }
 
-fn date(s: &str) -> Token {
+fn date<'a>(s: &'a str) -> Token<'a> {
     Date(time::Date::parse(s, &Iso8601::DEFAULT).unwrap())
 }
 
-fn time(s: &str) -> Token {
+fn time<'a>(s: &'a str) -> Token<'a> {
     Time(time::Time::parse(s, &Iso8601::DEFAULT).unwrap())
 }
 
-fn string_literal(s: &str) -> Token {
+fn string_literal<'a>(s: &'a str) -> Token<'a> {
     StringLiteral(Cow::Borrowed(s))
 }
 

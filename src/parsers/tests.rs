@@ -6,7 +6,7 @@ use std::ops::Range;
 use test_case::test_case;
 use time::Month;
 
-fn bare_lex_with_source(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+fn bare_lex_with_source<'a>(source_id: SourceId, s: &'a str) -> Vec<(Token<'a>, Span)> {
     bare_lex(s)
         .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
         .collect::<Vec<_>>()

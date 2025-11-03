@@ -470,7 +470,7 @@ impl std::fmt::Debug for BeancountSources {
     }
 }
 
-pub fn lex_with_source(source_id: SourceId, s: &str) -> Vec<(Token, Span)> {
+pub fn lex_with_source<'a>(source_id: SourceId, s: &'a str) -> Vec<(Token<'a>, Span)> {
     lex(s)
         .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
         .collect::<Vec<_>>()
@@ -577,7 +577,7 @@ impl<'s> BeancountParser<'s> {
     }
 
     /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
-    pub fn parse(&self) -> Result<ParseSuccess, ParseError> {
+    pub fn parse<'a>(&'a self) -> Result<ParseSuccess<'a>, ParseError> {
         let (parsed_sources, options, mut errors, warnings) = self.parse_declarations();
         let error_paths = self.sources.error_path_iter().collect::<HashMap<_, _>>();
         let mut p = PragmaProcessor::new(self.root_path(), parsed_sources, error_paths, options);
@@ -615,7 +615,7 @@ impl<'s> BeancountParser<'s> {
 
     /// Parse the sources, returning declarations and any errors.
     /// The declarations are indexed by SourceId
-    fn parse_declarations(&self) -> ParseDeclarationsResult {
+    fn parse_declarations<'a>(&'a self) -> ParseDeclarationsResult<'a> {
         let mut all_outputs = HashMap::new();
         let mut all_errors = Vec::new();
         let mut parser_state = chumsky::extra::SimpleState(ParserState::default());

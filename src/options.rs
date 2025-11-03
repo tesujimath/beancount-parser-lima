@@ -160,21 +160,23 @@ impl<'a> BeancountOption<'a> {
     }
 }
 
-fn parse_subaccount(colon_separated: &str) -> Result<Subaccount, BeancountOptionError> {
+fn parse_subaccount<'a>(colon_separated: &'a str) -> Result<Subaccount<'a>, BeancountOptionError> {
     Subaccount::try_from(colon_separated).map_err(|e| BadValueErrorKind::AccountName(e).wrap())
 }
 
-fn parse_account_type_name(value: &str) -> Result<AccountTypeName, BeancountOptionError> {
+fn parse_account_type_name<'a>(
+    value: &'a str,
+) -> Result<AccountTypeName<'a>, BeancountOptionError> {
     AccountTypeName::try_from(value).map_err(|e| BadValueErrorKind::AccountTypeName(e).wrap())
 }
 
-fn parse_currency(value: &str) -> Result<Currency, BeancountOptionError> {
+fn parse_currency<'a>(value: &'a str) -> Result<Currency<'a>, BeancountOptionError> {
     Currency::try_from(value).map_err(|e| BadValueErrorKind::Currency(e).wrap())
 }
 
-fn parse_inferred_tolerance_default(
-    value: &str,
-) -> Result<(CurrencyOrAny, Decimal), BeancountOptionError> {
+fn parse_inferred_tolerance_default<'a>(
+    value: &'a str,
+) -> Result<(CurrencyOrAny<'a>, Decimal), BeancountOptionError> {
     use BadValueErrorKind as Bad;
 
     let mut fields = value.split(':');
@@ -334,7 +336,7 @@ impl<'a> ParserOptions<'a> {
         .map(|variant| BeancountOption { source, variant })
     }
 
-    pub(crate) fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
+    pub(crate) fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName<'a> {
         &self.account_type_names.name_by_type[account_type as usize]
     }
 
@@ -548,7 +550,7 @@ impl<'a> Options<'a> {
         }
     }
 
-    pub fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName {
+    pub fn account_type_name(&self, account_type: AccountType) -> &AccountTypeName<'a> {
         self.parser_options.account_type_name(account_type)
     }
 
@@ -556,39 +558,39 @@ impl<'a> Options<'a> {
         self.title.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_balances(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_previous_balances(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_previous_balances.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_earnings(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_previous_earnings(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_previous_earnings.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_previous_conversions(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_previous_conversions(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_previous_conversions
             .as_ref()
             .map(|x| &x.spanned)
     }
 
-    pub fn account_current_earnings(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_current_earnings(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_current_earnings.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_current_conversions(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_current_conversions(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_current_conversions
             .as_ref()
             .map(|x| &x.spanned)
     }
 
-    pub fn account_unrealized_gains(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_unrealized_gains(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_unrealized_gains.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn account_rounding(&self) -> Option<&Spanned<Subaccount>> {
+    pub fn account_rounding(&self) -> Option<&Spanned<Subaccount<'a>>> {
         self.account_rounding.as_ref().map(|x| &x.spanned)
     }
 
-    pub fn conversion_currency(&self) -> Option<&Spanned<Currency>> {
+    pub fn conversion_currency(&self) -> Option<&Spanned<Currency<'a>>> {
         self.conversion_currency.as_ref().map(|x| &x.spanned)
     }
 
@@ -611,7 +613,9 @@ impl<'a> Options<'a> {
     }
 
     /// return the tolerance defaults for all currencies, with None as the 'any' currency
-    pub fn inferred_tolerance_defaults(&self) -> impl Iterator<Item = (Option<Currency>, Decimal)> {
+    pub fn inferred_tolerance_defaults<'s>(
+        &'s self,
+    ) -> impl Iterator<Item = (Option<Currency<'a>>, Decimal)> + 's {
         self.inferred_tolerance_default
             .iter()
             .map(|(c, d)| match c {
@@ -634,7 +638,7 @@ impl<'a> Options<'a> {
         self.documents.iter().map(|document| document.0)
     }
 
-    pub fn operating_currency(&self) -> impl Iterator<Item = &Currency> {
+    pub fn operating_currency(&self) -> impl Iterator<Item = &Currency<'a>> {
         self.operating_currency.iter().map(|document| document.0)
     }
 
