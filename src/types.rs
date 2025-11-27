@@ -1155,8 +1155,8 @@ impl Display for Account<'_> {
     }
 }
 
-impl AsRef<str> for Account<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for Account<'a> {
+    fn as_ref(&self) -> &'a str {
         self.name
     }
 }
@@ -1197,8 +1197,8 @@ impl ElementType for Account<'_> {
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub struct Subaccount<'a>(&'a str);
 
-impl AsRef<str> for Subaccount<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for Subaccount<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }
@@ -1273,8 +1273,8 @@ impl ElementType for AccountTypeName<'_> {
     }
 }
 
-impl AsRef<str> for AccountTypeName<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for AccountTypeName<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }
@@ -1348,8 +1348,8 @@ impl ElementType for AccountName<'_> {
     }
 }
 
-impl AsRef<str> for AccountName<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for AccountName<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }
@@ -1452,8 +1452,8 @@ impl ElementType for Currency<'_> {
     }
 }
 
-impl AsRef<str> for Currency<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for Currency<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }
@@ -1774,21 +1774,16 @@ impl Display for SimpleValue<'_> {
     }
 }
 
-/// A tag.
+/// A tag without the `#` prefix.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
-pub struct Tag<'a>(pub(crate) TagOrLinkIdentifier<'a>);
-
-impl<'a> From<TagOrLinkIdentifier<'a>> for Tag<'a> {
-    fn from(id: TagOrLinkIdentifier<'a>) -> Self {
-        Self(id)
-    }
-}
+pub struct Tag<'a>(pub(crate) &'a str);
 
 impl<'a> TryFrom<&'a str> for Tag<'a> {
     type Error = TagOrLinkIdentifierError;
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        TagOrLinkIdentifier::try_from(s).map(Tag)
+        validate_tag_or_link_identifier(s)?;
+        Ok(Tag(s))
     }
 }
 
@@ -1798,9 +1793,9 @@ impl ElementType for Tag<'_> {
     }
 }
 
-impl AsRef<str> for Tag<'_> {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
+impl<'a> AsRef<str> for Tag<'a> {
+    fn as_ref(&self) -> &'a str {
+        self.0
     }
 }
 
@@ -1812,25 +1807,23 @@ impl PartialEq<&str> for Tag<'_> {
 
 impl Display for Tag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "#{}", self.0 .0)
+        write!(f, "#{}", self.0)
     }
 }
 
-/// A link.
+/// A link without the `^` prefix.
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct TagOrLinkIdentifier<'a>(&'a str);
+
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
-pub struct Link<'a>(pub(crate) TagOrLinkIdentifier<'a>);
-
-impl<'a> From<TagOrLinkIdentifier<'a>> for Link<'a> {
-    fn from(id: TagOrLinkIdentifier<'a>) -> Self {
-        Self(id)
-    }
-}
+pub struct Link<'a>(pub(crate) &'a str);
 
 impl<'a> TryFrom<&'a str> for Link<'a> {
     type Error = TagOrLinkIdentifierError;
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        TagOrLinkIdentifier::try_from(s).map(Link)
+        validate_tag_or_link_identifier(s)?;
+        Ok(Link(s))
     }
 }
 
@@ -1848,27 +1841,21 @@ impl PartialEq<&str> for Link<'_> {
 
 impl Display for Link<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "^{}", self.0 .0)
+        write!(f, "^{}", self.0)
     }
 }
 
-impl AsRef<str> for Link<'_> {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
+impl<'a> AsRef<str> for Link<'a> {
+    fn as_ref(&self) -> &'a str {
+        self.0
     }
 }
-
-/// The validated identifier part of a `Tag` or `Link` without the `#` or `^` prefix.
-#[derive(PartialOrd, Ord, PartialEq, Eq, Hash, Copy, Clone, Debug)]
-pub struct TagOrLinkIdentifier<'a>(&'a str);
 
 /// The valid characters for tags and links besides alphanumeric.
 const TAG_OR_LINK_EXTRA_CHARS: [char; 4] = ['-', '_', '/', '.'];
 
-impl TagOrLinkIdentifier<'_> {
-    pub(crate) fn is_valid_char(c: &char) -> bool {
-        c.is_alphanumeric() || TAG_OR_LINK_EXTRA_CHARS.contains(c)
-    }
+fn is_valid_tag_or_link_identifier_char(c: &char) -> bool {
+    c.is_alphanumeric() || TAG_OR_LINK_EXTRA_CHARS.contains(c)
 }
 
 /// Error type for [TagOrLinkIdentifier] creation.
@@ -1890,31 +1877,15 @@ impl Display for TagOrLinkIdentifierError {
 
 impl std::error::Error for TagOrLinkIdentifierError {}
 
-impl<'a> TryFrom<&'a str> for TagOrLinkIdentifier<'a> {
-    type Error = TagOrLinkIdentifierError;
-
-    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        let bad_chars = s
-            .chars()
-            .filter(|c| !TagOrLinkIdentifier::is_valid_char(c))
-            .collect::<Vec<char>>();
-        if bad_chars.is_empty() {
-            Ok(TagOrLinkIdentifier(s))
-        } else {
-            Err(TagOrLinkIdentifierError(bad_chars))
-        }
-    }
-}
-
-impl AsRef<str> for TagOrLinkIdentifier<'_> {
-    fn as_ref(&self) -> &str {
-        self.0
-    }
-}
-
-impl PartialEq<&str> for TagOrLinkIdentifier<'_> {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
+fn validate_tag_or_link_identifier(s: &str) -> Result<(), TagOrLinkIdentifierError> {
+    let bad_chars = s
+        .chars()
+        .filter(|c| !is_valid_tag_or_link_identifier_char(c))
+        .collect::<Vec<char>>();
+    if bad_chars.is_empty() {
+        Ok(())
+    } else {
+        Err(TagOrLinkIdentifierError(bad_chars))
     }
 }
 
@@ -1932,8 +1903,8 @@ impl Key<'_> {
     }
 }
 
-impl AsRef<str> for Key<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for Key<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }

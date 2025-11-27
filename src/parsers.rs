@@ -1136,11 +1136,7 @@ where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
     let tag = select_ref!(Token::Tag(s) => *s);
-    tag.try_map(|s, span| {
-        TagOrLinkIdentifier::try_from(s)
-            .map(Tag)
-            .map_err(|e| Rich::custom(span, e.to_string()))
-    })
+    tag.try_map(|s, span| Tag::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
 }
 
 /// Matches a Link
@@ -1149,11 +1145,7 @@ where
     I: BorrowInput<'s, Token = Token<'s>, Span = Span>,
 {
     let link = select_ref!(Token::Link(s) => *s);
-    link.try_map(|s, span| {
-        TagOrLinkIdentifier::try_from(s)
-            .map(Link)
-            .map_err(|e| Rich::custom(span, e.to_string()))
-    })
+    link.try_map(|s, span| Link::try_from(s).map_err(|e| Rich::custom(span, e.to_string())))
 }
 
 /// Matches a Key.

@@ -83,9 +83,9 @@ fn test_tag_or_link_identifier_try_from(
     s: &str,
     expected_raw: Result<&str, TagOrLinkIdentifierError>,
 ) {
-    let result = TagOrLinkIdentifier::try_from(s);
+    let result = Tag::try_from(s);
     let expected = match expected_raw {
-        Ok(s) => Ok(TagOrLinkIdentifier(s)),
+        Ok(s) => Ok(Tag(s)),
         Err(e) => Err(e),
     };
     // visually check the error display by making a bad test case
