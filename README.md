@@ -6,6 +6,8 @@ It is intended to be a complete implementation of the Beancount file format, exc
 
 The slightly strange name is because of a somewhat careless failure on my part to notice the existing [beancount-parser](https://github.com/jcornaz/beancount-parser) when starting this project, for which apologies.
 
+For an end-user Beancounting program which uses this parser, see [limabean](https://github.com/tesujimath/limabean).
+
 ## Features
 
 - fast, thanks to [Logos](https://docs.rs/logos/latest/logos/) and [Chumsky](https://docs.rs/chumsky/latest/chumsky/) zero copy
