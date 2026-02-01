@@ -21,10 +21,7 @@ anyhow = "1.0.98"
 ariadne = "0.5.1"
 # for bleeding edge ariadne
 # ariadne= { path = "../../../../third-party/rust/ariadne" }
-chumsky = { version = "1.0.0-alpha.8", features = ["regex"] }
-# for bleeding edge chumsky:
-# chumsky = { git = "https://github.com/tesujimath/chumsky", branch = "one_of_ref-not_ref", features = ["label", "regex"] }
-# chumsky = { path = "../../../../third-party/rust/chumsky", features = ["label", "regex"] }
+chumsky = { version = "0.12.0", features = ["regex"] }
 either = "1.15.0"
 logos = "0.15.0"
 protobuf = "3.7.2"

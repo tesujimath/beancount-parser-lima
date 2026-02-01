@@ -37,6 +37,7 @@ pub(crate) enum BeancountOptionVariant<'a> {
     BookingMethod(Booking),
     PluginProcessingMode(PluginProcessingMode),
     Assimilated,
+    Ignored,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -157,6 +158,17 @@ impl<'a> BeancountOption<'a> {
             },
             variant,
         })
+    }
+
+    // a bit of a hack to be able to fail on unknown or bad option and still have the parser consume the input
+    pub(crate) fn ignored() -> Self {
+        Self {
+            source: Source {
+                name: Span::default(),
+                value: Span::default(),
+            },
+            variant: BeancountOptionVariant::Ignored,
+        }
     }
 }
 
@@ -479,8 +491,8 @@ impl<'a> Options<'a> {
                 Self::update_optional(&mut self.plugin_processing_mode, value, source)
             }
 
-            // this value contains nothing
-            Assimilated => Ok(()),
+            // these values contain nothing
+            Assimilated | Ignored => Ok(()),
         }
         .map_err(|ref e| match e {
             DuplicateOption(span) => Error::new("invalid option", "duplicate", source.name)
