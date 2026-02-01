@@ -13,29 +13,27 @@ exclude = ["/examples/images/*"]
 
 [dependencies]
 lazy_format = "2.0.3"
-rust_decimal = "1.37.2"
+rust_decimal = "1.40.0"
 strum = "0.27.2"
 strum_macros = "0.27.2"
-time = "0.3.41"
-anyhow = "1.0.98"
-ariadne = "0.5.1"
-# for bleeding edge ariadne
-# ariadne= { path = "../../../../third-party/rust/ariadne" }
+time = "0.3.46"
+anyhow = "1.0.100"
+ariadne = "0.6.0"
 chumsky = { version = "0.12.0", features = ["regex"] }
 either = "1.15.0"
-logos = "0.15.0"
+logos = "0.15.1"
 protobuf = "3.7.2"
-unescaper = "0.1.6"
+unescaper = "0.1.8"
 
 [dev-dependencies]
-derive_more = { version = "2.0.1", features = ["display"] }
+derive_more = { version = "2.1.1", features = ["display"] }
 itertools = "0.14.0"
-proptest = "1.7.0"
+proptest = "1.9.0"
 rstest = "0.26.1"
-rust_decimal_macros = "1.37.1"
+rust_decimal_macros = "1.40.0"
 stats_alloc = "0.1.10"
 test-case = "3.3.1"
-time = { version = "0.3.41", features = ["parsing"] }
+time = { version = "0.3.46", features = ["parsing"] }
 xflags = "0.3.2"
 
 [build-dependencies]
