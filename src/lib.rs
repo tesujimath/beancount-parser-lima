@@ -564,10 +564,13 @@ type ParseDeclarationsResult<'t> = (
 impl<'s> BeancountParser<'s> {
     /// Create a `BeancountParser` from `BeancountSources` read from all input files.
     pub fn new(sources: &'s BeancountSources) -> Self {
-        let mut tokenized_sources = Vec::new();
+        // `content_iter()` walks a `HashMap`, so iteration order is not guaranteed.
+        // We must index by `SourceId` rather than relying on iteration order.
+        let mut tokenized_sources = vec![Vec::new(); sources.source_id_strings.len()];
 
         for (source_id, _path, content) in sources.content_iter() {
-            tokenized_sources.push(lex_with_source(source_id, content));
+            let i_source: usize = source_id.into();
+            tokenized_sources[i_source] = lex_with_source(source_id, content);
         }
 
         BeancountParser {
