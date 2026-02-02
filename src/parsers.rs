@@ -136,7 +136,7 @@ where
         .ignore_then(string().map_with(|name, e| spanned(name, e.span())))
         .then(string().map_with(|value, e| spanned(value, e.span())))
         .validate(move |(name, value), e, emitter| {
-            // validate allows us to eimt an error for a bad option but still consume the input,
+            // validate allows us to emit an error for a bad option but still consume the input,
             // but we have to return the dummy Ignored option
 
             use BeancountOptionError::*;
