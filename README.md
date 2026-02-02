@@ -83,10 +83,6 @@ Behaviour which differs from original Beancount parser has been annotated in the
 
 Tests for features unsupported in the Lima parser are left in test-cases-unsupported.
 
-## Alpha Status Dependencies
-
-- Chumsky `1.0.0.alpha.*` releases are required for zero-copy support
-
 ## Alternatives
 
 [beancount-parser](https://github.com/jcornaz/beancount-parser) is another parser for Beancount which predates this one,

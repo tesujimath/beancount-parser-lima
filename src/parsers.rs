@@ -3,7 +3,13 @@ use crate::{
     options::{BeancountOption, BeancountOptionError, ParserOptions, DEFAULT_LONG_STRING_MAXLINES},
     types::*,
 };
-use chumsky::{input::BorrowInput, prelude::*};
+use chumsky::{
+    input::BorrowInput,
+    prelude::{
+        any_ref, choice, end, extra, group, just, recursive, select_ref, skip_then_retry_until,
+        IterParser, Parser, Rich,
+    },
+};
 use either::Either;
 use rust_decimal::Decimal;
 use std::{
@@ -129,38 +135,29 @@ where
     just(Token::Option)
         .ignore_then(string().map_with(|name, e| spanned(name, e.span())))
         .then(string().map_with(|value, e| spanned(value, e.span())))
-        .try_map_with(move |(name, value), e| {
+        .validate(move |(name, value), e, emitter| {
+            // validate allows us to emit an error for a bad option but still consume the input,
+            // but we have to return the dummy Ignored option
+
             use BeancountOptionError::*;
 
-            let opt = BeancountOption::parse(name, value, source_path).map_err(|e| match e {
-                UnknownOption => Rich::custom(name.span, e.to_string()),
-                BadValue(_) => Rich::custom(value.span, e.to_string()),
-            });
+            let opt = BeancountOption::parse(name, value, source_path)
+                .map_err(|e| match e {
+                    UnknownOption => Rich::custom(name.span, e.to_string()),
+                    BadValue(_) => Rich::custom(value.span, e.to_string()),
+                })
+                .and_then(|opt| {
+                    let parser_state: &mut extra::SimpleState<ParserState> = e.state();
+                    parser_state
+                        .options
+                        .assimilate(opt)
+                        .map_err(|e| Rich::custom(value.span, e.to_string()))
+                });
 
-            if let Ok(opt) = opt {
-                let parser_state: &mut extra::SimpleState<ParserState> = e.state();
-                parser_state
-                    .options
-                    .assimilate(opt)
-                    .map_err(|e| Rich::custom(value.span, e.to_string()))
-            } else {
-                opt
-            }
-
-            // TODO
-            // match parser_options.assimilate(&opt.name, &opt.value) {
-            //     Ok(()) => Ok(opt),
-            //     // TODO report location of duplicate option
-            //     Err(ref e @ DuplicateOption(ref _span)) => {
-            //         Err(Rich::custom(name.span, e.to_string()))
-            //     }
-            //     Err(ref e @ UnknownOption) => Err(Rich::custom(name.span, e.to_string())),
-            //     Err(ref e @ BadValue(_)) => Err(Rich::custom(value.span, e.to_string())),
-            //     // TODO report location of duplicate value
-            //     Err(ref e @ DuplicateValue(ref _span)) => {
-            //         Err(Rich::custom(value.span, e.to_string()))
-            //     }
-            // }
+            opt.unwrap_or_else(|e| {
+                emitter.emit(e);
+                BeancountOption::ignored()
+            })
         })
 }
 
