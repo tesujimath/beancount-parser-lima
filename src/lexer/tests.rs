@@ -578,21 +578,13 @@ fn valid_commas_in_number() {
 }
 
 // ANOMALY: We're stricter about commas than original Beancount, so this lexes differently
-// ANOMALY: There seems to be a Logos bug here, which is why the comma gets eaten by the 452.
-// Logos issue: [Incorrectly matched token slice](https://github.com/maciejhirsz/logos/issues/256)
 #[test]
 fn invalid_commas_in_integer() {
     lex_and_check(
         r#"
     452,34.00
 "#,
-        vec![
-            number!(452),
-            // should get a comma token here:
-            // Comma,
-            number!(34.0),
-            Eol,
-        ],
+        vec![number!(452), Comma, number!(34.0), Eol],
     );
 }
 
@@ -644,13 +636,8 @@ fn ignored_lines_non_comment_ignored() {
     Regular prose appearing mid-file.
 "#,
         vec![
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
+            Currency("R"),
+            Key("egular"),
             Key("prose"),
             Key("appearing"),
             Key("mid-file"),
@@ -668,9 +655,8 @@ fn ignored_lines_non_comment_non_flag() {
     Xxx this sentence starts with a non-flag character.
 "#,
         vec![
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
+            Currency("X"),
+            Key("xx"),
             Key("this"),
             Key("sentence"),
             Key("starts"),
@@ -738,19 +724,11 @@ fn lexer_error_invalid_text() {
     Not a Beancount file.
 "#,
         vec![
+            Currency("N"),
+            Key("ot"),
             unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
-            unrecognized(),
+            Currency("B"),
+            Key("eancount"),
             Key("file"),
             unrecognized(),
             Eol,
