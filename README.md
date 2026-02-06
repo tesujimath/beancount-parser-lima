@@ -22,7 +22,7 @@ For an end-user Beancounting program which uses this parser, see [limabean](http
 
 ## Status
 
-This parser is used by [Lima](https://github.com/tesujimath/beancount-lima), a new Beancount implementation in Rust and Scheme, by the same author.
+This parser is used in [limabean](https://github.com/tesujimath/limabean), a new implementation of Beancount in Rust and Clojure, by the same author.
 
 - comprehensive test-suite from main Beancount repo is [incorporated](test-cases), modulo a few [unsupported cases](test-cases-unsupported).
 
