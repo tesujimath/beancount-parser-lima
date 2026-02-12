@@ -19,7 +19,7 @@ use unescaper::unescape;
 //
 // It ought to be possible to ignore an indented line where colon is the first non-whitespace character,
 // but if we try to do that here we hit a limitation in Logos which means we lose indent not followed by colon.
-#[logos(subpattern ignored_whole_line= r"([*!&#?%:].*\n)")] // rolled into end-of-line handling below
+#[logos(subpattern ignored_whole_line= r"([*!&#?%:].*\r?\n)")] // rolled into end-of-line handling below
 #[logos(subpattern comment_to_eol= r"(;.*)")] // rolled into end-of-line handling below
 #[logos(subpattern currency = r"[A-Z][A-Z0-9'\._-]*|/[0-9'\._-]*[A-Z][A-Z0-9'\._-]*")]
 #[logos(subpattern date = r"\d{4}[\-/]\d{2}[\-/]\d{2}")]
@@ -155,10 +155,10 @@ pub enum Token<'a> {
 
     // end-of-line and indent, which is the only significant whitespace
     // ignored_whole_line must be anchored immediately after a newline
-    #[regex(r"(?&comment_to_eol)?\n(?&ignored_whole_line)*[ \t]+")]
+    #[regex(r"(?&comment_to_eol)?\r?\n(?&ignored_whole_line)*[ \t]+")]
     EolThenIndent,
 
-    #[regex(r"(?&comment_to_eol)?\n(?&ignored_whole_line)*")]
+    #[regex(r"(?&comment_to_eol)?\r?\n(?&ignored_whole_line)*")]
     Eol,
 
     // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`

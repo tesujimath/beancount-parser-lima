@@ -12,6 +12,7 @@ use self::beancount::{
 use ::beancount_parser_lima as lima;
 use derive_more::Display;
 use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
+use regex::Regex;
 use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
@@ -20,6 +21,7 @@ use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::LazyLock,
 };
 
 fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: Ledger) {
@@ -986,12 +988,26 @@ impl ExpectEq<Vec<String>> for Vec<&PathBuf> {
     }
 }
 
+static BARE_LF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\n|([^\r])\n").unwrap());
+
 impl<S> ExpectEq<S> for &str
 where
     S: AsRef<str> + ?Sized,
 {
     fn expect_eq(&self, expected: &S, ctx: Context) {
-        assert_eq!(*self, expected.as_ref(), "{}", &ctx);
+        let expected = expected.as_ref();
+
+        // on Windows we need to cope with embedded newlines in protobuf strings, e.g. in MultipleLines_MultilineNarration
+        // narration: "Hello one line\nand yet another,\nand why not another!"
+        // while the actual output may have \r\n instead
+        if cfg!(windows) {
+            if *self != expected {
+                let expected_with_crlf = BARE_LF.replace_all(expected, "$1\r\n");
+                assert_eq!(*self, expected_with_crlf);
+            }
+        } else {
+            assert_eq!(*self, expected, "{}", &ctx);
+        }
     }
 }
 
