@@ -988,7 +988,7 @@ impl ExpectEq<Vec<String>> for Vec<&PathBuf> {
     }
 }
 
-static BARE_LF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\n|[^\r]\n").unwrap());
+static BARE_LF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\n|([^\r])\n").unwrap());
 
 impl<S> ExpectEq<S> for &str
 where
@@ -1002,7 +1002,7 @@ where
         // while the actual output may have \r\n instead
         if cfg!(windows) {
             if *self != expected {
-                let expected_with_crlf = BARE_LF.replace_all(expected, "\r\n");
+                let expected_with_crlf = BARE_LF.replace_all(expected, "$1\r\n");
                 assert_eq!(*self, expected_with_crlf);
             }
         } else {
