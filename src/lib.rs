@@ -913,13 +913,11 @@ impl<'s> Iterator for PragmaProcessor<'s> {
                                     None => panic!("impossible, I hope"),
                                     Some(IncludedGlob::Expanded(paths)) => {
                                         if paths.is_empty() {
-                                            let w = Warning::new(
-                                                "ignored include",
-                                                "glob failed to match any files",
-                                                span,
-                                            );
+                                            // this is an error rather than a warning to catch plain paths whic fail to match
+                                            let e =
+                                                Error::new("include failed", "no such file", span);
 
-                                            self.warnings.push(w)
+                                            self.errors.push(e)
                                         }
 
                                         for included in paths {
