@@ -17,11 +17,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Run Tests
+
+      - name: Run Tests and check Cargo.lock
         run: |
           cargo test
+          git diff --exit-code Cargo.lock
 
   check-nix-flake:
     name: Check Nix Flake
