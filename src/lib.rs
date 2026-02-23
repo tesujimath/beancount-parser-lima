@@ -84,9 +84,10 @@
 
 use ariadne::{Color, Label, Report};
 use chumsky::prelude::{Input, Parser};
+use glob::{self, glob_with};
 use lazy_format::lazy_format;
-use lexer::{lex, Token};
-use parsers::{file, includes, ParserState};
+use lexer::{Token, lex};
+use parsers::{ParserState, file, includes};
 use sort::SortIteratorAdaptor;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -121,14 +122,21 @@ pub struct BeancountSources {
     root_source_id: SourceId,
     root_content: String,
     root_content_char_indices: Vec<usize>,
+    included_globs: HashMap<PathBuf, IncludedGlob>,
     included_content: HashMap<PathBuf, IncludedSource>,
     source_id_strings: Vec<String>, // indexed by SourceId
 }
 
 #[derive(Clone, Debug)]
+enum IncludedGlob {
+    Expanded(Vec<PathBuf>), // the content and its char indices
+    Error(String),
+}
+
+#[derive(Clone, Debug)]
 enum IncludedSource {
     Content(SourceId, String, Vec<usize>), // the content and its char indices
-    IoError(String),
+    Error(String),
     Duplicate,
 }
 
@@ -189,56 +197,112 @@ impl BeancountSources {
             .unwrap_or("inline".to_string());
         let mut source_id_strings = Vec::from([root_source_id_string]);
 
-        let mut pending_paths = get_includes(&root_content, root_source_id)
+        let mut pending_includes = get_includes(&root_content, root_source_id)
             .into_iter()
-            .map(|included_path| resolve_included_path(root_path.as_ref(), included_path.as_ref()))
+            .map(|included| resolve_included_path(root_path.as_ref(), included.as_ref()))
             .collect::<VecDeque<_>>();
 
+        let mut included_globs = HashMap::new();
         let mut included_content: HashMap<PathBuf, IncludedSource> = HashMap::new();
 
         // for duplicate detection
         let mut canonical_paths =
-            HashSet::from([root_path.as_ref().and_then(|p| p.canonicalize().ok())]);
-
-        while !pending_paths.is_empty() {
-            let path = pending_paths.pop_front().unwrap();
-            let canonical_path = path.canonicalize().ok();
-
-            if canonical_paths.contains(&canonical_path) {
-                // don't overwrite existing content
-                included_content
-                    .entry(path)
-                    .or_insert(IncludedSource::Duplicate);
+            if let Some(canonical_root) = root_path.as_ref().and_then(|p| p.canonicalize().ok()) {
+                HashSet::from([canonical_root])
             } else {
-                canonical_paths.insert(canonical_path);
+                HashSet::default()
+            };
 
-                let source_id = SourceId::from(source_id_strings.len());
-                source_id_strings.push(path.to_string_lossy().into());
+        while !pending_includes.is_empty() {
+            let included = pending_includes.pop_front().unwrap();
+            let included_str = included.to_string_lossy();
+            let included_str = included_str.as_ref();
 
-                let included_source = read(&path).map_or_else(
-                    |e| IncludedSource::IoError(e.to_string()),
-                    |c| {
-                        // find the char indices for the content
-                        // needed for mapping byte indices to char indices, to convert Chumsky spans to Ariadne spans
-                        // see https://github.com/zesterer/chumsky/issues/65#issuecomment-1689216633
-                        let char_indices = c.char_indices().map(|(i, _)| i).collect::<Vec<_>>();
-                        IncludedSource::Content(source_id, c, char_indices)
-                    },
-                );
+            match glob_with(
+                included_str,
+                glob::MatchOptions {
+                    case_sensitive: true,
+                    require_literal_separator: true,
+                    require_literal_leading_dot: true,
+                },
+            ) {
+                Err(e) => {
+                    included_globs.insert(included, IncludedGlob::Error(e.to_string()));
+                }
+                Ok(globbed_includes) => {
+                    let mut glob_expansions = Vec::default();
 
-                // stabilisation of VacantEntry::insert_entry() would enable us to avoid cloning the path here
-                // and doing an immediate lookup
-                included_content.insert(path.clone(), included_source);
-                let included_source = included_content.get(&path).unwrap();
+                    for globbed_include in globbed_includes {
+                        match globbed_include {
+                            Err(e) => {
+                                let path = e.path().to_path_buf();
+                                glob_expansions.push(path.clone());
+                                included_content.insert(path, IncludedSource::Error(e.to_string()));
+                            }
+                            Ok(globbed_include) => {
+                                glob_expansions.push(globbed_include.clone());
 
-                if let IncludedSource::Content(_, content, _) = included_source {
-                    let mut includes = get_includes(content, source_id)
-                        .into_iter()
-                        .map(|included_path| {
-                            resolve_included_path(Some(&path), included_path.as_ref())
-                        })
-                        .collect::<VecDeque<_>>();
-                    pending_paths.append(&mut includes);
+                                if let Ok(canonical_path) = globbed_include.canonicalize() {
+                                    if canonical_paths.contains(&canonical_path) {
+                                        // don't overwrite existing content
+                                        included_content
+                                            .entry(globbed_include)
+                                            .or_insert(IncludedSource::Duplicate);
+                                    } else {
+                                        canonical_paths.insert(canonical_path);
+
+                                        let source_id = SourceId::from(source_id_strings.len());
+                                        source_id_strings
+                                            .push(globbed_include.to_string_lossy().into());
+
+                                        let included_source = read(&globbed_include).map_or_else(
+                                            |e| {
+                                                IncludedSource::Error(format!(
+                                                    "{}: {}",
+                                                    globbed_include.to_string_lossy(),
+                                                    e
+                                                ))
+                                            },
+                                            |c| {
+                                                // find the char indices for the content
+                                                // needed for mapping byte indices to char indices, to convert Chumsky spans to Ariadne spans
+                                                // see https://github.com/zesterer/chumsky/issues/65#issuecomment-1689216633
+                                                let char_indices = c
+                                                    .char_indices()
+                                                    .map(|(i, _)| i)
+                                                    .collect::<Vec<_>>();
+                                                IncludedSource::Content(source_id, c, char_indices)
+                                            },
+                                        );
+
+                                        // stabilisation of VacantEntry::insert_entry() would enable us to avoid cloning the path here
+                                        // and doing an immediate lookup
+                                        included_content
+                                            .insert(globbed_include.clone(), included_source);
+                                        let included_source =
+                                            included_content.get(&globbed_include).unwrap();
+
+                                        if let IncludedSource::Content(_, content, _) =
+                                            included_source
+                                        {
+                                            let mut includes = get_includes(content, source_id)
+                                                .into_iter()
+                                                .map(|included_path| {
+                                                    resolve_included_path(
+                                                        Some(&globbed_include),
+                                                        included_path.as_ref(),
+                                                    )
+                                                })
+                                                .collect::<VecDeque<_>>();
+                                            pending_includes.append(&mut includes);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    included_globs.insert(included, IncludedGlob::Expanded(glob_expansions));
                 }
             }
         }
@@ -253,6 +317,7 @@ impl BeancountSources {
             root_source_id,
             root_content,
             root_content_char_indices,
+            included_globs,
             included_content,
             source_id_strings,
         }
@@ -408,16 +473,17 @@ impl BeancountSources {
         )
     }
 
-    fn error_path_iter(&self) -> impl Iterator<Item = (Option<&Path>, String)> {
+    fn error_paths(&self) -> HashMap<Option<&Path>, String> {
         self.included_content
             .iter()
             .filter_map(|(pathbuf, included_source)| {
-                if let IncludedSource::IoError(e) = included_source {
+                if let IncludedSource::Error(e) = included_source {
                     Some((Some(pathbuf.as_path()), e.clone()))
                 } else {
                     None
                 }
             })
+            .collect::<HashMap<_, _>>()
     }
 }
 
@@ -461,7 +527,7 @@ impl std::fmt::Debug for BeancountSources {
                     self.source_id_string(*source_id),
                     content.len()
                 )?,
-                IncludedSource::IoError(e) => writeln!(f, "    {:?} err {},", path, e)?,
+                IncludedSource::Error(e) => writeln!(f, "    {:?} err {},", path, e)?,
                 IncludedSource::Duplicate => writeln!(f, "    {:?} duplicate include", path)?,
             }
         }
@@ -581,9 +647,14 @@ impl<'s> BeancountParser<'s> {
 
     /// Parse the sources, returning date-sorted directives and options, or errors, along with warnings in both cases.
     pub fn parse<'a>(&'a self) -> Result<ParseSuccess<'a>, ParseError> {
-        let (parsed_sources, options, mut errors, warnings) = self.parse_declarations();
-        let error_paths = self.sources.error_path_iter().collect::<HashMap<_, _>>();
-        let mut p = PragmaProcessor::new(self.root_path(), parsed_sources, error_paths, options);
+        let (parsed_sources, options, mut errors, mut warnings) = self.parse_declarations();
+        let mut p = PragmaProcessor::new(
+            self.root_path(),
+            parsed_sources,
+            &self.sources.included_globs,
+            self.sources.error_paths(),
+            options,
+        );
 
         // directives are stable-sorted by date, where balance directives sort ahead of the other directives for that day
         // as per https://beancount.github.io/docs/beancount_design_doc.html#stream-invariants
@@ -597,8 +668,9 @@ impl<'s> BeancountParser<'s> {
                 )
             })
             .collect::<Vec<_>>();
-        let (options, plugins, mut pragma_errors) = p.result();
+        let (options, plugins, mut pragma_errors, mut pragma_warnings) = p.result();
         errors.append(&mut pragma_errors);
+        warnings.append(&mut pragma_warnings);
 
         if errors.is_empty() {
             Ok(ParseSuccess {
@@ -659,6 +731,7 @@ struct PragmaProcessor<'s> {
     current_declarations: VecDeque<Spanned<Declaration<'s>>>,
     stacked: VecDeque<(Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>)>,
     remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>>,
+    included_globs: &'s HashMap<PathBuf, IncludedGlob>,
     error_paths: HashMap<Option<PathBuf>, String>,
     include_span_by_canonical_path: HashMap<PathBuf, Span>,
     // tags and meta key/values for pragma push/pop
@@ -666,14 +739,16 @@ struct PragmaProcessor<'s> {
     meta_key_values: HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
     options: Options<'s>,
     plugins: Vec<Plugin<'s>>,
-    // errors, for collection when the iterator is exhausted
+    // errors and warnings, for collection when the iterator is exhausted
     errors: Vec<Error>,
+    warnings: Vec<Warning>,
 }
 
 impl<'s> PragmaProcessor<'s> {
     fn new(
         root_path: Option<&Path>,
         parsed_sources: HashMap<Option<&Path>, Vec<Spanned<Declaration<'s>>>>,
+        included_globs: &'s HashMap<PathBuf, IncludedGlob>,
         error_paths: HashMap<Option<&Path>, String>,
         options: Options<'s>,
     ) -> Self {
@@ -696,6 +771,7 @@ impl<'s> PragmaProcessor<'s> {
             current_declarations,
             stacked: VecDeque::new(),
             remaining,
+            included_globs,
             error_paths,
             include_span_by_canonical_path: HashMap::default(),
             tags: HashMap::new(),
@@ -703,12 +779,14 @@ impl<'s> PragmaProcessor<'s> {
             options,
             plugins: Vec::new(),
             errors: Vec::new(),
+            warnings: Vec::new(),
         }
     }
 
-    fn result(self) -> (Options<'s>, Vec<Plugin<'s>>, Vec<Error>) {
+    fn result(self) -> (Options<'s>, Vec<Plugin<'s>>, Vec<Error>, Vec<Warning>) {
         // any leftover tags or key/values is an error
         let mut errors = self.errors;
+        let warnings = self.warnings;
 
         for (key, _value) in self.meta_key_values {
             let e = Error::new(
@@ -732,7 +810,7 @@ impl<'s> PragmaProcessor<'s> {
             }
         }
 
-        (self.options, self.plugins, errors)
+        (self.options, self.plugins, errors, warnings)
     }
 }
 
@@ -822,60 +900,96 @@ impl<'s> Iterator for PragmaProcessor<'s> {
                                     self.meta_key_values.remove(&meta);
                                 }
                             }
-                            Include(relpath) => {
-                                let (path, span) = (
-                                    Some(resolve_included_path(
+                            Include(rel_glob) => {
+                                let (abs_glob, span) = (
+                                    resolve_included_path(
                                         self.current_path.as_ref(),
-                                        AsRef::<Path>::as_ref(*relpath.item()),
-                                    )),
-                                    *relpath.span(),
+                                        AsRef::<Path>::as_ref(*rel_glob.item()),
+                                    ),
+                                    *rel_glob.span(),
                                 );
-                                let canonical_path =
-                                    path.as_ref().and_then(|p| p.canonicalize().ok());
 
-                                match self.remaining.remove_entry(&path) {
-                                    Some((included_path, included_declarations)) => {
-                                        let stacked_path = std::mem::replace(
-                                            &mut self.current_path,
-                                            included_path,
-                                        );
-                                        let stacked_declarations = std::mem::replace(
-                                            &mut self.current_declarations,
-                                            included_declarations,
-                                        );
-                                        self.stacked
-                                            .push_front((stacked_path, stacked_declarations));
+                                match self.included_globs.get(&abs_glob) {
+                                    None => panic!("impossible, I hope"),
+                                    Some(IncludedGlob::Expanded(paths)) => {
+                                        if paths.is_empty() {
+                                            // this is an error rather than a warning to catch plain paths whic fail to match
+                                            let e =
+                                                Error::new("include failed", "no such file", span);
 
-                                        // record the span in case of a duplicate include error later
-                                        if let Some(canonical_path) = canonical_path {
-                                            self.include_span_by_canonical_path
-                                                .insert(canonical_path, span);
+                                            self.errors.push(e)
                                         }
-                                    }
 
-                                    None => {
-                                        // either a known error path or a duplicate
-                                        let e = match self.error_paths.get(&path) {
-                                            Some(e) => {
-                                                Error::new("can't read file", e.to_string(), span)
-                                            }
-                                            None => {
-                                                let e = Error::new(
-                                                    "duplicate include",
-                                                    "file already included",
-                                                    span,
-                                                );
+                                        for included in paths {
+                                            let included = Some(included.clone());
 
-                                                // relate the error to the first include if we can
-                                                if let Some(span) = canonical_path.and_then(|p| {
-                                                    self.include_span_by_canonical_path.get(&p)
-                                                }) {
-                                                    e.related_to_named_span("file", *span)
-                                                } else {
-                                                    e
+                                            match self.remaining.remove_entry(&included) {
+                                                Some((included_path, included_declarations)) => {
+                                                    let stacked_path = std::mem::replace(
+                                                        &mut self.current_path,
+                                                        included_path,
+                                                    );
+                                                    let stacked_declarations = std::mem::replace(
+                                                        &mut self.current_declarations,
+                                                        included_declarations,
+                                                    );
+                                                    self.stacked.push_front((
+                                                        stacked_path,
+                                                        stacked_declarations,
+                                                    ));
+
+                                                    // record the span in case of a duplicate include error later
+                                                    if let Ok(canonical_path) = self
+                                                        .current_path
+                                                        .as_ref()
+                                                        .unwrap()
+                                                        .canonicalize()
+                                                    {
+                                                        self.include_span_by_canonical_path
+                                                            .insert(canonical_path, span);
+                                                    }
+                                                }
+
+                                                None => {
+                                                    // either a known error path or a duplicate
+                                                    let e =
+                                                        match self.error_paths.get(&included) {
+                                                            Some(e) => Error::new(
+                                                                "can't read file",
+                                                                e.to_string(),
+                                                                span,
+                                                            ),
+                                                            None => {
+                                                                let e = Error::new(
+                                                                    "duplicate include",
+                                                                    "file already included",
+                                                                    span,
+                                                                );
+
+                                                                // relate the error to the first include if we can
+                                                                if let Some(canonical_path) =
+                                                                    included.and_then(|included| {
+                                                                        included.canonicalize().ok()
+                                                                    })
+                                                                {
+                                                                    if let Some(span) =
+                                                                self.include_span_by_canonical_path
+                                                                    .get(&canonical_path)
+                                                        {
+                                                            e.related_to_named_span("file", *span)
+                                                        } else {e }
+                                                                } else {
+                                                                    e
+                                                                }
+                                                            }
+                                                        };
+                                                    self.errors.push(e);
                                                 }
                                             }
-                                        };
+                                        }
+                                    }
+                                    Some(IncludedGlob::Error(e)) => {
+                                        let e = Error::new("can't expand glob", e, span);
                                         self.errors.push(e);
                                     }
                                 }

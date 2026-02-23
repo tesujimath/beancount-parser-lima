@@ -24,6 +24,7 @@ either = "1.15.0"
 logos = "0.16.1"
 protobuf = "3.7.2"
 unescaper = "0.1.8"
+glob = "0.3.3"
 
 [dev-dependencies]
 derive_more = { version = "2.1.1", features = ["display"] }

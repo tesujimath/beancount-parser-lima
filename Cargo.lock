@@ -74,6 +74,7 @@ dependencies = [
  "chumsky",
  "derive_more",
  "either",
+ "glob",
  "itertools",
  "lazy_format",
  "logos",

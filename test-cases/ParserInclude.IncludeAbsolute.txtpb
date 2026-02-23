@@ -1,5 +1,5 @@
 # ANOMALY: Lima resolves includes within the core parser
 # and we cannot write a portable test with an absolute path, alas
 errors {
-  message: "can't read file"
+  message: "include failed"
 }

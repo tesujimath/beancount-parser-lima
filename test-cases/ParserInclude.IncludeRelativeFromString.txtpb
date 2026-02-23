@@ -2,5 +2,5 @@
 # and we already have a test for including a file which exists,
 # so this is the failing case
 errors {
-  message: "can't read file"
+  message: "include failed"
 }

@@ -26,7 +26,7 @@
         {
           devShells.default = mkShell {
             nativeBuildInputs = [
-              beancount
+              bashInteractive
 
               # build dependencies
               cargo-flamegraph
@@ -39,6 +39,10 @@
               rust-analyzer
               rust-bin.stable.latest.default
               rustfmt
+
+              # useful tools:
+              beancount
+              beanquery
             ];
           };
         }
