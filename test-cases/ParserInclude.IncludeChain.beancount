@@ -1,0 +1,5 @@
+2004-01-27 * "QUITE OLD"
+  Liabilities:US:Amex:BlueCash  -122.02 USD
+  Expenses:Food:Grocery          122.02 USD
+
+include "ParserInclude.IncludeChain/Included1.beancount"

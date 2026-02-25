@@ -1,0 +1,45 @@
+directives {
+  date { year: 2004 month: 1 day: 27 }
+  transaction {
+    flag: "*"
+    narration: "QUITE OLD"
+    postings {
+      account: "Liabilities:US:Amex:BlueCash"
+      spec { units { number { exact: "-122.02" } currency: "USD" } }
+    }
+    postings {
+      account: "Expenses:Food:Grocery"
+      spec { units { number { exact: "122.02" } currency: "USD" } }
+    }
+  }
+}
+directives {
+  date { year: 2011 month: 2 day: 27 }
+  transaction {
+    flag: "*"
+    narration: "ANOTHER MARKET"
+    postings {
+      account: "Liabilities:US:Amex:BlueCash"
+      spec { units { number { exact: "-23.03" } currency: "USD" } }
+    }
+    postings {
+      account: "Expenses:Food:Grocery"
+      spec { units { number { exact: "23.03" } currency: "USD" } }
+    }
+  }
+}
+directives {
+  date { year: 2014 month: 1 day: 27 }
+  transaction {
+    flag: "*"
+    narration: "UNION MARKET"
+    postings {
+      account: "Liabilities:US:Amex:BlueCash"
+      spec { units { number { exact: "-22.02" } currency: "USD" } }
+    }
+    postings {
+      account: "Expenses:Food:Grocery"
+      spec { units { number { exact: "22.02" } currency: "USD" } }
+    }
+  }
+}
