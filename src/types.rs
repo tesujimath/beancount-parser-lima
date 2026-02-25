@@ -6,7 +6,7 @@ use chumsky::{
 use rust_decimal::Decimal;
 use std::{
     cmp::max,
-    collections::{hash_map, HashMap, HashSet},
+    collections::{HashMap, HashSet, hash_map},
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
     iter::empty,
@@ -1161,6 +1161,12 @@ impl<'a> AsRef<str> for Account<'a> {
     }
 }
 
+impl<'a> From<Account<'a>> for &'a str {
+    fn from(value: Account<'a>) -> Self {
+        value.name
+    }
+}
+
 /// Error type for [AccountTypeName] creation.
 #[derive(PartialEq, Eq, Debug)]
 pub struct AccountError(AccountErrorKind);
@@ -1200,6 +1206,12 @@ pub struct Subaccount<'a>(&'a str);
 impl<'a> AsRef<str> for Subaccount<'a> {
     fn as_ref(&self) -> &'a str {
         self.0
+    }
+}
+
+impl<'a> From<Subaccount<'a>> for &'a str {
+    fn from(value: Subaccount<'a>) -> Self {
+        value.0
     }
 }
 
@@ -1279,6 +1291,12 @@ impl<'a> AsRef<str> for AccountTypeName<'a> {
     }
 }
 
+impl<'a> From<AccountTypeName<'a>> for &'a str {
+    fn from(value: AccountTypeName<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for AccountTypeName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1354,6 +1372,12 @@ impl<'a> AsRef<str> for AccountName<'a> {
     }
 }
 
+impl<'a> From<AccountName<'a>> for &'a str {
+    fn from(value: AccountName<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for AccountName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1388,7 +1412,13 @@ impl Display for AccountNameError {
                 bad_char
             ),
             Subsequent(bad_chars) => {
-                format(f, bad_chars, single_quoted, ", ", Some("invalid character "))?;
+                format(
+                    f,
+                    bad_chars,
+                    single_quoted,
+                    ", ",
+                    Some("invalid character "),
+                )?;
                 f.write_str(" in account name - must be alphanumeric or '-'")
             }
         }
@@ -1458,6 +1488,12 @@ impl<'a> AsRef<str> for Currency<'a> {
     }
 }
 
+impl<'a> From<Currency<'a>> for &'a str {
+    fn from(value: Currency<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for Currency<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1494,15 +1530,27 @@ impl Display for CurrencyError {
                 bad_char
             ),
             Intermediate(bad_chars) => {
-                format(f, bad_chars, single_quoted, ", ", Some("invalid intermediate characters "))?;
-                format(f, CURRENCY_INTERMEDIATE_EXTRA_CHARS, single_quoted, ", ", Some(" for currency - must be upppercase ASCII alphanumeric or one of "))
+                format(
+                    f,
+                    bad_chars,
+                    single_quoted,
+                    ", ",
+                    Some("invalid intermediate characters "),
+                )?;
+                format(
+                    f,
+                    CURRENCY_INTERMEDIATE_EXTRA_CHARS,
+                    single_quoted,
+                    ", ",
+                    Some(" for currency - must be upppercase ASCII alphanumeric or one of "),
+                )
             }
             Final(bad_char) => write!(
                 f,
                 "invalid final character '{}' for currency - must be uppercase ASCII alphanumeric",
                 bad_char
             ),
-            MissingLetter => write!(f, "currency must contain at least one letter")
+            MissingLetter => write!(f, "currency must contain at least one letter"),
         }
     }
 }
@@ -1799,6 +1847,12 @@ impl<'a> AsRef<str> for Tag<'a> {
     }
 }
 
+impl<'a> From<Tag<'a>> for &'a str {
+    fn from(value: Tag<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for Tag<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1848,6 +1902,12 @@ impl Display for Link<'_> {
 impl<'a> AsRef<str> for Link<'a> {
     fn as_ref(&self) -> &'a str {
         self.0
+    }
+}
+
+impl<'a> From<Link<'a>> for &'a str {
+    fn from(value: Link<'a>) -> Self {
+        value.0
     }
 }
 
@@ -1906,6 +1966,12 @@ impl Key<'_> {
 impl<'a> AsRef<str> for Key<'a> {
     fn as_ref(&self) -> &'a str {
         self.0
+    }
+}
+
+impl<'a> From<Key<'a>> for &'a str {
+    fn from(value: Key<'a>) -> Self {
+        value.0
     }
 }
 
