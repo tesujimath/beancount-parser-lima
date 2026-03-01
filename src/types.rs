@@ -2385,38 +2385,43 @@ impl ElementType for CostSpec<'_> {
 
 impl Display for CostSpec<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut prefix = "";
+        let mut sep = "";
         let space = " ";
+        let comma_space = ", ";
 
         f.write_str("{")?;
 
         if let Some(per_unit) = &self.per_unit {
-            write!(f, "{}{}", prefix, per_unit)?;
-            prefix = space;
+            write!(f, "{}{}", sep, per_unit)?;
+            sep = space;
         }
 
         if let Some(total) = &self.total {
-            write!(f, "{}# {}", prefix, total)?;
-            prefix = space;
+            write!(f, "{}# {}", sep, total)?;
+            sep = space;
         }
 
         if let Some(currency) = &self.currency {
-            write!(f, "{}{}", prefix, currency)?;
-            prefix = space;
+            write!(f, "{}{}", sep, currency)?;
+            sep = space;
+        }
+
+        if sep == space {
+            sep = comma_space
         }
 
         if let Some(date) = &self.date {
-            write!(f, "{}{}", prefix, date)?;
-            prefix = space;
+            write!(f, "{}{}", sep, date)?;
+            sep = comma_space;
         }
 
         if let Some(label) = &self.label {
-            write!(f, "{}\"{}\"", prefix, label)?;
-            prefix = space;
+            write!(f, "{}\"{}\"", sep, label)?;
+            sep = comma_space;
         }
 
         if self.merge {
-            write!(f, "{}*", prefix)?;
+            write!(f, "{}*", sep)?;
         }
 
         f.write_str("}")
