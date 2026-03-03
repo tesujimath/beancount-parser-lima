@@ -733,7 +733,7 @@ struct PragmaProcessor<'s> {
     remaining: HashMap<Option<PathBuf>, VecDeque<Spanned<Declaration<'s>>>>,
     included_globs: &'s HashMap<PathBuf, IncludedGlob>,
     error_paths: HashMap<Option<PathBuf>, String>,
-    include_span_by_canonical_path: HashMap<PathBuf, Span>,
+    include_by_canonical_path: HashMap<PathBuf, IncludeContext<'s>>,
     // tags and meta key/values for pragma push/pop
     tags: HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
     meta_key_values: HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
@@ -742,6 +742,40 @@ struct PragmaProcessor<'s> {
     // errors and warnings, for collection when the iterator is exhausted
     errors: Vec<Error>,
     warnings: Vec<Warning>,
+}
+
+#[derive(Debug)]
+struct IncludeContext<'s> {
+    tags: HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
+    meta_key_values: HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
+    span: Span,
+}
+
+fn fmt_include_context<'s>(
+    tags: &HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
+    meta_key_values: &HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
+) -> String {
+    let tags_s = itertools::intersperse(
+        tags.keys().map(|tag| tag.item().to_string()),
+        " ".to_string(),
+    )
+    .collect::<String>();
+    let meta_s = itertools::intersperse(
+        meta_key_values.iter().map(|(k, v)| {
+            format!(
+                "{}: [{}]",
+                k.item(),
+                itertools::intersperse(
+                    v.iter().map(|(_, v)| v.item().to_string()),
+                    " ".to_string()
+                )
+                .collect::<String>()
+            )
+        }),
+        " ".to_string(),
+    )
+    .collect::<String>();
+    format!("{} {}", tags_s, meta_s)
 }
 
 impl<'s> PragmaProcessor<'s> {
@@ -773,7 +807,7 @@ impl<'s> PragmaProcessor<'s> {
             remaining,
             included_globs,
             error_paths,
-            include_span_by_canonical_path: HashMap::default(),
+            include_by_canonical_path: HashMap::default(),
             tags: HashMap::new(),
             meta_key_values: HashMap::new(),
             options,
@@ -945,45 +979,77 @@ impl<'s> Iterator for PragmaProcessor<'s> {
                                                         .unwrap()
                                                         .canonicalize()
                                                     {
-                                                        self.include_span_by_canonical_path
-                                                            .insert(canonical_path, span);
+                                                        self.include_by_canonical_path.insert(
+                                                            canonical_path,
+                                                            IncludeContext {
+                                                                tags: self.tags.clone(),
+                                                                meta_key_values: self
+                                                                    .meta_key_values
+                                                                    .clone(),
+                                                                span,
+                                                            },
+                                                        );
                                                     }
                                                 }
 
                                                 None => {
-                                                    // either a known error path or a duplicate
-                                                    let e =
-                                                        match self.error_paths.get(&included) {
-                                                            Some(e) => Error::new(
-                                                                "can't read file",
-                                                                e.to_string(),
-                                                                span,
-                                                            ),
-                                                            None => {
-                                                                let e = Error::new(
-                                                                    "duplicate include",
-                                                                    "file already included",
-                                                                    span,
-                                                                );
+                                                    // either a known error path or a duplicate include
+                                                    if let Some(e) = self.error_paths.get(&included)
+                                                    {
+                                                        self.errors.push(Error::new(
+                                                            "can't read file",
+                                                            e.to_string(),
+                                                            span,
+                                                        ));
+                                                    } else {
+                                                        // duplicate include, only allowed if the include context is the same
 
-                                                                // relate the error to the first include if we can
-                                                                if let Some(canonical_path) =
-                                                                    included.and_then(|included| {
-                                                                        included.canonicalize().ok()
-                                                                    })
+                                                        let e = Error::new(
+                                                            "duplicate include",
+                                                            format!(
+                                                                "context {}",
+                                                                fmt_include_context(
+                                                                    &self.tags,
+                                                                    &self.meta_key_values
+                                                                )
+                                                            ),
+                                                            span,
+                                                        );
+
+                                                        // relate the error to the first include if we can
+                                                        let e = if let Some(canonical_path) =
+                                                            included.and_then(|included| {
+                                                                included.canonicalize().ok()
+                                                            }) {
+                                                            if let Some(include_context) = self
+                                                                .include_by_canonical_path
+                                                                .get(&canonical_path)
+                                                            {
+                                                                if include_context.tags == self.tags
+                                                                    && include_context
+                                                                        .meta_key_values
+                                                                        == self.meta_key_values
                                                                 {
-                                                                    if let Some(span) =
-                                                                self.include_span_by_canonical_path
-                                                                    .get(&canonical_path)
-                                                        {
-                                                            e.related_to_named_span("file", *span)
-                                                        } else {e }
+                                                                    // include context is identical, so the include is harmless
+                                                                    // and we ignore it
+                                                                    None
                                                                 } else {
-                                                                    e
+                                                                    Some(e.related_to_named_span(
+                                                                        format!("context {}", fmt_include_context(&include_context.tags, &include_context.meta_key_values)),
+                                                                        include_context.span,
+                                                                    ))
                                                                 }
+                                                            } else {
+                                                                Some(e)
                                                             }
+                                                        } else {
+                                                            Some(e)
                                                         };
-                                                    self.errors.push(e);
+
+                                                        if let Some(e) = e {
+                                                            self.errors.push(e);
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }

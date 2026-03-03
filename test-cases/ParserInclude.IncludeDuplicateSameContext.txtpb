@@ -15,6 +15,7 @@ directives {
 }
 directives {
   date { year: 2014 month: 1 day: 27 }
+  tags: "included"
   transaction {
     flag: "*"
     narration: "UNION MARKET"

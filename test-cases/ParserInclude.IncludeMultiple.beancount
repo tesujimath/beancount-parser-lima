@@ -1,0 +1,2 @@
+include "ParserInclude.IncludeMultiple/Included1.beancount"
+include "ParserInclude.IncludeMultiple/Included2.beancount"
