@@ -1,5 +1,11 @@
 pushtag #included
-include "ParserInclude.IncludeDuplicateSameContext/Included1.beancount"
+pushmeta name: "Fred"
+pushmeta size: 1
+pushmeta name: "Another"
+include "ParserInclude.IncludeDuplicateDifferentContext/Included1.beancount"
+popmeta name:
+popmeta name:
+popmeta size:
 poptag #included
 
 2004-01-27 * "QUITE OLD"
@@ -7,5 +13,7 @@ poptag #included
   Expenses:Food:Grocery          122.02 USD
 
 pushtag #included-again
-include "ParserInclude.IncludeDuplicateSameContext/Included1.beancount"
+pushtag #oops
+include "ParserInclude.IncludeDuplicateDifferentContext/Included1.beancount"
 poptag #included-again
+poptag #oops

@@ -751,6 +751,33 @@ struct IncludeContext<'s> {
     span: Span,
 }
 
+fn fmt_include_context<'s>(
+    tags: &HashMap<Spanned<Tag<'s>>, Vec<Spanned<Tag<'s>>>>,
+    meta_key_values: &HashMap<Spanned<Key<'s>>, Vec<(Span, Spanned<MetaValue<'s>>)>>,
+) -> String {
+    let tags_s = itertools::intersperse(
+        tags.keys().map(|tag| tag.item().to_string()),
+        " ".to_string(),
+    )
+    .collect::<String>();
+    let meta_s = itertools::intersperse(
+        meta_key_values.iter().map(|(k, v)| {
+            format!(
+                "{}: [{}]",
+                k.item(),
+                itertools::intersperse(
+                    v.iter().map(|(_, v)| v.item().to_string()),
+                    " ".to_string()
+                )
+                .collect::<String>()
+            )
+        }),
+        " ".to_string(),
+    )
+    .collect::<String>();
+    format!("{} {}", tags_s, meta_s)
+}
+
 impl<'s> PragmaProcessor<'s> {
     fn new(
         root_path: Option<&Path>,
@@ -979,7 +1006,13 @@ impl<'s> Iterator for PragmaProcessor<'s> {
 
                                                         let e = Error::new(
                                                             "duplicate include",
-                                                            "file already included with different context",
+                                                            format!(
+                                                                "context {}",
+                                                                fmt_include_context(
+                                                                    &self.tags,
+                                                                    &self.meta_key_values
+                                                                )
+                                                            ),
                                                             span,
                                                         );
 
@@ -1002,7 +1035,7 @@ impl<'s> Iterator for PragmaProcessor<'s> {
                                                                     None
                                                                 } else {
                                                                     Some(e.related_to_named_span(
-                                                                        "file",
+                                                                        format!("context {}", fmt_include_context(&include_context.tags, &include_context.meta_key_values)),
                                                                         include_context.span,
                                                                     ))
                                                                 }
