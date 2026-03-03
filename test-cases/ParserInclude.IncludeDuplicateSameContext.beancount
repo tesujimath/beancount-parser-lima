@@ -1,0 +1,11 @@
+pushtag #included
+include "ParserInclude.IncludeDuplicateSameContext/Included1.beancount"
+poptag #included
+
+2004-01-27 * "QUITE OLD"
+  Liabilities:US:Amex:BlueCash  -122.02 USD
+  Expenses:Food:Grocery          122.02 USD
+
+pushtag #included
+include "ParserInclude.IncludeDuplicateSameContext/Included1.beancount"
+poptag #included
