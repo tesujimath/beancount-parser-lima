@@ -1161,7 +1161,7 @@ impl<'a> AsRef<str> for Account<'a> {
     }
 }
 
-impl<'a> From<&Account<'a>> for &'a str {
+impl<'a> From<&'_ Account<'a>> for &'a str {
     fn from(value: &Account<'a>) -> Self {
         value.name
     }
@@ -1211,6 +1211,12 @@ impl<'a> AsRef<str> for Subaccount<'a> {
 
 impl<'a> From<Subaccount<'a>> for &'a str {
     fn from(value: Subaccount<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Subaccount<'a>> for &'a str {
+    fn from(value: &Subaccount<'a>) -> Self {
         value.0
     }
 }
@@ -1297,6 +1303,12 @@ impl<'a> From<AccountTypeName<'a>> for &'a str {
     }
 }
 
+impl<'a> From<&'_ AccountTypeName<'a>> for &'a str {
+    fn from(value: &AccountTypeName<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for AccountTypeName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1374,6 +1386,12 @@ impl<'a> AsRef<str> for AccountName<'a> {
 
 impl<'a> From<AccountName<'a>> for &'a str {
     fn from(value: AccountName<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ AccountName<'a>> for &'a str {
+    fn from(value: &AccountName<'a>) -> Self {
         value.0
     }
 }
@@ -1490,6 +1508,12 @@ impl<'a> AsRef<str> for Currency<'a> {
 
 impl<'a> From<Currency<'a>> for &'a str {
     fn from(value: Currency<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Currency<'a>> for &'a str {
+    fn from(value: &Currency<'a>) -> Self {
         value.0
     }
 }
@@ -1853,6 +1877,12 @@ impl<'a> From<Tag<'a>> for &'a str {
     }
 }
 
+impl<'a> From<&'_ Tag<'a>> for &'a str {
+    fn from(value: &Tag<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for Tag<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1907,6 +1937,12 @@ impl<'a> AsRef<str> for Link<'a> {
 
 impl<'a> From<Link<'a>> for &'a str {
     fn from(value: Link<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Link<'a>> for &'a str {
+    fn from(value: &Link<'a>) -> Self {
         value.0
     }
 }
@@ -1971,6 +2007,12 @@ impl<'a> AsRef<str> for Key<'a> {
 
 impl<'a> From<Key<'a>> for &'a str {
     fn from(value: Key<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Key<'a>> for &'a str {
+    fn from(value: &Key<'a>) -> Self {
         value.0
     }
 }
