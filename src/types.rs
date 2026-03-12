@@ -1161,8 +1161,8 @@ impl<'a> AsRef<str> for Account<'a> {
     }
 }
 
-impl<'a> From<Account<'a>> for &'a str {
-    fn from(value: Account<'a>) -> Self {
+impl<'a> From<&Account<'a>> for &'a str {
+    fn from(value: &Account<'a>) -> Self {
         value.name
     }
 }
