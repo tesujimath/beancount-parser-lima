@@ -20,7 +20,7 @@ fn main() -> io::Result<()> {
         required path: PathBuf
     };
 
-    let stderr = &io::stderr();
+    let stderr = &mut io::stderr();
     let sources = BeancountSources::try_from(flags.path)?;
     let parser = BeancountParser::new(&sources);
 
@@ -29,9 +29,9 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: &mut W)
 where
-    W: Write + Copy,
+    W: Write,
 {
     match parser.parse() {
         Ok(ParseSuccess {

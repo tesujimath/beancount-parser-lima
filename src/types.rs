@@ -17,6 +17,15 @@ use std::{marker::PhantomData, ops::DerefMut};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 use time::Date;
 
+// Public interface for errors and warnings
+pub trait Report {
+    fn message(&self) -> &str;
+    fn reason(&self) -> &str;
+    fn span(&self) -> Span;
+    fn contexts(&self) -> impl Iterator<Item = (&str, Span)>;
+    fn related(&self) -> impl Iterator<Item = (&str, Span)>;
+}
+
 /// Error or warning, according to the marker type with which it is instantiated.
 #[derive(Clone, Debug)]
 pub struct ErrorOrWarning<K>(pub(crate) Box<ErrorOrWarningImpl<K>>);
@@ -33,8 +42,8 @@ pub(crate) struct ErrorOrWarningImpl<K> {
     pub(crate) message: String,
     pub(crate) reason: String,
     pub(crate) span: Span,
-    pub(crate) contexts: Vec<(String, Span)>,
-    pub(crate) related: Vec<(String, Span)>,
+    pub(crate) contexts: Option<Vec<(String, Span)>>,
+    pub(crate) related: Option<Vec<(String, Span)>>,
     kind: PhantomData<K>,
 }
 
@@ -54,48 +63,33 @@ pub struct WarningKind;
 /// All that can usefully be done with these is write them via `BeancountSources`.
 pub type Warning = ErrorOrWarning<WarningKind>;
 
-impl Error {
-    pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
-        ErrorOrWarningImpl {
-            message: message.into(),
-            reason: reason.into(),
-            span,
-            contexts: Vec::new(),
-            related: Vec::new(),
-            kind: PhantomData,
-        }
-        .into()
+impl<K> Report for ErrorOrWarning<K> {
+    fn message(&self) -> &str {
+        &self.0.message
     }
 
-    pub(crate) fn with_contexts<M: Into<String>, R: Into<String>>(
-        message: M,
-        reason: R,
-        span: Span,
-        contexts: Vec<(String, Span)>,
-    ) -> Self {
-        ErrorOrWarningImpl {
-            message: message.into(),
-            reason: reason.into(),
-            span,
-            contexts,
-            related: Vec::new(),
-            kind: PhantomData,
-        }
-        .into()
+    fn reason(&self) -> &str {
+        &self.0.reason
     }
-}
 
-impl Warning {
-    pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
-        ErrorOrWarningImpl {
-            message: message.into(),
-            reason: reason.into(),
-            span,
-            contexts: Vec::new(),
-            related: Vec::new(),
-            kind: PhantomData,
-        }
-        .into()
+    fn span(&self) -> Span {
+        self.0.span
+    }
+
+    fn contexts(&self) -> impl Iterator<Item = (&str, Span)> {
+        self.0
+            .contexts
+            .iter()
+            .flatten()
+            .map(|(element, span)| (element.as_str(), *span))
+    }
+
+    fn related(&self) -> impl Iterator<Item = (&str, Span)> {
+        self.0
+            .related
+            .iter()
+            .flatten()
+            .map(|(element, span)| (element.as_str(), *span))
     }
 }
 
@@ -103,33 +97,45 @@ impl<K> ErrorOrWarning<K>
 where
     K: ErrorOrWarningKind,
 {
+    /// Create an error or warning with the given message, reason, and span
+    pub(crate) fn new<M: Into<String>, R: Into<String>>(message: M, reason: R, span: Span) -> Self {
+        ErrorOrWarningImpl::<K> {
+            message: message.into(),
+            reason: reason.into(),
+            span,
+            contexts: None,
+            related: None,
+            kind: PhantomData,
+        }
+        .into()
+    }
+
     /// Annotate an error or warning as being related to another parsed element.
-    pub fn related_to<'a, T>(self, element: &'a Spanned<T>) -> Self
+    pub fn related_to<'a, 'b, T>(self, element: &'b Spanned<T>) -> Self
     where
-        T: ElementType + 'a,
+        T: ElementType<'a> + 'b,
     {
         let mut e = self;
-        e.0.related
-            .push((element.element_type().to_string(), element.span));
+        let related = e.0.related.get_or_insert(Vec::new());
+        related.push((element.element_type().to_string(), element.span));
         e
     }
 
     /// Annotate an error or warning as being related to a number of parsed elements.
-    pub fn related_to_all<'a, T>(self, elements: impl IntoIterator<Item = &'a Spanned<T>>) -> Self
+    pub fn related_to_all<'a, 'b, T, I>(self, elements: I) -> Self
     where
-        T: ElementType + 'a,
+        T: ElementType<'a> + 'b,
+        I: IntoIterator<Item = &'b Spanned<T>>,
     {
-        let mut e = self;
         let mut new_related = elements
             .into_iter()
             .map(|element| (element.element_type().to_string(), element.span))
             .collect::<Vec<_>>();
-        e.0.related.append(&mut new_related);
-        e
-    }
 
-    pub fn message(&self) -> &str {
-        self.0.message.as_str()
+        let mut e = self;
+        let related = e.0.related.get_or_insert(Vec::new());
+        related.append(&mut new_related);
+        e
     }
 
     pub(crate) fn related_to_named_span<S>(self, name: S, span: Span) -> Self
@@ -137,19 +143,50 @@ where
         S: ToString,
     {
         let mut e = self;
-        e.0.related.push((name.to_string(), span));
+        let related = e.0.related.get_or_insert(Vec::new());
+        related.push((name.to_string(), span));
         e
     }
 
     /// Annotate an error or warning as being in the context of another parsed elememt,
     /// for example an error on a [Posting] being in the context of its [Transaction].
-    pub fn in_context<T>(self, element: &Spanned<T>) -> Self
+    pub fn in_context<'a, T>(self, element: &Spanned<T>) -> Self
     where
-        T: ElementType,
+        T: ElementType<'a>,
     {
         let mut e = self;
-        e.0.contexts
-            .push((element.element_type().to_string(), element.span));
+        let contexts = e.0.contexts.get_or_insert(Vec::new());
+        contexts.push((element.element_type().to_string(), element.span));
+        e
+    }
+
+    /// Annotate an error or warning as being in the context of other parsed elements.
+    pub fn in_contexts<'a, 'b, T, I>(self, elements: I) -> Self
+    where
+        T: ElementType<'a> + 'b,
+        I: IntoIterator<Item = &'b Spanned<T>>,
+    {
+        let mut new_contexts = elements
+            .into_iter()
+            .map(|element| (element.element_type().to_string(), element.span))
+            .collect::<Vec<_>>();
+
+        let mut e = self;
+        let contexts = e.0.contexts.get_or_insert(Vec::new());
+        contexts.append(&mut new_contexts);
+        e
+    }
+
+    // This one makes me sad
+    pub(crate) fn in_explicitly_labelled_contexts<I>(self, elements: I) -> Self
+    where
+        I: IntoIterator<Item = (String, Span)>,
+    {
+        let mut new_contexts = elements.into_iter().collect::<Vec<_>>();
+
+        let mut e = self;
+        let contexts = e.0.contexts.get_or_insert(Vec::new());
+        contexts.append(&mut new_contexts);
         e
     }
 
@@ -187,8 +224,10 @@ where
         "at {}..{} of source {}",
         value.0.span.start, value.0.span.end, value.0.span.source
     )?;
-    for context in value.0.contexts.iter() {
-        write!(f, " while parsing {} at {:?}", context.0, context.1)?;
+    if let Some(contexts) = &value.0.contexts {
+        for context in contexts.iter() {
+            write!(f, " while parsing {} at {:?}", context.0, context.1)?;
+        }
     }
     Ok(())
 }
@@ -256,8 +295,37 @@ where
     }
 }
 
+impl<K> Deref for AnnotatedErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
+    type Target = ErrorOrWarning<K>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error_or_warning
+    }
+}
+
+impl<K> AnnotatedErrorOrWarning<K>
+where
+    K: ErrorOrWarningKind,
+{
+    pub fn annotation(&self) -> Option<&str> {
+        self.annotation.as_deref()
+    }
+}
+
 pub type AnnotatedError = AnnotatedErrorOrWarning<ErrorKind>;
 pub type AnnotatedWarning = AnnotatedErrorOrWarning<WarningKind>;
+
+/// A spanned region in a Source
+pub struct SpannedSource<'a> {
+    /// File-name of source, only None in the case of the source being an inline string
+    pub file_name: Option<&'a str>,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub content: &'a str,
+}
 
 /// Top-level account type, the prefix of any fully-qualified [Account].
 #[derive(PartialEq, Eq, Hash, Clone, Copy, EnumString, EnumIter, IntoStaticStr, Debug)]
@@ -288,7 +356,7 @@ pub enum Flag {
     Letter(FlagLetter),
 }
 
-impl ElementType for Flag {
+impl ElementType<'static> for Flag {
     fn element_type(&self) -> &'static str {
         "flag"
     }
@@ -379,7 +447,7 @@ impl AsRef<str> for Booking {
     }
 }
 
-impl ElementType for Booking {
+impl ElementType<'static> for Booking {
     fn element_type(&self) -> &'static str {
         "booking"
     }
@@ -547,9 +615,9 @@ impl<T> Spanned<T> {
     }
 }
 
-impl<T> Spanned<T>
+impl<'a, T> Spanned<T>
 where
-    T: ElementType,
+    T: ElementType<'a>,
 {
     /// Create a new `Error` referring to the spanned element.
     pub fn error<S: Into<String>>(&self, reason: S) -> Error {
@@ -557,19 +625,6 @@ where
             format!("invalid {}", self.element_type()),
             reason,
             self.span,
-        )
-    }
-
-    pub fn error_with_contexts<S: Into<String>>(
-        &self,
-        reason: S,
-        contexts: Vec<(String, Span)>,
-    ) -> Error {
-        Error::with_contexts(
-            format!("invalid {}", self.element_type()),
-            reason,
-            self.span,
-            contexts,
         )
     }
 
@@ -626,34 +681,34 @@ impl<T> OptionalItem<T> for Option<&Spanned<T>> {
 }
 
 /// Implemented by any element, for access to its kind in error reporting.
-pub trait ElementType {
-    fn element_type(&self) -> &'static str;
+pub trait ElementType<'a> {
+    fn element_type(&self) -> &'a str;
 }
 
 // blanket implementation for references
-impl<T> ElementType for &T
+impl<'a, T> ElementType<'a> for &T
 where
-    T: ElementType,
+    T: ElementType<'a>,
 {
-    fn element_type(&self) -> &'static str {
+    fn element_type(&self) -> &'a str {
         (**self).element_type()
     }
 }
 
-impl<T> ElementType for &mut T
+impl<'a, T> ElementType<'a> for &mut T
 where
-    T: ElementType,
+    T: ElementType<'a>,
 {
-    fn element_type(&self) -> &'static str {
+    fn element_type(&self) -> &'a str {
         (**self).element_type()
     }
 }
 
-impl<T> ElementType for Box<T>
+impl<'a, T> ElementType<'a> for Box<T>
 where
-    T: ElementType,
+    T: ElementType<'a>,
 {
-    fn element_type(&self) -> &'static str {
+    fn element_type(&self) -> &'a str {
         (**self).element_type()
     }
 }
@@ -692,7 +747,7 @@ impl<'a> Directive<'a> {
     }
 }
 
-impl ElementType for Directive<'_> {
+impl ElementType<'static> for Directive<'_> {
     fn element_type(&self) -> &'static str {
         use DirectiveVariant::*;
 
@@ -841,7 +896,7 @@ impl<'a> Price<'a> {
     }
 }
 
-impl ElementType for Price<'_> {
+impl ElementType<'static> for Price<'_> {
     fn element_type(&self) -> &'static str {
         "price"
     }
@@ -876,7 +931,7 @@ impl<'a> Balance<'a> {
     }
 }
 
-impl ElementType for Balance<'_> {
+impl ElementType<'static> for Balance<'_> {
     fn element_type(&self) -> &'static str {
         "balance"
     }
@@ -1234,7 +1289,7 @@ impl Display for AccountError {
 
 impl std::error::Error for AccountError {}
 
-impl ElementType for Account<'_> {
+impl ElementType<'static> for Account<'_> {
     fn element_type(&self) -> &'static str {
         "account"
     }
@@ -1326,7 +1381,7 @@ impl<'a> TryFrom<&'a str> for AccountTypeName<'a> {
     }
 }
 
-impl ElementType for AccountTypeName<'_> {
+impl ElementType<'static> for AccountTypeName<'_> {
     fn element_type(&self) -> &'static str {
         "account type name"
     }
@@ -1413,7 +1468,7 @@ impl AccountName<'_> {
     }
 }
 
-impl ElementType for AccountName<'_> {
+impl ElementType<'static> for AccountName<'_> {
     fn element_type(&self) -> &'static str {
         "account name"
     }
@@ -1535,7 +1590,7 @@ impl Currency<'_> {
     }
 }
 
-impl ElementType for Currency<'_> {
+impl ElementType<'static> for Currency<'_> {
     fn element_type(&self) -> &'static str {
         "currency"
     }
@@ -1714,7 +1769,7 @@ impl<'a> Posting<'a> {
     }
 }
 
-impl ElementType for Posting<'_> {
+impl ElementType<'static> for Posting<'_> {
     fn element_type(&self) -> &'static str {
         "posting"
     }
@@ -1863,7 +1918,7 @@ pub enum SimpleValue<'a> {
     Expr(ExprValue),
 }
 
-impl ElementType for SimpleValue<'_> {
+impl ElementType<'static> for SimpleValue<'_> {
     fn element_type(&self) -> &'static str {
         "simple value"
     }
@@ -1900,7 +1955,7 @@ impl<'a> TryFrom<&'a str> for Tag<'a> {
     }
 }
 
-impl ElementType for Tag<'_> {
+impl ElementType<'static> for Tag<'_> {
     fn element_type(&self) -> &'static str {
         "tag"
     }
@@ -1952,7 +2007,7 @@ impl<'a> TryFrom<&'a str> for Link<'a> {
     }
 }
 
-impl ElementType for Link<'_> {
+impl ElementType<'static> for Link<'_> {
     fn element_type(&self) -> &'static str {
         "link"
     }
@@ -2058,7 +2113,7 @@ impl<'a> From<&'_ Key<'a>> for &'a str {
     }
 }
 
-impl ElementType for Key<'_> {
+impl ElementType<'static> for Key<'_> {
     fn element_type(&self) -> &'static str {
         "key"
     }
@@ -2176,7 +2231,7 @@ impl From<Expr> for ExprValue {
 }
 
 //
-impl ElementType for ExprValue {
+impl ElementType<'static> for ExprValue {
     fn element_type(&self) -> &'static str {
         "amount" // is there a better user-facing name?
     }
@@ -2460,7 +2515,7 @@ impl<'a> CostSpec<'a> {
     }
 }
 
-impl ElementType for CostSpec<'_> {
+impl ElementType<'static> for CostSpec<'_> {
     fn element_type(&self) -> &'static str {
         "cost specification"
     }

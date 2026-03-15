@@ -1,17 +1,17 @@
 use self::beancount::{
     data::{
-        meta::KV, meta_value, Amount, Balance, Close, Commodity, Custom, Directive, Document,
-        Error, Event, MetaValue, Note, Open, Pad, Posting, Price, Query, Transaction,
+        Amount, Balance, Close, Commodity, Custom, Directive, Document, Error, Event, MetaValue,
+        Note, Open, Pad, Posting, Price, Query, Transaction, meta::KV, meta_value,
     },
     date::Date,
     inter::{CostSpec, PriceSpec},
     ledger::Ledger,
     number::Number,
-    options::{options::ProcessingMode, processing_info::Plugin, AccountTypes, Booking, Options},
+    options::{AccountTypes, Booking, Options, options::ProcessingMode, processing_info::Plugin},
 };
 use ::beancount_parser_lima as lima;
 use derive_more::Display;
-use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess};
+use lima::{BeancountParser, BeancountSources, OptionalItem, ParseError, ParseSuccess, Report};
 use regex::Regex;
 use rust_decimal::Decimal;
 use std::{
@@ -25,7 +25,7 @@ use std::{
 };
 
 fn check(sources: &BeancountSources, parser: &BeancountParser, expected_ledger: Ledger) {
-    let stderr = &std::io::stderr();
+    let stderr = &mut std::io::stderr();
 
     let expected_directives = expected_ledger.directives;
     let expected_options = expected_ledger.options.as_ref();
@@ -609,11 +609,11 @@ impl<'e> ExpectEq<HashMap<&'e str, &'e MetaValue>> for HashMap<&str, &lima::Meta
 
 impl ExpectEq<MetaValue> for lima::MetaValue<'_> {
     fn expect_eq(&self, expected: &MetaValue, ctx: Context) {
+        use Option::None;
         use lima::MetaValue::*;
         use lima::SimpleValue;
         use lima::SimpleValue::*;
-        use meta_value::Value;
-        use Option::None; // shadow SimpleValue::None
+        use meta_value::Value; // shadow SimpleValue::None
 
         match (self, &expected.value) {
             (Simple(String(actual)), Some(Value::Text(expected))) => {
@@ -1057,8 +1057,8 @@ fn bytes_to_flag(bytes: &[u8]) -> Result<lima::Flag, BytesToFlagError> {
 
 impl ExpectEq<Booking> for lima::Booking {
     fn expect_eq(&self, expected: &Booking, ctx: Context) {
-        use lima::Booking as lima;
         use Booking::*;
+        use lima::Booking as lima;
 
         let eq = match (self, expected) {
             // UNKNOWN = 0,
@@ -1079,8 +1079,8 @@ impl ExpectEq<Booking> for lima::Booking {
 
 impl ExpectEq<ProcessingMode> for lima::PluginProcessingMode {
     fn expect_eq(&self, expected: &ProcessingMode, ctx: Context) {
-        use lima::PluginProcessingMode as lima;
         use ProcessingMode::*;
+        use lima::PluginProcessingMode as lima;
 
         let eq = match (self, expected) {
             // UNKNOWN = 0,
