@@ -252,7 +252,7 @@ impl Display for Token<'_> {
 
 type RangedToken<'a> = (Token<'a>, Range<usize>);
 type RangedTokenOrError<'a> = (Result<Token<'a>, LexerError>, Range<usize>);
-type SpannedToken<'a> = (Token<'a>, Span);
+type SpannedToken<'a> = (Token<'a>, Span_);
 
 // Work-around for Logos issue #315.  See `RecoveryAttempter`.
 //

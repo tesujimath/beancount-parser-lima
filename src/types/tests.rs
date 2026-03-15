@@ -12,7 +12,7 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn arb_span(max_sources: u32, maxlen: usize)(source_id in arb_source_id(max_sources), b in any::<usize>(), len in 0..maxlen) -> Span {
+    fn arb_span(max_sources: u32, maxlen: usize)(source_id in arb_source_id(max_sources), b in any::<usize>(), len in 0..maxlen) -> Span_ {
         chumsky::span::Span::new(source_id, b..b + len)
     }
 }
@@ -27,11 +27,11 @@ proptest! {
             h.finish()
         }
 
-        assert_eq!(spanned(i1, s1), spanned(i1, s2));
-        assert_eq!(spanned(i1, s1) == spanned(i2, s2), i1 == i2);
+        assert_eq!(spanned_(i1, s1), spanned_(i1, s2));
+        assert_eq!(spanned_(i1, s1) == spanned_(i2, s2), i1 == i2);
 
-        assert_eq!(hash(spanned(i1, s1)), hash(spanned(i1, s2)));
-        assert_eq!(hash(spanned(i1, s1)) == hash(spanned(i2, s2)), i1 == i2);
+        assert_eq!(hash(spanned_(i1, s1)), hash(spanned_(i1, s2)));
+        assert_eq!(hash(spanned_(i1, s1)) == hash(spanned_(i2, s2)), i1 == i2);
     }
 }
 

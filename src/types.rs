@@ -181,18 +181,14 @@ fn fmt_error_or_warning<K>(value: &ErrorOrWarning<K>, f: &mut Formatter<'_>) -> 
 where
     K: ErrorOrWarningKind,
 {
-    use chumsky::span::Span;
-
     write!(f, "{} ({}) ", value.0.message, value.0.reason)?;
     write!(
         f,
         "at {}..{} of source {}",
-        value.0.span.start(),
-        value.0.span.end(),
-        value.0.span.context()
+        value.0.span.start, value.0.span.end, value.0.span.source
     )?;
     for context in value.0.contexts.iter() {
-        write!(f, " while parsing {} at {}", context.0, context.1)?;
+        write!(f, " while parsing {} at {:?}", context.0, context.1)?;
     }
     Ok(())
 }
@@ -422,7 +418,45 @@ impl Display for SourceId {
 }
 
 /// Identifies a span of text within its source file.
-pub type Span = chumsky::span::SimpleSpan<usize, SourceId>;
+pub(crate) type Span_ = chumsky::span::SimpleSpan<usize, SourceId>;
+
+/// A public and transparent span.
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub struct Span {
+    pub source: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+impl From<&Span_> for Span {
+    fn from(value: &Span_) -> Self {
+        Span {
+            source: value.context.into(),
+            start: value.start,
+            end: value.end,
+        }
+    }
+}
+
+impl From<Span_> for Span {
+    fn from(value: Span_) -> Self {
+        Span {
+            source: value.context.into(),
+            start: value.start,
+            end: value.end,
+        }
+    }
+}
+
+impl From<Span> for Span_ {
+    fn from(value: Span) -> Self {
+        chumsky::span::SimpleSpan {
+            start: value.start,
+            end: value.end,
+            context: value.source.into(),
+        }
+    }
+}
 
 /// A Spanned item is one located within its source file.
 /// The span is invisible with respect to equality and hashing.
@@ -448,6 +482,13 @@ impl<T> DerefMut for Spanned<T> {
     }
 }
 
+pub(crate) fn spanned_<T>(item: T, span: Span_) -> Spanned<T> {
+    Spanned {
+        item,
+        span: span.into(),
+    }
+}
+
 pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
     Spanned { item, span }
 }
@@ -455,12 +496,12 @@ pub fn spanned<T>(item: T, span: Span) -> Spanned<T> {
 /// for use with `map_with`
 pub(crate) fn spanned_extra<'a, 'b, T, I, E>(item: T, e: &mut MapExtra<'a, 'b, I, E>) -> Spanned<T>
 where
-    I: Input<'a, Span = Span>,
+    I: Input<'a, Span = Span_>,
     E: ParserExtra<'a, I>,
 {
     Spanned {
         item,
-        span: e.span(),
+        span: e.span().into(),
     }
 }
 
