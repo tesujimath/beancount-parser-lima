@@ -756,12 +756,12 @@ impl<'a> Transaction<'a> {
     }
 
     /// Field accessor.
-    pub fn payee(&self) -> Option<&Spanned<&str>> {
+    pub fn payee(&self) -> Option<&Spanned<&'a str>> {
         self.payee.as_ref()
     }
 
     /// Field accessor.
-    pub fn narration(&self) -> Option<&Spanned<&str>> {
+    pub fn narration(&self) -> Option<&Spanned<&'a str>> {
         self.narration.as_ref()
     }
 
@@ -963,7 +963,7 @@ impl<'a> Document<'a> {
 
     /// The path to the document, possibly relative to a directory given by options.
     /// No check is made as to validity of the path or existence of the file.
-    pub fn path(&self) -> &Spanned<&str> {
+    pub fn path(&self) -> &Spanned<&'a str> {
         &self.path
     }
 }
@@ -989,7 +989,7 @@ impl<'a> Note<'a> {
     }
 
     /// Field accessor.
-    pub fn comment(&self) -> &Spanned<&str> {
+    pub fn comment(&self) -> &Spanned<&'a str> {
         &self.comment
     }
 }
@@ -1001,7 +1001,7 @@ pub struct Event<'a> {
     pub(crate) description: Spanned<&'a str>,
 }
 
-impl Event<'_> {
+impl<'a> Event<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(
             f,
@@ -1014,12 +1014,12 @@ impl Event<'_> {
     }
 
     /// Field accessor.
-    pub fn event_type(&self) -> &Spanned<&str> {
+    pub fn event_type(&self) -> &Spanned<&'a str> {
         &self.event_type
     }
 
     /// Field accessor.
-    pub fn description(&self) -> &Spanned<&str> {
+    pub fn description(&self) -> &Spanned<&'a str> {
         &self.description
     }
 }
@@ -1031,7 +1031,7 @@ pub struct Query<'a> {
     pub(crate) content: Spanned<&'a str>,
 }
 
-impl Query<'_> {
+impl<'a> Query<'a> {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date, metadata: &Metadata) -> fmt::Result {
         write!(f, "{} query \"{}\" \"{}\"", date, self.name, self.content)?;
         // we prefer to show tags and links inline rather then line by line in metadata
@@ -1040,12 +1040,12 @@ impl Query<'_> {
     }
 
     /// Field accessor.
-    pub fn name(&self) -> &Spanned<&str> {
+    pub fn name(&self) -> &Spanned<&'a str> {
         &self.name
     }
 
     /// Field accessor.
-    pub fn content(&self) -> &Spanned<&str> {
+    pub fn content(&self) -> &Spanned<&'a str> {
         &self.content
     }
 }
@@ -1067,7 +1067,7 @@ impl<'a> Custom<'a> {
     }
 
     /// Field accessor.
-    pub fn type_(&self) -> &Spanned<&str> {
+    pub fn type_(&self) -> &Spanned<&'a str> {
         &self.type_
     }
 
@@ -1086,12 +1086,12 @@ pub struct Plugin<'a> {
 
 impl<'a> Plugin<'a> {
     /// Field accessor.
-    pub fn module_name(&self) -> &Spanned<&str> {
+    pub fn module_name(&self) -> &Spanned<&'a str> {
         &self.module_name
     }
 
     /// Field accessor.
-    pub fn config(&self) -> Option<&Spanned<&str>> {
+    pub fn config(&self) -> Option<&Spanned<&'a str>> {
         self.config.as_ref()
     }
 }
@@ -1161,8 +1161,8 @@ impl<'a> AsRef<str> for Account<'a> {
     }
 }
 
-impl<'a> From<Account<'a>> for &'a str {
-    fn from(value: Account<'a>) -> Self {
+impl<'a> From<&'_ Account<'a>> for &'a str {
+    fn from(value: &Account<'a>) -> Self {
         value.name
     }
 }
@@ -1211,6 +1211,12 @@ impl<'a> AsRef<str> for Subaccount<'a> {
 
 impl<'a> From<Subaccount<'a>> for &'a str {
     fn from(value: Subaccount<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Subaccount<'a>> for &'a str {
+    fn from(value: &Subaccount<'a>) -> Self {
         value.0
     }
 }
@@ -1297,6 +1303,12 @@ impl<'a> From<AccountTypeName<'a>> for &'a str {
     }
 }
 
+impl<'a> From<&'_ AccountTypeName<'a>> for &'a str {
+    fn from(value: &AccountTypeName<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for AccountTypeName<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1374,6 +1386,12 @@ impl<'a> AsRef<str> for AccountName<'a> {
 
 impl<'a> From<AccountName<'a>> for &'a str {
     fn from(value: AccountName<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ AccountName<'a>> for &'a str {
+    fn from(value: &AccountName<'a>) -> Self {
         value.0
     }
 }
@@ -1490,6 +1508,12 @@ impl<'a> AsRef<str> for Currency<'a> {
 
 impl<'a> From<Currency<'a>> for &'a str {
     fn from(value: Currency<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Currency<'a>> for &'a str {
+    fn from(value: &Currency<'a>) -> Self {
         value.0
     }
 }
@@ -1853,6 +1877,12 @@ impl<'a> From<Tag<'a>> for &'a str {
     }
 }
 
+impl<'a> From<&'_ Tag<'a>> for &'a str {
+    fn from(value: &Tag<'a>) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq<&str> for Tag<'_> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -1907,6 +1937,12 @@ impl<'a> AsRef<str> for Link<'a> {
 
 impl<'a> From<Link<'a>> for &'a str {
     fn from(value: Link<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Link<'a>> for &'a str {
+    fn from(value: &Link<'a>) -> Self {
         value.0
     }
 }
@@ -1971,6 +2007,12 @@ impl<'a> AsRef<str> for Key<'a> {
 
 impl<'a> From<Key<'a>> for &'a str {
     fn from(value: Key<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<&'_ Key<'a>> for &'a str {
+    fn from(value: &Key<'a>) -> Self {
         value.0
     }
 }
@@ -2345,7 +2387,7 @@ pub struct CostSpec<'a> {
     merge: bool,
 }
 
-impl CostSpec<'_> {
+impl<'a> CostSpec<'a> {
     /// Field accessor.
     pub fn per_unit(&self) -> Option<&Spanned<ExprValue>> {
         self.per_unit.as_ref()
@@ -2357,7 +2399,7 @@ impl CostSpec<'_> {
     }
 
     /// Field accessor.
-    pub fn currency(&self) -> Option<&Spanned<Currency<'_>>> {
+    pub fn currency(&self) -> Option<&Spanned<Currency<'a>>> {
         self.currency.as_ref()
     }
 
@@ -2367,7 +2409,7 @@ impl CostSpec<'_> {
     }
 
     /// Field accessor.
-    pub fn label(&self) -> Option<&Spanned<&str>> {
+    pub fn label(&self) -> Option<&Spanned<&'a str>> {
         self.label.as_ref()
     }
 
