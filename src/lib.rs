@@ -463,7 +463,9 @@ impl BeancountSources {
 
     fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
         let safe_span = if span.source >= self.source_id_strings.len() {
-            // bad source collapses down to empty span, because we don't really have a good way to reject that
+            // bad source collapses down to empty span,
+            // because we don't really have a good way to reject that
+            // and at least we mustn't panic
             Span {
                 source: self.root_source_id.into(),
                 start: 0,
