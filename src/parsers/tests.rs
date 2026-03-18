@@ -1,13 +1,13 @@
 #![cfg(test)]
 use super::super::{bare_lex, end_of_input, types::*};
 use super::*;
-use chumsky::prelude::{any, Input, IterParser};
+use chumsky::prelude::{Input, IterParser, any};
 use rust_decimal_macros::dec;
 use std::ops::Range;
 use test_case::test_case;
 use time::Month;
 
-fn bare_lex_with_source<'a>(source_id: SourceId, s: &'a str) -> Vec<(Token<'a>, Span)> {
+fn bare_lex_with_source<'a>(source_id: SourceId, s: &'a str) -> Vec<(Token<'a>, Span_)> {
     bare_lex(s)
         .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
         .collect::<Vec<_>>()
@@ -34,26 +34,25 @@ fn test_transaction(
         .parse_with_state(spanned_tokens, &mut parser_state)
         .into_result();
 
-    let expected_date = spanned(
-        Date::from_calendar_date(expected_date.0 .0, expected_date.0 .1, expected_date.0 .2)
-            .unwrap(),
+    let expected_date = spanned_(
+        Date::from_calendar_date(expected_date.0.0, expected_date.0.1, expected_date.0.2).unwrap(),
         sourced_span(expected_date.1),
     );
 
-    let expected_flag = spanned(expected_flag.0, sourced_span(expected_flag.1));
+    let expected_flag = spanned_(expected_flag.0, sourced_span(expected_flag.1));
 
-    let expected_payee = expected_payee.map(|(s, range)| spanned(s, sourced_span(range)));
+    let expected_payee = expected_payee.map(|(s, range)| spanned_(s, sourced_span(range)));
 
-    let expected_narration = expected_narration.map(|(s, range)| spanned(s, sourced_span(range)));
+    let expected_narration = expected_narration.map(|(s, range)| spanned_(s, sourced_span(range)));
 
     let expected_tags = expected_tags
         .into_iter()
-        .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
+        .map(|(s, range)| spanned_(Tag::try_from(s).unwrap(), sourced_span(range)))
         .collect::<HashSet<_>>();
 
     let expected_links = expected_links
         .into_iter()
-        .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
+        .map(|(s, range)| spanned_(Link::try_from(s).unwrap(), sourced_span(range)))
         .collect::<HashSet<_>>();
 
     assert!(result.is_ok());
@@ -138,12 +137,12 @@ fn test_tags_links(
 
     let expected_tags = expected_tags
         .into_iter()
-        .map(|(s, range)| spanned(Tag::try_from(s).unwrap(), sourced_span(range)))
+        .map(|(s, range)| spanned_(Tag::try_from(s).unwrap(), sourced_span(range)))
         .collect::<HashSet<_>>();
 
     let expected_links = expected_links
         .into_iter()
-        .map(|(s, range)| spanned(Link::try_from(s).unwrap(), sourced_span(range)))
+        .map(|(s, range)| spanned_(Link::try_from(s).unwrap(), sourced_span(range)))
         .collect::<HashSet<_>>();
 
     let result = tags_links()

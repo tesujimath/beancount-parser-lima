@@ -3,7 +3,7 @@ use super::types::*;
 use rust_decimal::Decimal;
 use std::path::{Path, PathBuf};
 use std::{
-    collections::{hash_map, HashMap},
+    collections::{HashMap, hash_map},
     fmt::{self, Display, Formatter},
     hash::Hash,
 };
@@ -163,10 +163,7 @@ impl<'a> BeancountOption<'a> {
     // a bit of a hack to be able to fail on unknown or bad option and still have the parser consume the input
     pub(crate) fn ignored() -> Self {
         Self {
-            source: Source {
-                name: Span::default(),
-                value: Span::default(),
-            },
+            source: Source::default(),
             variant: BeancountOptionVariant::Ignored,
         }
     }
@@ -527,8 +524,8 @@ impl<'a> Options<'a> {
     where
         K: Eq + Hash,
     {
-        use hash_map::Entry::*;
         use OptionError::*;
+        use hash_map::Entry::*;
 
         match field.entry(key) {
             Vacant(entry) => {
@@ -549,8 +546,8 @@ impl<'a> Options<'a> {
     where
         K: Eq + Hash,
     {
-        use hash_map::Entry::*;
         use OptionError::*;
+        use hash_map::Entry::*;
 
         match field.entry(key) {
             Vacant(entry) => {
@@ -710,6 +707,22 @@ pub(crate) struct Source {
     pub(crate) value: Span,
 }
 
+// this is a bit of a grotty hack, sorry
+// but it's private to the crate, and we don't leak a default for Span
+impl Default for Source {
+    fn default() -> Self {
+        let default_span = Span {
+            source: 0,
+            start: 0,
+            end: 0,
+        };
+        Self {
+            name: default_span,
+            value: default_span,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) enum OptionError {
     DuplicateOption(Span),
@@ -717,12 +730,12 @@ pub(crate) enum OptionError {
 }
 
 impl OptionError {
-    pub(crate) fn span(&self) -> Span {
+    pub(crate) fn span(&self) -> &Span {
         use OptionError::*;
 
         match self {
-            DuplicateOption(span) => *span,
-            DuplicateValue(span) => *span,
+            DuplicateOption(span) => span,
+            DuplicateValue(span) => span,
         }
     }
 }
