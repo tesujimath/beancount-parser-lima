@@ -462,7 +462,19 @@ impl BeancountSources {
     }
 
     fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
-        let source_id = span.source.into();
+        let safe_span = if span.source >= self.source_id_strings.len() {
+            // bad source collapses down to empty span,
+            // because we don't really have a good way to reject that
+            // and at least we mustn't panic
+            Span {
+                source: self.root_source_id.into(),
+                start: 0,
+                end: 0,
+            }
+        } else {
+            *span
+        };
+        let source_id = safe_span.source.into();
         let source_id_str = self.source_id_string(source_id);
         let empty_char_indices = Vec::default();
         let (source_content, source_content_char_indices) = if source_id == self.root_source_id {
@@ -475,7 +487,7 @@ impl BeancountSources {
             ("", &empty_char_indices)
         };
 
-        let byte_span = trimmed_span(source_content, span);
+        let byte_span = trimmed_span(source_content, &safe_span);
         let rune_span = self.byte_to_rune(source_content_char_indices, byte_span);
 
         (source_content, source_id_str, byte_span, rune_span)
@@ -1146,7 +1158,14 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span_ {
 
 fn trimmed_span(source: &str, span: &Span) -> Span {
     let mut trimmed = *span;
-    trimmed.end = trim_trailing_whitespace(source, span.start, span.end);
+
+    // invalid spans fall back to nothing
+    if source.get(span.start..span.end).is_none() {
+        trimmed.start = 0;
+        trimmed.end = 0;
+    } else {
+        trimmed.end = trim_trailing_whitespace(source, span.start, span.end);
+    }
     trimmed
 }
 
