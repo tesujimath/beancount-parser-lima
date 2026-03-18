@@ -1324,14 +1324,15 @@ impl From<ParserError<'_>> for Error {
     fn from(error: ParserError) -> Self {
         let error = error.map_token(|tok| tok.to_string());
 
-        Error::with_contexts(
+        Error::new(
             error.to_string(),
             error.reason().to_string(),
             error.span().into(),
+        )
+        .in_explicitly_labelled_contexts(
             error
                 .contexts()
-                .map(|(label, span)| (label.to_string(), span.into()))
-                .collect(),
+                .map(|(label, span)| (label.to_string(), span.into())),
         )
     }
 }

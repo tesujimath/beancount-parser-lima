@@ -21,12 +21,12 @@
 //!    let sources = BeancountSources::try_from(PathBuf::from("examples/data/error-post-balancing.beancount")).unwrap();
 //!    let parser = BeancountParser::new(&sources);
 //!
-//!    parse(&sources, &parser, &io::stderr());
+//!    parse(&sources, &parser, &mut io::stderr());
 //!}
 //!
-//!fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+//!fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: &mut W)
 //!where
-//!    W: Write + Copy,
+//!    W: Write,
 //!{
 //!    match parser.parse() {
 //!        Ok(ParseSuccess {
@@ -82,7 +82,7 @@
 //!}
 //!```
 
-use ariadne::{Color, Label, Report};
+use ariadne::{Color, Label};
 use chumsky::prelude::{Input, Parser};
 use glob::{self, glob_with};
 use lazy_format::lazy_format;
@@ -324,9 +324,9 @@ impl BeancountSources {
     }
 
     #[deprecated(since = "0.12.0", note = "Use `write_errors_or_warnings` instead")]
-    pub fn write<W, E, K>(&self, w: W, errors_or_warnings: Vec<E>) -> io::Result<()>
+    pub fn write<W, E, K>(&self, w: &mut W, errors_or_warnings: Vec<E>) -> io::Result<()>
     where
-        W: Write + Copy,
+        W: Write,
         E: Into<AnnotatedErrorOrWarning<K>>,
         K: ErrorOrWarningKind,
     {
@@ -336,11 +336,11 @@ impl BeancountSources {
     /// Write human-readable error reports.
     pub fn write_errors_or_warnings<W, E, K>(
         &self,
-        mut w: W,
+        w: &mut W,
         errors_or_warnings: Vec<E>,
     ) -> io::Result<()>
     where
-        W: Write + Copy,
+        W: Write,
         E: Into<AnnotatedErrorOrWarning<K>>,
         K: ErrorOrWarningKind,
     {
@@ -349,33 +349,8 @@ impl BeancountSources {
                 error_or_warning,
                 annotation,
             } = error_or_warning.into();
-            let error_or_warning = *(error_or_warning.0);
-            let (src_id, span) =
-                self.source_id_string_and_adjusted_rune_span(&error_or_warning.span);
-            let color = error_or_warning.color();
-            let report_kind = error_or_warning.report_kind();
 
-            Report::build(report_kind, (src_id.clone(), (span.start..span.end)))
-                .with_message(error_or_warning.message)
-                .with_labels(Some(
-                    Label::new((src_id, (span.start..span.end)))
-                        .with_message(error_or_warning.reason)
-                        .with_color(color),
-                ))
-                .with_labels(error_or_warning.contexts.into_iter().map(|(label, span)| {
-                    let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                    Label::new((src_id, (span.start..span.end)))
-                        .with_message(lazy_format!("in this {}", label))
-                        .with_color(Color::Yellow)
-                }))
-                .with_labels(error_or_warning.related.into_iter().map(|(label, span)| {
-                    let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                    Label::new((src_id, (span.start..span.end)))
-                        .with_message(lazy_format!("{}", label))
-                        .with_color(Color::Yellow)
-                }))
-                .finish()
-                .write(ariadne::sources(self.sources()), w)?;
+            self.write_error_or_warning(w, &error_or_warning)?;
 
             if let Some(annotation) = annotation {
                 // clippy thinks this is better than write! 🤷
@@ -383,6 +358,86 @@ impl BeancountSources {
             }
         }
         Ok(())
+    }
+
+    /// Write human-readable error or warning report.
+    fn write_error_or_warning<W, K>(
+        &self,
+        w: &mut W,
+        error_or_warning: &ErrorOrWarning<K>,
+    ) -> io::Result<()>
+    where
+        W: Write,
+        K: ErrorOrWarningKind,
+    {
+        self.write_report::<W, K, ErrorOrWarning<K>>(w, error_or_warning)
+    }
+
+    /// Write human-readable error or warning report.
+    pub fn write_report<W, K, R>(&self, w: &mut W, report: &R) -> io::Result<()>
+    where
+        W: Write,
+        K: ErrorOrWarningKind,
+        R: Report,
+    {
+        let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&report.span());
+        let color = K::color();
+        let report_kind = K::report_kind();
+
+        ariadne::Report::build(report_kind, (src_id.clone(), (span.start..span.end)))
+            .with_message(report.message())
+            .with_labels(Some(
+                Label::new((src_id, (span.start..span.end)))
+                    .with_message(report.reason())
+                    .with_color(color),
+            ))
+            .with_labels(report.contexts().map(|(label, span)| {
+                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
+                Label::new((src_id, (span.start..span.end)))
+                    .with_message(lazy_format!("in this {}", label))
+                    .with_color(Color::Yellow)
+            }))
+            .with_labels(report.related().map(|(label, span)| {
+                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
+                Label::new((src_id, (span.start..span.end)))
+                    .with_message(lazy_format!("{}", label))
+                    .with_color(Color::Yellow)
+            }))
+            .finish()
+            .write(ariadne::sources(self.sources()), w)
+    }
+
+    /// Resolve the span into filename, line number range, and spanned content.
+    /// Filename will be present unless the sources were created from an inline string.
+    pub fn resolve_span<'a>(&'a self, span: &Span) -> SpannedSource<'a> {
+        let (source_content, source_id_str, byte_span, rune_span) = self.get_adjusted_source(span);
+
+        let file_name = if Into::<SourceId>::into(span.source) == self.root_source_id {
+            self.root_path.as_ref().and(Some(source_id_str))
+        } else {
+            Some(source_id_str)
+        };
+
+        let mut source_chars = source_content.chars();
+        let start_line = source_chars
+            .by_ref()
+            .take(rune_span.start)
+            .filter(|c| *c == '\n')
+            .count()
+            + 1;
+        let lines_spanned = source_chars
+            .by_ref()
+            .take(rune_span.end - rune_span.start)
+            .filter(|c| *c == '\n')
+            .count();
+        let end_line = start_line + lines_spanned;
+
+        SpannedSource {
+            file_name,
+            start_line,
+            end_line,
+            content: &source_content[byte_span.start..byte_span.end],
+        }
     }
 
     fn byte_to_rune(&self, char_indices: &[usize], byte_span: Span) -> Span {
@@ -568,12 +623,12 @@ type SpannedToken<'t> = (Token<'t>, Span_);
 ///     let sources = BeancountSources::try_from(PathBuf::from("examples/data/full.beancount")).unwrap();
 ///     let parser = BeancountParser::new(&sources);
 ///
-///     parse(&sources, &parser, &io::stderr());
+///     parse(&sources, &parser, &mut io::stderr());
 /// }
 ///
-/// fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: W)
+/// fn parse<W>(sources: &BeancountSources, parser: &BeancountParser, error_w: &mut W)
 /// where
-///     W: Write + Copy,
+///     W: Write,
 /// {
 ///     match parser.parse() {
 ///         Ok(ParseSuccess {

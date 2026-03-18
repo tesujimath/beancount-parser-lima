@@ -2,7 +2,7 @@ use std::io::{self, prelude::*};
 use std::path::PathBuf;
 
 // for counting allocations
-use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
+use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 use std::alloc::System;
 
 #[global_allocator]
@@ -21,7 +21,7 @@ fn main() -> io::Result<()> {
         required path: PathBuf
     };
 
-    let stderr = &io::stderr();
+    let stderr = &mut io::stderr();
 
     let sources = if flags.path.to_str() == Some("STDIN") {
         let mut source_string = String::new();
@@ -42,9 +42,9 @@ fn parse<W>(
     sources: &BeancountSources,
     parser: &BeancountParser,
     show_allocations: bool,
-    error_w: W,
+    error_w: &mut W,
 ) where
-    W: Write + Copy,
+    W: Write,
 {
     // allocation counting
     let reg = Region::new(GLOBAL);
