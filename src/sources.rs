@@ -215,7 +215,7 @@ impl BeancountSources {
                 annotation,
             } = error_or_warning.into();
 
-            self.write_error_or_warning(w, &error_or_warning)?;
+            self.write_report::<W, K, ErrorOrWarning<K>>(w, &error_or_warning)?;
 
             if let Some(annotation) = annotation {
                 // clippy thinks this is better than write! 🤷
@@ -226,56 +226,24 @@ impl BeancountSources {
     }
 
     /// Write human-readable error or warning report.
-    fn write_error_or_warning<W, K>(
-        &self,
-        w: &mut W,
-        error_or_warning: &ErrorOrWarning<K>,
-    ) -> io::Result<()>
-    where
-        W: Write,
-        K: ErrorOrWarningKind,
-    {
-        self.write_report::<W, K, ErrorOrWarning<K>>(w, error_or_warning)
-    }
-
-    /// Write human-readable error or warning report.
     pub fn write_report<W, K, R>(&self, w: &mut W, report: &R) -> io::Result<()>
     where
         W: Write,
         K: ErrorOrWarningKind,
         R: Report,
     {
-        let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&report.span());
-        let color = K::color();
-        let report_kind = K::report_kind();
-
-        ariadne::Report::build(report_kind, (src_id.clone(), (span.start..span.end)))
-            .with_message(report.message())
-            .with_labels(Some(
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(report.reason())
-                    .with_color(color),
-            ))
-            .with_labels(report.contexts().map(|(label, span)| {
-                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(lazy_format!("in this {}", label))
-                    .with_color(Color::Yellow)
-            }))
-            .with_labels(report.related().map(|(label, span)| {
-                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(lazy_format!("{}", label))
-                    .with_color(Color::Yellow)
-            }))
-            .finish()
-            .write(ariadne::sources(self.sources()), w)
+        write_report::<W, K, R, _>(
+            w,
+            report,
+            &|span| self.get_adjusted_source(span),
+            self.sources(),
+        )
     }
 
     /// Resolve the span into filename, line number range, and spanned content.
     /// Filename will be present unless the sources were created from an inline string.
     pub fn resolve_span<'a>(&'a self, span: &Span) -> SpannedSource<'a> {
-        let (source_content, source_id_str, byte_span, rune_span) = self.get_adjusted_source(span);
+        let (source_content, source_id_str, byte_span, rune_span) = self.get_adjusted_source(*span);
 
         let file_name = if Into::<SourceId>::into(span.source) == self.root_source_id {
             self.root_path.as_ref().and(Some(source_id_str))
@@ -319,16 +287,11 @@ impl BeancountSources {
         K: ErrorOrWarningKind,
     {
         let (source_content, _, byte_span, _rune_span) =
-            self.get_adjusted_source(&error_or_warning.0.span);
+            self.get_adjusted_source(error_or_warning.0.span);
         &source_content[byte_span.start..byte_span.end]
     }
 
-    fn source_id_string_and_adjusted_rune_span(&self, span: &Span) -> (String, Span) {
-        let (_, source_id, _byte_span, rune_span) = self.get_adjusted_source(span);
-        (source_id.to_string(), rune_span)
-    }
-
-    fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
+    fn get_adjusted_source(&self, span: Span) -> (&str, &str, Span, Span) {
         let safe_span = if span.source >= self.source_id_strings.len() {
             // bad source collapses down to empty span,
             // because we don't really have a good way to reject that
@@ -339,7 +302,7 @@ impl BeancountSources {
                 end: 0,
             }
         } else {
-            *span
+            span
         };
         let source_id = safe_span.source.into();
         let source_id_str = self.source_id_string(source_id);
@@ -354,8 +317,8 @@ impl BeancountSources {
             ("", &empty_char_indices)
         };
 
-        let byte_span = trimmed_span(source_content, &safe_span);
-        let rune_span = self.byte_to_rune(source_content_char_indices, byte_span);
+        let byte_span = trimmed_span(source_content, safe_span);
+        let rune_span = byte_to_rune(source_content_char_indices, byte_span);
 
         (source_content, source_id_str, byte_span, rune_span)
     }
@@ -482,23 +445,35 @@ impl std::fmt::Debug for BeancountSources {
 }
 
 #[derive(Clone)]
-pub struct SyntheticSources {
+pub struct SyntheticSources<'a> {
+    sources: &'a BeancountSources,
     base_id: usize,
     content: HashMap<String, (SourceId, String, Vec<usize>)>, // content and char indices, indexed by source name
     source_id_strings: Vec<String>,                           // indexed by SourceId - base_id
 }
 
-impl SyntheticSources {
-    fn new(base_id: usize) -> Self {
+impl<'a> SyntheticSources<'a> {
+    pub fn new(sources: &'a BeancountSources) -> Self {
         SyntheticSources {
-            base_id,
+            sources,
+            base_id: sources.num_sources(),
             content: HashMap::default(),
             source_id_strings: Vec::default(),
         }
     }
 }
 
-impl SyntheticSources {
+impl<'a> SyntheticSources<'a> {
+    fn sources(&self) -> Vec<(String, &str)> {
+        let mut sources = self.sources.sources();
+        sources.extend(
+            self.content.iter().map(|(source_id_str, (_, content, _))| {
+                (source_id_str.to_string(), content.as_str())
+            }),
+        );
+        sources
+    }
+
     /// A synthetic span is a content fragment which doesn't occur in the original sources, but
     /// may be referred to in error reports.  Multiple fragments may share the same source name.
     pub fn create_synthetic_span(&mut self, source_name: &str, content_fragment: &str) -> Span {
@@ -536,51 +511,79 @@ impl SyntheticSources {
         }
     }
 
-    // fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
-    //     let safe_span = if span.source >= self.base_id + self.source_id_strings.len() {
-    //         // bad source collapses down to empty span,
-    //         // because we don't really have a good way to reject that
-    //         // and at least we mustn't panic
-    //         Span {
-    //             source: self.root_source_id.into(),
-    //             start: 0,
-    //             end: 0,
-    //         }
-    //     } else {
-    //         *span
-    //     };
-    //     let source = safe_span.source;
-    //     let source_id = source.into();
-    //     let empty_char_indices = Vec::default();
+    /// Write human-readable error reports.
+    pub fn write_errors_or_warnings<W, E, K>(
+        &self,
+        w: &mut W,
+        errors_or_warnings: Vec<E>,
+    ) -> io::Result<()>
+    where
+        W: Write,
+        E: Into<AnnotatedErrorOrWarning<K>>,
+        K: ErrorOrWarningKind,
+    {
+        for error_or_warning in errors_or_warnings.into_iter() {
+            let AnnotatedErrorOrWarning {
+                error_or_warning,
+                annotation,
+            } = error_or_warning.into();
 
-    //     let (source_id_str, source_content, source_content_char_indices) = if source
-    //         < synthetic.base_id
-    //     {
-    //         let source_id_str = self.source_id_string(source_id);
+            self.write_report::<W, K, ErrorOrWarning<K>>(w, &error_or_warning)?;
 
-    //         if source_id == self.root_source_id {
-    //             (
-    //                 source_id_str,
-    //                 self.root_content.as_str(),
-    //                 &self.root_content_char_indices,
-    //             )
-    //         } else if let IncludedSource::Content(_, content, content_char_indices) =
-    //             self.included_content.get(Path::new(source_id_str)).unwrap()
-    //         {
-    //             (source_id_str, content.as_str(), content_char_indices)
-    //         } else {
-    //             (source_id_str, "", &empty_char_indices)
-    //         }
-    //     } else {
-    //         let source_id_str = synthetic.source_id_strings[source - synthetic.base_id].as_str();
-    //         let (_, content, content_char_indices) = synthetic.content.get(source_id_str).unwrap();
-    //         (source_id_str, content.as_str(), content_char_indices)
-    //     };
-    //     let byte_span = trimmed_span(source_content, &safe_span);
-    //     let rune_span = self.byte_to_rune(source_content_char_indices, byte_span);
+            if let Some(annotation) = annotation {
+                // clippy thinks this is better than write! 🤷
+                w.write_fmt(core::format_args!("{}\n", &annotation))?;
+            }
+        }
+        Ok(())
+    }
 
-    //     (source_content, source_id_str, byte_span, rune_span)
-    // }
+    /// Write human-readable error or warning report.
+    pub fn write_report<W, K, R>(&self, w: &mut W, report: &R) -> io::Result<()>
+    where
+        W: Write,
+        K: ErrorOrWarningKind,
+        R: Report,
+    {
+        write_report::<W, K, R, _>(
+            w,
+            report,
+            &|span| self.get_adjusted_source(span),
+            self.sources(),
+        )
+    }
+
+    /// Resolve the span into filename, line number range, and spanned content.
+    /// Filename will be present unless the sources were created from an inline string.
+    pub fn resolve_span<'s>(&'s self, span: &Span) -> SpannedSource<'s> {
+        resolve_span(*span, &|span| self.get_adjusted_source(span), true)
+    }
+
+    pub fn error_source_text<'s, K>(&'s self, error_or_warning: &ErrorOrWarning<K>) -> &'s str
+    where
+        K: ErrorOrWarningKind,
+    {
+        let (source_content, _, byte_span, _rune_span) =
+            self.get_adjusted_source(error_or_warning.0.span);
+        &source_content[byte_span.start..byte_span.end]
+    }
+
+    fn get_adjusted_source(&self, span: Span) -> (&str, &str, Span, Span) {
+        if span.source >= self.base_id && span.source < self.base_id + self.source_id_strings.len()
+        {
+            let source_id_str = self.source_id_strings[span.source - self.base_id].as_str();
+
+            let (_, content, content_char_indices) = self.content.get(source_id_str).unwrap();
+            let content = content.as_str();
+
+            let byte_span = trimmed_span(content, span);
+            let rune_span = byte_to_rune(content_char_indices, byte_span);
+
+            (content, source_id_str, byte_span, rune_span)
+        } else {
+            self.sources.get_adjusted_source(span)
+        }
+    }
 }
 
 // get included path relative to including path
@@ -617,8 +620,95 @@ where
     Ok(file_content)
 }
 
-fn trimmed_span(source: &str, span: &Span) -> Span {
-    let mut trimmed = *span;
+fn write_report<'a, W, K, R, F>(
+    w: &mut W,
+    report: &R,
+    get_adjusted_source: &F,
+    sources: Vec<(String, &str)>,
+) -> io::Result<()>
+where
+    W: Write,
+    K: ErrorOrWarningKind,
+    R: Report,
+    F: Fn(Span) -> (&'a str, &'a str, Span, Span),
+{
+    let (src_id, span) =
+        source_id_string_and_adjusted_rune_span(report.span(), get_adjusted_source);
+    let color = K::color();
+    let report_kind = K::report_kind();
+
+    ariadne::Report::build(report_kind, (src_id.clone(), (span.start..span.end)))
+        .with_message(report.message())
+        .with_labels(Some(
+            Label::new((src_id, (span.start..span.end)))
+                .with_message(report.reason())
+                .with_color(color),
+        ))
+        .with_labels(report.contexts().map(|(label, span)| {
+            let (src_id, span) = source_id_string_and_adjusted_rune_span(span, get_adjusted_source);
+            Label::new((src_id, (span.start..span.end)))
+                .with_message(lazy_format!("in this {}", label))
+                .with_color(Color::Yellow)
+        }))
+        .with_labels(report.related().map(|(label, span)| {
+            let (src_id, span) = source_id_string_and_adjusted_rune_span(span, get_adjusted_source);
+            Label::new((src_id, (span.start..span.end)))
+                .with_message(lazy_format!("{}", label))
+                .with_color(Color::Yellow)
+        }))
+        .finish()
+        .write(ariadne::sources(sources), w)
+}
+
+/// Resolve the span into filename, line number range, and spanned content.
+/// Filename will be present unless the sources were created from an inline string.
+fn resolve_span<'a, F>(
+    span: Span,
+    get_adjusted_source: &F,
+    source_id_is_file_name: bool,
+) -> SpannedSource<'a>
+where
+    F: Fn(Span) -> (&'a str, &'a str, Span, Span),
+{
+    let (source_content, source_id_str, byte_span, rune_span) = get_adjusted_source(span);
+
+    let mut source_chars = source_content.chars();
+    let start_line = source_chars
+        .by_ref()
+        .take(rune_span.start)
+        .filter(|c| *c == '\n')
+        .count()
+        + 1;
+    let lines_spanned = source_chars
+        .by_ref()
+        .take(rune_span.end - rune_span.start)
+        .filter(|c| *c == '\n')
+        .count();
+    let end_line = start_line + lines_spanned;
+
+    SpannedSource {
+        file_name: source_id_is_file_name.then_some(source_id_str),
+        start_line,
+        end_line,
+        content: source_content
+            .get(byte_span.start..byte_span.end)
+            .unwrap_or(""),
+    }
+}
+
+fn source_id_string_and_adjusted_rune_span<'a, F>(
+    span: Span,
+    get_adjusted_source: &F,
+) -> (String, Span)
+where
+    F: Fn(Span) -> (&'a str, &'a str, Span, Span),
+{
+    let (_, source_id, _byte_span, rune_span) = get_adjusted_source(span);
+    (source_id.to_string(), rune_span)
+}
+
+fn trimmed_span(source: &str, span: Span) -> Span {
+    let mut trimmed = span;
 
     // invalid spans fall back to nothing
     if source.get(span.start..span.end).is_none() {
@@ -628,4 +718,11 @@ fn trimmed_span(source: &str, span: &Span) -> Span {
         trimmed.end = trim_trailing_whitespace(source, span.start, span.end);
     }
     trimmed
+}
+
+fn byte_to_rune(char_indices: &[usize], byte_span: Span) -> Span {
+    let mut rune_span = byte_span;
+    rune_span.start = char_indices.partition_point(|&i| i < byte_span.start);
+    rune_span.end = char_indices.partition_point(|&i| i < byte_span.end);
+    rune_span
 }

@@ -676,6 +676,6 @@ pub(crate) mod options;
 mod parsers;
 mod sort;
 mod sources;
-pub use sources::BeancountSources;
+pub use sources::{BeancountSources, SyntheticSources};
 mod trim;
 pub mod types;
