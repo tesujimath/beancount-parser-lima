@@ -25,10 +25,16 @@ fn autogen_beancount_proto() {
 }
 fn main() -> std::io::Result<()> {
     let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
-    let proto_dir = cargo_manifest_dir.join("protobuf");
+    let proto_beancount_dir = cargo_manifest_dir.join("protobuf/beancount");
+    let proto_subdirs = ["cparser", "ccore"];
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed={}", proto_dir.display());
+    for proto_subdir in &proto_subdirs {
+        println!(
+            "cargo:rerun-if-changed={}",
+            proto_beancount_dir.join(proto_subdir).display()
+        );
+    }
 
     autogen_beancount_proto();
 
