@@ -120,7 +120,7 @@ where
                 })
             }),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .labelled("directive") // yeah, pragma is not a user-facing concept
     .as_context()
 }
@@ -225,7 +225,7 @@ where
         }),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
 }
 
 fn replace_some_empty_with_none(s: Option<Spanned<&str>>) -> Option<Spanned<&str>> {
@@ -669,7 +669,7 @@ where
                 }),
             ))
             .map_with(spanned_extra)
-            .then_ignore(just(Token::Eol))
+            .then_ignore(choice((just(Token::Eol).ignored(), end())))
             .then(metadata().map_with(spanned_extra))
             .map(
                 |(
@@ -794,7 +794,7 @@ where
                 tag().map_with(spanned_extra).map(Tag),
                 link().map_with(spanned_extra).map(Link),
             ))
-            .then_ignore(just(Token::Eol)),
+            .then_ignore(choice((just(Token::Eol).ignored(), end()))),
         )
         .labelled("metadata")
         .as_context()
