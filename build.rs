@@ -24,6 +24,12 @@ fn autogen_beancount_proto() {
         .run_from_script();
 }
 fn main() -> std::io::Result<()> {
+    let cargo_manifest_dir: PathBuf = env::var("CARGO_MANIFEST_DIR").unwrap().into();
+    let proto_dir = cargo_manifest_dir.join("protobuf");
+
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed={}", proto_dir.display());
+
     autogen_beancount_proto();
 
     Ok(())
