@@ -461,6 +461,17 @@ impl BeancountSources {
         (source_id.to_string(), rune_span)
     }
 
+    /// Returns `(filename, 1-based line number)` for the start of the given span.
+    pub fn source_location(&self, span: &Span) -> (&str, u32) {
+        let (source_content, source_id_str, byte_span, _) = self.get_adjusted_source(span);
+        let lineno = source_content[..byte_span.start]
+            .bytes()
+            .filter(|&b| b == b'\n')
+            .count() as u32
+            + 1;
+        (source_id_str, lineno)
+    }
+
     fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
         let safe_span = if span.source >= self.source_id_strings.len() {
             // bad source collapses down to empty span,
