@@ -1,3 +1,15 @@
-errors {
-  message: "found end of input expected '@', '@@', '{', or '\\n'"
+# FastBean: parser now accepts EOF in place of final newline
+directives {
+  date { year: 2014 month: 11 day: 2 }
+  transaction {
+    flag: "*"
+    postings {
+      account: "Assets:Something"
+      spec { units { number { exact: "1" } currency: "USD" } }
+    }
+    postings {
+      account: "Assets:Other"
+      spec { units { number { exact: "-1" } currency: "USD" } }
+    }
+  }
 }
