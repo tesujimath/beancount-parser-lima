@@ -1,4 +1,4 @@
-# FastBean: parser now accepts EOF in place of final newline
+# Parser now accepts EOF in place of final newline (fixed in #54)
 directives {
   date { year: 2014 month: 11 day: 2 }
   transaction {
