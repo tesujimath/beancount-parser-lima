@@ -1460,7 +1460,7 @@ pub struct AccountName<'a>(&'a str);
 
 impl AccountName<'_> {
     pub(crate) fn is_valid_initial(c: &char) -> bool {
-        c.is_ascii_uppercase() || c.is_ascii_digit()
+        c.is_ascii_uppercase() || c.is_ascii_digit() || (!c.is_ascii() && c.is_alphabetic())
     }
 
     pub(crate) fn is_valid_subsequent(c: &char) -> bool {
