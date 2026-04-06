@@ -436,7 +436,7 @@ impl BeancountSources {
             file_name,
             start_line,
             end_line,
-            content: &source_content[byte_span.start..byte_span.end],
+            content: source_content.get(byte_span.start..byte_span.end).unwrap_or(""),
         }
     }
 
