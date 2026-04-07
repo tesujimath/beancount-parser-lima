@@ -253,7 +253,7 @@ where
         amount().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, currency, amount, (tags, links)), mut metadata), _span, emitter| {
@@ -282,7 +282,7 @@ where
         amount_with_tolerance().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, atol, (tags, links)), mut metadata), _span, emitter| {
@@ -343,7 +343,7 @@ where
         booking().map_with(spanned_extra).or_not(),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .map(|(date, _, account, currency, booking, tags_links)| {
         (date, account, currency, booking, tags_links)
     })
@@ -418,7 +418,7 @@ where
         account().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, (tags, links)), mut metadata), _span, emitter| {
@@ -445,7 +445,7 @@ where
         currency().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, currency, (tags, links)), mut metadata), _span, emitter| {
@@ -473,7 +473,7 @@ where
         account().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, source, (tags, links)), mut metadata), _span, emitter| {
@@ -501,7 +501,7 @@ where
         string().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, path, (tags, links)), mut metadata), _span, emitter| {
@@ -529,7 +529,7 @@ where
         string().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, account, comment, (tags, links)), mut metadata), _span, emitter| {
@@ -557,7 +557,7 @@ where
         string().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, event_type, description, (tags, links)), mut metadata), _span, emitter| {
@@ -588,7 +588,7 @@ where
         string().map_with(spanned_extra),
         tags_links(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .validate(
         |((date, _, name, content, (tags, links)), mut metadata), _span, emitter| {
@@ -618,7 +618,7 @@ where
             .repeated()
             .collect::<Vec<_>>(),
     ))
-    .then_ignore(just(Token::Eol))
+    .then_ignore(choice((just(Token::Eol).ignored(), end())))
     .then(metadata().map_with(spanned_extra))
     .map(|((date, _, type_, values), metadata)| Directive {
         date,

@@ -161,6 +161,11 @@ pub enum Token<'a> {
     #[regex(r"(?&comment_to_eol)?\r?\n(?&ignored_whole_line)*")]
     Eol,
 
+    // A trailing comment without a following newline (occurs at EOF).
+    // Logos longest-match ensures this only fires when Eol can't match.
+    #[regex(r";[^\r\n]*", allow_greedy = true)]
+    EolComment,
+
     // indent handling is post-processed by lexer, when `EolThenIndent` is broken into separate `Eol` and `Indent`
     // which fails to capture an indented first line, but that isn't a thing in Beancount anyway
     Indent,
@@ -173,7 +178,7 @@ impl Token<'_> {
     fn is_eol(&self) -> bool {
         use Token::*;
 
-        *self == EolThenIndent || *self == Eol
+        *self == EolThenIndent || *self == Eol || *self == EolComment
     }
 }
 
@@ -243,6 +248,7 @@ impl Display for Token<'_> {
 
             EolThenIndent => write!(f, "\\n{}", INDENT),
             Eol => write!(f, "\\n"),
+            EolComment => write!(f, "; ..."),
             Indent => write!(f, "{}", INDENT),
 
             Error(e) => write!(f, "ERROR {}", e),
@@ -568,7 +574,8 @@ where
             match (&mut first_tok, &mut second_tok) {
                 (Some(first), Some(second)) if first.0.is_eol() && second.0.is_eol() => {
                     let (tok, span) = second_tok.take().unwrap();
-                    first_tok = Some((tok, first.1.start..span.end));
+                    let end = if tok == Token::EolComment { span.start } else { span.end };
+                    first_tok = Some((tok, first.1.start..end));
                     second_tok = self.iter.next();
                 }
                 (Some(first), Some(second))
@@ -637,6 +644,11 @@ where
             }
             (None, None) => None,
             (Some(item), _) => {
+                let item = if item.0 == Token::EolComment {
+                    (Token::Eol, item.1.start..item.1.start)
+                } else {
+                    item
+                };
                 if item.0 == Token::Eol {
                     self.previous_was_eol = true;
                 }
