@@ -82,62 +82,22 @@
 //!}
 //!```
 
-use ariadne::{Color, Label};
 use chumsky::prelude::{Input, Parser};
-use glob::{self, glob_with};
-use lazy_format::lazy_format;
-use lexer::{Token, lex};
-use parsers::{ParserState, file, includes};
+use lexer::{lex, Token};
+use parsers::{file, ParserState};
 use sort::SortIteratorAdaptor;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    ffi::OsStr,
-    fmt::{self, Formatter},
-    fs::File,
-    io::{self, Read, Write},
-    iter::once,
+    collections::{HashMap, VecDeque},
     path::{Path, PathBuf},
 };
 
+use crate::{parsers::includes, sources::resolve_included_path};
 pub use crate::{trim::trim_trailing_whitespace, types::*};
-
-/// Contains the content of the Beancount source file, and the content of
-/// the transitive closure of all the include'd source files.
-///
-/// Zero-copy parsing means that all string values are returned as references into these strings.
-///
-/// # Examples
-/// ```
-/// # use std::path::PathBuf;
-/// use beancount_parser_lima::{BeancountParser, BeancountSources};
-///
-/// let sources = BeancountSources::try_from(PathBuf::from("examples/data/full.beancount")).unwrap();
-/// let beancount_parser = BeancountParser::new(&sources);
-///
-/// let result = beancount_parser.parse();
-/// ```
-#[derive(Clone)]
-pub struct BeancountSources {
-    root_path: Option<PathBuf>,
-    root_source_id: SourceId,
-    root_content: String,
-    root_content_char_indices: Vec<usize>,
-    included_globs: HashMap<PathBuf, IncludedGlob>,
-    included_content: HashMap<PathBuf, IncludedSource>,
-    source_id_strings: Vec<String>, // indexed by SourceId
-}
 
 #[derive(Clone, Debug)]
 enum IncludedGlob {
     Expanded(Vec<PathBuf>), // the content and its char indices
     Error(String),
-}
-
-#[derive(Clone, Debug)]
-enum IncludedSource {
-    Content(SourceId, String, Vec<usize>), // the content and its char indices
-    Error(String),
-    Duplicate,
 }
 
 // get all includes, discarding errors
@@ -164,459 +124,10 @@ fn get_includes(content: &str, source_id: SourceId) -> Vec<String> {
     get_includes_for_tokens(tokens, source_id, end_of_input(source_id, content))
 }
 
-// get directory for a path if any
-fn path_dir(p: &Path) -> Option<&Path> {
-    p.parent().and_then(|p| {
-        if !AsRef::<OsStr>::as_ref(&p).is_empty() {
-            Some(p)
-        } else {
-            None
-        }
-    })
-}
-
-// get included path relative to including path
-fn resolve_included_path(including_path: Option<&PathBuf>, included_path: &Path) -> PathBuf {
-    match including_path.and_then(|p| path_dir(p.as_ref())) {
-        Some(p) => p.join(included_path),
-        None => included_path.to_path_buf(),
-    }
-}
-
-impl BeancountSources {
-    fn try_read_with_includes(root_path: PathBuf) -> io::Result<Self> {
-        let root_content = read(&root_path)?;
-        Ok(Self::read_with_includes(Some(root_path), root_content))
-    }
-
-    fn read_with_includes(root_path: Option<PathBuf>, root_content: String) -> Self {
-        let root_source_id = SourceId::default();
-        let root_source_id_string = root_path
-            .as_ref()
-            .map(|p| p.to_string_lossy().into())
-            .unwrap_or("inline".to_string());
-        let mut source_id_strings = Vec::from([root_source_id_string]);
-
-        let mut pending_includes = get_includes(&root_content, root_source_id)
-            .into_iter()
-            .map(|included| resolve_included_path(root_path.as_ref(), included.as_ref()))
-            .collect::<VecDeque<_>>();
-
-        let mut included_globs = HashMap::new();
-        let mut included_content: HashMap<PathBuf, IncludedSource> = HashMap::new();
-
-        // for duplicate detection
-        let mut canonical_paths =
-            if let Some(canonical_root) = root_path.as_ref().and_then(|p| p.canonicalize().ok()) {
-                HashSet::from([canonical_root])
-            } else {
-                HashSet::default()
-            };
-
-        while !pending_includes.is_empty() {
-            let included = pending_includes.pop_front().unwrap();
-            let included_str = included.to_string_lossy();
-            let included_str = included_str.as_ref();
-
-            match glob_with(
-                included_str,
-                glob::MatchOptions {
-                    case_sensitive: true,
-                    require_literal_separator: true,
-                    require_literal_leading_dot: true,
-                },
-            ) {
-                Err(e) => {
-                    included_globs.insert(included, IncludedGlob::Error(e.to_string()));
-                }
-                Ok(globbed_includes) => {
-                    let mut glob_expansions = Vec::default();
-
-                    for globbed_include in globbed_includes {
-                        match globbed_include {
-                            Err(e) => {
-                                let path = e.path().to_path_buf();
-                                glob_expansions.push(path.clone());
-                                included_content.insert(path, IncludedSource::Error(e.to_string()));
-                            }
-                            Ok(globbed_include) => {
-                                glob_expansions.push(globbed_include.clone());
-
-                                if let Ok(canonical_path) = globbed_include.canonicalize() {
-                                    if canonical_paths.contains(&canonical_path) {
-                                        // don't overwrite existing content
-                                        included_content
-                                            .entry(globbed_include)
-                                            .or_insert(IncludedSource::Duplicate);
-                                    } else {
-                                        canonical_paths.insert(canonical_path);
-
-                                        let source_id = SourceId::from(source_id_strings.len());
-                                        source_id_strings
-                                            .push(globbed_include.to_string_lossy().into());
-
-                                        let included_source = read(&globbed_include).map_or_else(
-                                            |e| {
-                                                IncludedSource::Error(format!(
-                                                    "{}: {}",
-                                                    globbed_include.to_string_lossy(),
-                                                    e
-                                                ))
-                                            },
-                                            |c| {
-                                                // find the char indices for the content
-                                                // needed for mapping byte indices to char indices, to convert Chumsky spans to Ariadne spans
-                                                // see https://github.com/zesterer/chumsky/issues/65#issuecomment-1689216633
-                                                let char_indices = c
-                                                    .char_indices()
-                                                    .map(|(i, _)| i)
-                                                    .collect::<Vec<_>>();
-                                                IncludedSource::Content(source_id, c, char_indices)
-                                            },
-                                        );
-
-                                        // stabilisation of VacantEntry::insert_entry() would enable us to avoid cloning the path here
-                                        // and doing an immediate lookup
-                                        included_content
-                                            .insert(globbed_include.clone(), included_source);
-                                        let included_source =
-                                            included_content.get(&globbed_include).unwrap();
-
-                                        if let IncludedSource::Content(_, content, _) =
-                                            included_source
-                                        {
-                                            let mut includes = get_includes(content, source_id)
-                                                .into_iter()
-                                                .map(|included_path| {
-                                                    resolve_included_path(
-                                                        Some(&globbed_include),
-                                                        included_path.as_ref(),
-                                                    )
-                                                })
-                                                .collect::<VecDeque<_>>();
-                                            pending_includes.append(&mut includes);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    included_globs.insert(included, IncludedGlob::Expanded(glob_expansions));
-                }
-            }
-        }
-
-        let root_content_char_indices = root_content
-            .char_indices()
-            .map(|(i, _)| i)
-            .collect::<Vec<_>>();
-
-        Self {
-            root_path,
-            root_source_id,
-            root_content,
-            root_content_char_indices,
-            included_globs,
-            included_content,
-            source_id_strings,
-        }
-    }
-
-    #[deprecated(since = "0.12.0", note = "Use `write_errors_or_warnings` instead")]
-    pub fn write<W, E, K>(&self, w: &mut W, errors_or_warnings: Vec<E>) -> io::Result<()>
-    where
-        W: Write,
-        E: Into<AnnotatedErrorOrWarning<K>>,
-        K: ErrorOrWarningKind,
-    {
-        self.write_errors_or_warnings(w, errors_or_warnings)
-    }
-
-    /// Write human-readable error reports.
-    pub fn write_errors_or_warnings<W, E, K>(
-        &self,
-        w: &mut W,
-        errors_or_warnings: Vec<E>,
-    ) -> io::Result<()>
-    where
-        W: Write,
-        E: Into<AnnotatedErrorOrWarning<K>>,
-        K: ErrorOrWarningKind,
-    {
-        for error_or_warning in errors_or_warnings.into_iter() {
-            let AnnotatedErrorOrWarning {
-                error_or_warning,
-                annotation,
-            } = error_or_warning.into();
-
-            self.write_error_or_warning(w, &error_or_warning)?;
-
-            if let Some(annotation) = annotation {
-                // clippy thinks this is better than write! 🤷
-                w.write_fmt(core::format_args!("{}\n", &annotation))?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Write human-readable error or warning report.
-    fn write_error_or_warning<W, K>(
-        &self,
-        w: &mut W,
-        error_or_warning: &ErrorOrWarning<K>,
-    ) -> io::Result<()>
-    where
-        W: Write,
-        K: ErrorOrWarningKind,
-    {
-        self.write_report::<W, K, ErrorOrWarning<K>>(w, error_or_warning)
-    }
-
-    /// Write human-readable error or warning report.
-    pub fn write_report<W, K, R>(&self, w: &mut W, report: &R) -> io::Result<()>
-    where
-        W: Write,
-        K: ErrorOrWarningKind,
-        R: Report,
-    {
-        let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&report.span());
-        let color = K::color();
-        let report_kind = K::report_kind();
-
-        ariadne::Report::build(report_kind, (src_id.clone(), (span.start..span.end)))
-            .with_message(report.message())
-            .with_labels(Some(
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(report.reason())
-                    .with_color(color),
-            ))
-            .with_labels(report.contexts().map(|(label, span)| {
-                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(lazy_format!("in this {}", label))
-                    .with_color(Color::Yellow)
-            }))
-            .with_labels(report.related().map(|(label, span)| {
-                let (src_id, span) = self.source_id_string_and_adjusted_rune_span(&span);
-                Label::new((src_id, (span.start..span.end)))
-                    .with_message(lazy_format!("{}", label))
-                    .with_color(Color::Yellow)
-            }))
-            .finish()
-            .write(ariadne::sources(self.sources()), w)
-    }
-
-    /// Resolve the span into filename, line number range, and spanned content.
-    /// Filename will be present unless the sources were created from an inline string.
-    pub fn resolve_span<'a>(&'a self, span: &Span) -> SpannedSource<'a> {
-        let (source_content, source_id_str, byte_span, rune_span) = self.get_adjusted_source(span);
-
-        let file_name = if Into::<SourceId>::into(span.source) == self.root_source_id {
-            self.root_path.as_ref().and(Some(source_id_str))
-        } else {
-            Some(source_id_str)
-        };
-
-        let mut source_chars = source_content.chars();
-        let start_line = source_chars
-            .by_ref()
-            .take(rune_span.start)
-            .filter(|c| *c == '\n')
-            .count()
-            + 1;
-        let lines_spanned = source_chars
-            .by_ref()
-            .take(rune_span.end - rune_span.start)
-            .filter(|c| *c == '\n')
-            .count();
-        let end_line = start_line + lines_spanned;
-
-        SpannedSource {
-            file_name,
-            start_line,
-            end_line,
-            content: source_content.get(byte_span.start..byte_span.end).unwrap_or(""),
-        }
-    }
-
-    fn byte_to_rune(&self, char_indices: &[usize], byte_span: Span) -> Span {
-        let mut rune_span = byte_span;
-        rune_span.start = char_indices.partition_point(|&i| i < byte_span.start);
-        rune_span.end = char_indices.partition_point(|&i| i < byte_span.end);
-        rune_span
-    }
-
-    pub fn error_source_text<'a, K>(&'a self, error_or_warning: &ErrorOrWarning<K>) -> &'a str
-    where
-        K: ErrorOrWarningKind,
-    {
-        let (source_content, _, byte_span, _rune_span) =
-            self.get_adjusted_source(&error_or_warning.0.span);
-        &source_content[byte_span.start..byte_span.end]
-    }
-
-    fn source_id_string_and_adjusted_rune_span(&self, span: &Span) -> (String, Span) {
-        let (_, source_id, _byte_span, rune_span) = self.get_adjusted_source(span);
-        (source_id.to_string(), rune_span)
-    }
-
-    fn get_adjusted_source(&self, span: &Span) -> (&str, &str, Span, Span) {
-        let safe_span = if span.source >= self.source_id_strings.len() {
-            // bad source collapses down to empty span,
-            // because we don't really have a good way to reject that
-            // and at least we mustn't panic
-            Span {
-                source: self.root_source_id.into(),
-                start: 0,
-                end: 0,
-            }
-        } else {
-            *span
-        };
-        let source_id = safe_span.source.into();
-        let source_id_str = self.source_id_string(source_id);
-        let empty_char_indices = Vec::default();
-        let (source_content, source_content_char_indices) = if source_id == self.root_source_id {
-            (self.root_content.as_str(), &self.root_content_char_indices)
-        } else if let IncludedSource::Content(_, content, content_char_indices) =
-            self.included_content.get(Path::new(source_id_str)).unwrap()
-        {
-            (content.as_str(), content_char_indices)
-        } else {
-            ("", &empty_char_indices)
-        };
-
-        let byte_span = trimmed_span(source_content, &safe_span);
-        let rune_span = self.byte_to_rune(source_content_char_indices, byte_span);
-
-        (source_content, source_id_str, byte_span, rune_span)
-    }
-
-    fn source_id_string(&self, source_id: SourceId) -> &str {
-        self.source_id_strings[Into::<usize>::into(source_id)].as_str()
-    }
-
-    fn sources(&self) -> Vec<(String, &str)> {
-        once((
-            self.source_id_string(self.root_source_id).to_string(),
-            self.root_content.as_str(),
-        ))
-        .chain(
-            self.included_content
-                .iter()
-                .filter_map(|(_, included_source)| {
-                    if let IncludedSource::Content(source_id, content, _) = included_source {
-                        Some((
-                            self.source_id_string(*source_id).to_string(),
-                            content.as_str(),
-                        ))
-                    } else {
-                        None
-                    }
-                }),
-        )
-        .collect()
-    }
-
-    fn content_iter(&self) -> impl Iterator<Item = (SourceId, Option<&Path>, &str)> {
-        once((
-            self.root_source_id,
-            self.root_path.as_deref(),
-            self.root_content.as_str(),
-        ))
-        .chain(
-            self.included_content
-                .iter()
-                .filter_map(|(pathbuf, included_source)| {
-                    if let IncludedSource::Content(source_id, content, _) = included_source {
-                        Some((*source_id, Some(pathbuf.as_path()), content.as_str()))
-                    } else {
-                        None
-                    }
-                }),
-        )
-    }
-
-    fn error_paths(&self) -> HashMap<Option<&Path>, String> {
-        self.included_content
-            .iter()
-            .filter_map(|(pathbuf, included_source)| {
-                if let IncludedSource::Error(e) = included_source {
-                    Some((Some(pathbuf.as_path()), e.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect::<HashMap<_, _>>()
-    }
-}
-
-impl TryFrom<PathBuf> for BeancountSources {
-    type Error = io::Error;
-
-    fn try_from(source_path: PathBuf) -> io::Result<Self> {
-        Self::try_read_with_includes(source_path)
-    }
-}
-
-impl TryFrom<&Path> for BeancountSources {
-    type Error = io::Error;
-
-    fn try_from(source_path: &Path) -> io::Result<Self> {
-        Self::try_read_with_includes(source_path.to_owned())
-    }
-}
-
-impl From<String> for BeancountSources {
-    fn from(source_string: String) -> Self {
-        Self::read_with_includes(None, source_string)
-    }
-}
-
-impl From<&str> for BeancountSources {
-    fn from(source_string: &str) -> Self {
-        Self::read_with_includes(None, source_string.to_owned())
-    }
-}
-
-impl std::fmt::Debug for BeancountSources {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, "BeancountSources(",)?;
-
-        for (path, included_source) in &self.included_content {
-            match included_source {
-                IncludedSource::Content(source_id, content, _) => writeln!(
-                    f,
-                    "    {} ok len {},",
-                    self.source_id_string(*source_id),
-                    content.len()
-                )?,
-                IncludedSource::Error(e) => writeln!(f, "    {:?} err {},", path, e)?,
-                IncludedSource::Duplicate => writeln!(f, "    {:?} duplicate include", path)?,
-            }
-        }
-
-        writeln!(f, ")",)
-    }
-}
-
 pub fn lex_with_source<'a>(source_id: SourceId, s: &'a str) -> Vec<(Token<'a>, Span_)> {
     lex(s)
         .map(|(tok, span)| (tok, chumsky::span::Span::new(source_id, span)))
         .collect::<Vec<_>>()
-}
-
-fn read<P>(file_path: P) -> io::Result<String>
-where
-    P: AsRef<Path>,
-{
-    let mut f = File::open(&file_path)?;
-    let mut file_content = String::new();
-
-    // read the whole file
-    f.read_to_string(&mut file_content)?;
-    Ok(file_content)
 }
 
 type SpannedToken<'t> = (Token<'t>, Span_);
@@ -652,7 +163,7 @@ type SpannedToken<'t> = (Token<'t>, Span_);
 ///             for directive in directives {
 ///                 println!("{}\n", &directive);
 ///             }
-///    
+///
 ///             sources.write_errors_or_warnings(error_w, warnings).unwrap();
 ///         }
 ///         Err(ParseError { errors, warnings }) => {
@@ -697,7 +208,7 @@ impl<'s> BeancountParser<'s> {
     pub fn new(sources: &'s BeancountSources) -> Self {
         // `content_iter()` walks a `HashMap`, so iteration order is not guaranteed.
         // We must index by `SourceId` rather than relying on iteration order.
-        let mut tokenized_sources = vec![Vec::new(); sources.source_id_strings.len()];
+        let mut tokenized_sources = vec![Vec::new(); sources.num_sources()];
 
         for (source_id, _path, content) in sources.content_iter() {
             let i_source: usize = source_id.into();
@@ -716,7 +227,7 @@ impl<'s> BeancountParser<'s> {
         let mut p = PragmaProcessor::new(
             self.root_path(),
             parsed_sources,
-            &self.sources.included_globs,
+            self.sources.included_globs(),
             self.sources.error_paths(),
             options,
         );
@@ -750,7 +261,7 @@ impl<'s> BeancountParser<'s> {
     }
 
     fn root_path(&self) -> Option<&'s Path> {
-        self.sources.root_path.as_deref()
+        self.sources.root_path()
     }
 
     /// Parse the sources, returning declarations and any errors.
@@ -1156,19 +667,6 @@ fn end_of_input(source_id: SourceId, s: &str) -> Span_ {
     chumsky::span::Span::new(source_id, s.len()..s.len())
 }
 
-fn trimmed_span(source: &str, span: &Span) -> Span {
-    let mut trimmed = *span;
-
-    // invalid spans fall back to nothing
-    if source.get(span.start..span.end).is_none() {
-        trimmed.start = 0;
-        trimmed.end = 0;
-    } else {
-        trimmed.end = trim_trailing_whitespace(source, span.start, span.end);
-    }
-    trimmed
-}
-
 #[cfg(test)]
 pub use lexer::bare_lex;
 mod format;
@@ -1177,5 +675,7 @@ pub use options::Options;
 pub(crate) mod options;
 mod parsers;
 mod sort;
+mod sources;
+pub use sources::{BeancountSources, SyntheticSources};
 mod trim;
 pub mod types;
