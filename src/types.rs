@@ -834,6 +834,10 @@ impl<'a> Transaction<'a> {
 
         format(f, &self.payee, double_quoted, " ", Some(" "))?;
         format(f, &self.narration, double_quoted, " ", Some(" "))?;
+        if self.payee.is_some() && self.narration.is_none() {
+            f.write_str(r#" """#)?;
+        }
+
         // we prefer to show tags and links inline rather then line by line in metadata
         metadata.fmt_tags_links_inline(f)?;
         metadata.fmt_keys_values(f)?;
