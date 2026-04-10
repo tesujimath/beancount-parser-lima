@@ -563,7 +563,7 @@ impl<'a> Options<'a> {
         self.parser_options.account_type_name(account_type)
     }
 
-    pub fn title(&self) -> Option<&Spanned<&str>> {
+    pub fn title(&self) -> Option<&Spanned<&'a str>> {
         self.title.as_ref().map(|x| &x.spanned)
     }
 
@@ -648,7 +648,7 @@ impl<'a> Options<'a> {
     }
 
     pub fn operating_currency(&self) -> impl Iterator<Item = &Currency<'a>> {
-        self.operating_currency.iter().map(|document| document.0)
+        self.operating_currency.iter().map(|cur| cur.0)
     }
 
     pub fn render_commas(&self) -> Option<&Spanned<bool>> {
