@@ -486,7 +486,12 @@ impl<'a> SyntheticSources<'a> {
                 end,
             };
 
-            char_indices.extend(content_fragment.char_indices().map(|(i, _)| i));
+            let original_len = char_indices.len();
+            char_indices.extend(
+                content_fragment
+                    .char_indices()
+                    .map(|(i, _)| i + original_len),
+            );
             content.push_str(content_fragment);
 
             span
