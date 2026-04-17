@@ -106,3 +106,6 @@ The [Beancount protobuf files](protobuf), which were extracted from the original
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+`beancount-parser-lima` has been joyously hand-crafted over a period of several years.  I am disinclined to accept PRs developed using AI (although I did in fact already accept a couple of small PRs created with the help of Claude, which were both small and well done).
+Thank you for respecting the no-AI policy in general.
