@@ -232,15 +232,19 @@ impl<'s> BeancountParser<'s> {
             options,
         );
 
-        // directives are stable-sorted by date, where balance directives sort ahead of the other directives for that day
-        // as per https://beancount.github.io/docs/beancount_design_doc.html#stream-invariants
+        // directives are stable-sorted by date, with a secondary key enforcing the stream
+        // invariants from https://beancount.github.io/docs/beancount_design_doc.html#stream-invariants:
+        // Open sorts before Transaction; Balance sorts before Transaction.
         let directives = p
             .by_ref()
             .sort(|d| {
                 (
                     *d.item().date().item(),
-                    // secondary sort of Balance ahead of others
-                    !matches!(d.variant(), DirectiveVariant::Balance(_)),
+                    match d.variant() {
+                        DirectiveVariant::Open(_) => 0u8,
+                        DirectiveVariant::Balance(_) => 1u8,
+                        _ => 2u8,
+                    },
                 )
             })
             .collect::<Vec<_>>();

@@ -1,0 +1,29 @@
+directives {
+  date { year: 2024 month: 1 day: 1 }
+  open {
+    account: "Assets:Cash"
+  }
+}
+directives {
+  date { year: 2024 month: 1 day: 1 }
+  open {
+    account: "Income:Misc"
+  }
+}
+directives {
+  date { year: 2024 month: 1 day: 1 }
+  transaction {
+    flag: "*"
+    narration: "Opening transaction"
+    postings {
+      account: "Assets:Cash"
+      spec {
+        units { number { exact: "100" } currency: "USD" }
+      }
+    }
+    postings {
+      account: "Income:Misc"
+      spec {}
+    }
+  }
+}
