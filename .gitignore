@@ -2,3 +2,4 @@
 /target/
 /flamegraph.svg
 /perf.data*
+*~
